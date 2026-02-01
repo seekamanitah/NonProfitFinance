@@ -1,0 +1,241 @@
+@page "/help"
+@page "/help/{Section}"
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Help & Documentation - NonProfit Finance</PageTitle>
+
+<div class="help-container">
+    <!-- Sidebar Navigation -->
+    <aside class="help-sidebar">
+        <div class="help-search">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search help..." @bind="searchQuery" @bind:event="oninput" />
+        </div>
+        
+        <nav class="help-nav">
+            <div class="help-nav-section">
+                <h4><i class="fas fa-rocket"></i> Getting Started</h4>
+                <ul>
+                    <li class="@(Section == "welcome" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("welcome")'>Welcome & Overview</a>
+                    </li>
+                    <li class="@(Section == "quickstart" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("quickstart")'>Quick Start Guide</a>
+                    </li>
+                    <li class="@(Section == "navigation" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("navigation")'>Navigating the App</a>
+                    </li>
+                    <li class="@(Section == "shortcuts" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("shortcuts")'>Keyboard Shortcuts</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-dollar-sign"></i> Financial Management</h4>
+                <ul>
+                    <li class="@(Section == "transactions" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("transactions")'>Transactions</a>
+                    </li>
+                    <li class="@(Section == "categories" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("categories")'>Categories</a>
+                    </li>
+                    <li class="@(Section == "accounts" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("accounts")'>Accounts (Funds)</a>
+                    </li>
+                    <li class="@(Section == "budgets" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("budgets")'>Budgets</a>
+                    </li>
+                    <li class="@(Section == "recurring" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("recurring")'>Recurring Transactions</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-users"></i> Relationships</h4>
+                <ul>
+                    <li class="@(Section == "donors" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("donors")'>Donors</a>
+                    </li>
+                    <li class="@(Section == "grants" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("grants")'>Grants</a>
+                    </li>
+                    <li class="@(Section == "documents" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("documents")'>Documents</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-chart-bar"></i> Analysis & Reports</h4>
+                <ul>
+                    <li class="@(Section == "dashboard" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("dashboard")'>Dashboard</a>
+                    </li>
+                    <li class="@(Section == "reports" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("reports")'>Reports</a>
+                    </li>
+                    <li class="@(Section == "forms" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("forms")'>Printable Forms</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-shield-alt"></i> Compliance</h4>
+                <ul>
+                    <li class="@(Section == "compliance" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("compliance")'>Compliance Overview</a>
+                    </li>
+                    <li class="@(Section == "form990" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("form990")'>Form 990</a>
+                    </li>
+                    <li class="@(Section == "fundaccounting" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("fundaccounting")'>Fund Accounting</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-cog"></i> System</h4>
+                <ul>
+                    <li class="@(Section == "settings" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("settings")'>Settings</a>
+                    </li>
+                    <li class="@(Section == "spellcheck" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("spellcheck")'>Spell Check</a>
+                    </li>
+                    <li class="@(Section == "importexport" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("importexport")'>Import/Export</a>
+                    </li>
+                    <li class="@(Section == "backup" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("backup")'>Backup & Restore</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="help-nav-section">
+                <h4><i class="fas fa-book"></i> Reference</h4>
+                <ul>
+                    <li class="@(Section == "glossary" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("glossary")'>Glossary</a>
+                    </li>
+                    <li class="@(Section == "workflows" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("workflows")'>Workflow Examples</a>
+                    </li>
+                    <li class="@(Section == "faq" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("faq")'>FAQ</a>
+                    </li>
+                    <li class="@(Section == "troubleshooting" ? "active" : "")">
+                        <a @onclick='() => NavigateTo("troubleshooting")'>Troubleshooting</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="help-content">
+        @switch (Section?.ToLower())
+        {
+            case "welcome":
+            case null:
+            case "":
+                <HelpWelcome />
+                break;
+            case "quickstart":
+                <HelpQuickStart />
+                break;
+            case "navigation":
+                <HelpNavigation />
+                break;
+            case "shortcuts":
+                <HelpShortcuts />
+                break;
+            case "transactions":
+                <HelpTransactions />
+                break;
+            case "categories":
+                <HelpCategories />
+                break;
+            case "accounts":
+                <HelpAccounts />
+                break;
+            case "budgets":
+                <HelpBudgets />
+                break;
+            case "recurring":
+                <HelpRecurring />
+                break;
+            case "donors":
+                <HelpDonors />
+                break;
+            case "grants":
+                <HelpGrants />
+                break;
+            case "documents":
+                <HelpDocuments />
+                break;
+            case "dashboard":
+                <HelpDashboard />
+                break;
+            case "reports":
+                <HelpReports />
+                break;
+            case "forms":
+                <HelpForms />
+                break;
+            case "compliance":
+                <HelpCompliance />
+                break;
+            case "form990":
+                <HelpForm990 />
+                break;
+            case "fundaccounting":
+                <HelpFundAccounting />
+                break;
+            case "settings":
+                <HelpSettings />
+                break;
+            case "spellcheck":
+                <HelpSpellCheck />
+                break;
+            case "importexport":
+                <HelpImportExport />
+                break;
+            case "backup":
+                <HelpBackup />
+                break;
+            case "glossary":
+                <HelpGlossary />
+                break;
+            case "workflows":
+                <HelpWorkflows />
+                break;
+            case "faq":
+                <HelpFAQ />
+                break;
+            case "troubleshooting":
+                <HelpTroubleshooting />
+                break;
+            default:
+                <HelpWelcome />
+                break;
+        }
+    </main>
+</div>
+
+@code {
+    [Parameter]
+    public string? Section { get; set; }
+    
+    private string searchQuery = "";
+    
+    private void NavigateTo(string section)
+    {
+        Section = section;
+        Navigation.NavigateTo($"/help/{section}", forceLoad: false);
+    }
+}

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:bal="http://schemas.microsoft.com/wix/BalExtension"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <!-- Bundle definition - This creates the EXE bootstrapper -->
+  <Bundle Name="NonProfit Finance Manager Setup"
+          Version="1.0.0"
+          Manufacturer="Your Organization"
+          UpgradeCode="87654321-4321-4321-4321-CBA987654321"
+          IconSourceFile="icon.ico"
+          AboutUrl="https://yourwebsite.com">
+
+    <!-- Bootstrap UI -->
+    <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
+      <bal:WixStandardBootstrapperApplication
+        LicenseFile="License.rtf"
+        LogoFile="logo.png"
+        ThemeFile="Theme.xml"
+        LocalizationFile="Theme.wxl"
+        ShowVersion="yes" />
+    </BootstrapperApplicationRef>
+
+    <!-- Chain of installations -->
+    <Chain>
+      
+      <!-- .NET 10 Runtime (Hosting Bundle for web apps) -->
+      <ExePackage Id="DotNet10HostingBundle"
+                  DisplayName=".NET 10 Hosting Bundle"
+                  Cache="yes"
+                  Compressed="no"
+                  PerMachine="yes"
+                  Permanent="yes"
+                  Vital="yes"
+                  DownloadUrl="https://download.visualstudio.microsoft.com/download/pr/dotnet-hosting-10.0-win.exe"
+                  InstallCommand="/install /quiet /norestart /log &quot;[%TEMP%]\dotnet10-install.log&quot;"
+                  RepairCommand="/repair /quiet /norestart"
+                  UninstallCommand="/uninstall /quiet /norestart"
+                  DetectCondition="DotNet10Installed">
+        
+        <!-- Detection registry key -->
+        <util:RegistrySearch Id="DotNet10Search"
+                            Root="HKLM"
+                            Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+                            Value="Version"
+                            Variable="DotNet10Version"
+                            Result="value" />
+        
+        <util:RegistrySearch Id="DotNet10Installed"
+                            Root="HKLM"
+                            Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+                            Value="Version"
+                            Variable="DotNet10Installed"
+                            Result="exists" />
+      </ExePackage>
+
+      <!-- ASP.NET Core Runtime (if not included in Hosting Bundle) -->
+      <ExePackage Id="AspNetCore10Runtime"
+                  DisplayName="ASP.NET Core 10 Runtime"
+                  Cache="yes"
+                  Compressed="no"
+                  PerMachine="yes"
+                  Permanent="yes"
+                  Vital="yes"
+                  DownloadUrl="https://download.visualstudio.microsoft.com/download/pr/aspnetcore-runtime-10.0-win-x64.exe"
+                  InstallCommand="/install /quiet /norestart"
+                  DetectCondition="AspNetCore10Installed">
+        
+        <util:RegistrySearch Id="AspNetCore10Installed"
+                            Root="HKLM"
+                            Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\aspnetcore"
+                            Value="Version"
+                            Variable="AspNetCore10Installed"
+                            Result="exists" />
+      </ExePackage>
+
+      <!-- Main application MSI -->
+      <MsiPackage Id="NonProfitFinanceManager"
+                  DisplayName="NonProfit Finance Manager"
+                  SourceFile="NonProfitFinance.msi"
+                  Compressed="yes"
+                  Vital="yes"
+                  Cache="yes"
+                  InstallCondition="DotNet10Installed AND AspNetCore10Installed">
+        
+        <!-- Pass installation folder to MSI -->
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+      </MsiPackage>
+
+    </Chain>
+    
+    <!-- Variables -->
+    <Variable Name="InstallFolder" Type="string" Value="[ProgramFiles64Folder]\NonProfit Finance Manager" />
+    
+  </Bundle>
+</Wix>

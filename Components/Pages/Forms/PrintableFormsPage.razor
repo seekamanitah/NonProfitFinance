@@ -1,0 +1,687 @@
+@page "/forms"
+@inject IPrintableFormsService PrintableFormsService
+@inject IDonorService DonorService
+@inject ITransactionService TransactionService
+@inject ICategoryService CategoryService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Printable Forms - NonProfit Finance</PageTitle>
+
+<h2>Printable Forms</h2>
+<p class="text-muted">Generate professional forms for nonprofit operations</p>
+
+<div class="cards-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+    <!-- Donation Receipt -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <i class="fas fa-receipt text-success"></i> Donation Receipt
+            </h3>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Generate tax-deductible donation receipts for donors
+            </p>
+            <button class="btn btn-primary btn-block" @onclick="ShowDonationReceiptForm">
+                <i class="fas fa-file-invoice-dollar"></i> Create Receipt
+            </button>
+        </div>
+    </div>
+
+    <!-- Reimbursement Request -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <i class="fas fa-hand-holding-usd text-primary"></i> Reimbursement Request
+            </h3>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Request reimbursement for approved expenses
+            </p>
+            <button class="btn btn-primary btn-block" @onclick="ShowReimbursementForm">
+                <i class="fas fa-file-invoice"></i> Create Request
+            </button>
+        </div>
+    </div>
+
+    <!-- Check Request -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <i class="fas fa-money-check text-info"></i> Check Request
+            </h3>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Request check payment to vendor or payee
+            </p>
+            <button class="btn btn-primary btn-block" @onclick="ShowCheckRequestForm">
+                <i class="fas fa-file-contract"></i> Create Request
+            </button>
+        </div>
+    </div>
+
+    <!-- Expense Report -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <i class="fas fa-chart-line text-warning"></i> Expense Report
+            </h3>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Summarize expenses for a period
+            </p>
+            <button class="btn btn-primary btn-block" @onclick="ShowExpenseReportForm">
+                <i class="fas fa-file-alt"></i> Create Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Grant Application -->
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">
+                <i class="fas fa-hand-holding-heart text-danger"></i> Grant Application
+            </h3>
+            <p class="text-muted" style="font-size: 0.9rem;">
+                Blank grant application form template
+            </p>
+            <button class="btn btn-primary btn-block" @onclick="GenerateBlankGrantApplication">
+                <i class="fas fa-file"></i> Download Blank
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Donation Receipt Modal -->
+@if (showDonationReceiptForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForms">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Generate Donation Receipt</h3>
+                <button class="modal-close" @onclick="CloseForms">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Donor *</label>
+                    <SearchableSelect TItem="DonorDto" TValue="int?"
+                                    Items="donors"
+                                    @bind-SelectedValue="selectedDonorId"
+                                    ValueSelector="@(d => (int?)d.Id)"
+                                    TextSelector="@(d => d.Name)"
+                                    Placeholder="Select donor..." />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Donation Transaction *</label>
+                    <SearchableSelect TItem="TransactionDto" TValue="int?"
+                                    Items="donorTransactions"
+                                    @bind-SelectedValue="selectedTransactionId"
+                                    ValueSelector="@(t => (int?)t.Id)"
+                                    TextSelector="@GetTransactionText"
+                                    Placeholder="Select transaction..." />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseForms">Cancel</button>
+                <button class="btn btn-primary" @onclick="GenerateDonationReceipt" disabled="@isGenerating">
+                    @if (isGenerating)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-download"></i>
+                    }
+                    Generate Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Reimbursement Request Modal -->
+@if (showReimbursementForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForms">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Reimbursement Request</h3>
+                <button class="modal-close" @onclick="CloseForms">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Requestor Name *</label>
+                        <input type="text" class="form-control" @bind="reimbursementData.RequestorName" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Department *</label>
+                        <input type="text" class="form-control" @bind="reimbursementData.Department" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Phone *</label>
+                        <input type="tel" class="form-control" @bind="reimbursementData.Phone" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" @bind="reimbursementData.Email" />
+                    </div>
+                </div>
+                
+                <h4 class="mt-3">Expense Items</h4>
+                @foreach (var item in reimbursementData.Expenses)
+                {
+                    <div class="form-row" style="align-items: flex-end;">
+                        <div class="form-group" style="flex: 0 0 120px;">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control" @bind="item.Date" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" @bind="item.Description" />
+                        </div>
+                        <div class="form-group" style="flex: 0 0 150px;">
+                            <label class="form-label">Category</label>
+                            <select class="form-control" @bind="item.CategoryId">
+                                <option value="0">Select...</option>
+                                @foreach (var cat in expenseCategories)
+                                {
+                                    <option value="@cat.Id">@cat.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 0 0 120px;">
+                            <label class="form-label">Amount</label>
+                            <input type="number" step="0.01" class="form-control" @bind="item.Amount" />
+                        </div>
+                        <button class="btn btn-sm btn-icon text-danger" style="margin-bottom: 0.5rem;" @onclick="() => RemoveExpenseItem(item)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                }
+                <button class="btn btn-outline btn-sm" @onclick="AddExpenseItem">
+                    <i class="fas fa-plus"></i> Add Item
+                </button>
+                
+                <div class="form-group mt-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" @bind="reimbursementData.Notes" rows="3"></textarea>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="reimbursementData.CreateTransactions" />
+                        <strong>Automatically create transactions from this request</strong>
+                    </label>
+                    <small class="text-muted">
+                        Creates transactions in the system for each expense item (marked as Pending until approved)
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseForms">Cancel</button>
+                <button class="btn btn-primary" @onclick="GenerateReimbursementRequest" disabled="@isGenerating">
+                    @if (isGenerating)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-download"></i>
+                    }
+                    Generate Form
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Check Request Modal -->
+@if (showCheckRequestForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForms">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Check Request</h3>
+                <button class="modal-close" @onclick="CloseForms">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Payee Name *</label>
+                    <input type="text" class="form-control" @bind="checkRequestData.PayeeName" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Amount *</label>
+                    <input type="number" step="0.01" class="form-control" @bind="checkRequestData.Amount" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Purpose *</label>
+                    <textarea class="form-control" @bind="checkRequestData.Purpose" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Category *</label>
+                        <select class="form-control" @bind="checkRequestData.CategoryId">
+                            <option value="0">Select category...</option>
+                            @foreach (var cat in expenseCategories)
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Account</label>
+                        <input type="text" class="form-control" @bind="checkRequestData.AccountName" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Requestor *</label>
+                        <input type="text" class="form-control" @bind="checkRequestData.RequestorName" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Department *</label>
+                        <input type="text" class="form-control" @bind="checkRequestData.Department" />
+                    </div>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="checkRequestData.CreateTransaction" />
+                        <strong>Automatically create transaction from this request</strong>
+                    </label>
+                    <small class="text-muted">
+                        Creates a pending expense transaction in the system
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseForms">Cancel</button>
+                <button class="btn btn-primary" @onclick="GenerateCheckRequest" disabled="@isGenerating">
+                    @if (isGenerating)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-download"></i>
+                    }
+                    Generate Form
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Expense Report Modal -->
+@if (showExpenseReportForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForms">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Expense Report</h3>
+                <button class="modal-close" @onclick="CloseForms">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Submitted By *</label>
+                    <input type="text" class="form-control" @bind="expenseReportData.SubmittedBy" />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Start Date *</label>
+                        <input type="date" class="form-control" @bind="expenseReportData.StartDate" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Date *</label>
+                        <input type="date" class="form-control" @bind="expenseReportData.EndDate" />
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Report will include all transactions in the selected date range.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseForms">Cancel</button>
+                <button class="btn btn-primary" @onclick="GenerateExpenseReport" disabled="@isGenerating">
+                    @if (isGenerating)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-download"></i>
+                    }
+                    Generate Report
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool showDonationReceiptForm = false;
+    private bool showReimbursementForm = false;
+    private bool showCheckRequestForm = false;
+    private bool showExpenseReportForm = false;
+    private bool isGenerating = false;
+
+    private List<DonorDto> donors = new();
+    private List<TransactionDto> donorTransactions = new();
+    private List<CategoryDto> expenseCategories = new();
+    private int? selectedDonorId;
+    private int? selectedTransactionId;
+
+    // Form data models
+    private ReimbursementFormModel reimbursementData = new();
+    private CheckRequestFormModel checkRequestData = new();
+    private ExpenseReportFormModel expenseReportData = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        donors = await DonorService.GetAllAsync();
+        var allCategories = await CategoryService.GetAllAsync();
+        expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense).ToList();
+    }
+
+    private string GetTransactionText(TransactionDto t)
+    {
+        return $"{t.Date:MMM d, yyyy} - {t.Amount:C}";
+    }
+
+    private async Task ShowDonationReceiptForm()
+    {
+        showDonationReceiptForm = true;
+        StateHasChanged();
+    }
+
+    private void ShowReimbursementForm()
+    {
+        reimbursementData = new ReimbursementFormModel();
+        showReimbursementForm = true;
+        StateHasChanged();
+    }
+
+    private void ShowCheckRequestForm()
+    {
+        checkRequestData = new CheckRequestFormModel();
+        showCheckRequestForm = true;
+        StateHasChanged();
+    }
+
+    private void ShowExpenseReportForm()
+    {
+        expenseReportData = new ExpenseReportFormModel
+        {
+            StartDate = DateTime.Today.AddMonths(-1),
+            EndDate = DateTime.Today
+        };
+        showExpenseReportForm = true;
+        StateHasChanged();
+    }
+
+    private void CloseForms()
+    {
+        showDonationReceiptForm = false;
+        showReimbursementForm = false;
+        showCheckRequestForm = false;
+        showExpenseReportForm = false;
+        StateHasChanged();
+    }
+
+    private async Task GenerateDonationReceipt()
+    {
+        if (!selectedDonorId.HasValue || !selectedTransactionId.HasValue)
+            return;
+
+        isGenerating = true;
+        StateHasChanged();
+
+        try
+        {
+            var pdfBytes = await PrintableFormsService.GenerateDonationReceiptAsync(selectedDonorId.Value, selectedTransactionId.Value);
+            await DownloadFile(pdfBytes, $"donation_receipt_{selectedTransactionId.Value}.pdf", "application/pdf");
+            CloseForms();
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateReimbursementRequest()
+    {
+        if (string.IsNullOrWhiteSpace(reimbursementData.RequestorName))
+            return;
+
+        isGenerating = true;
+        StateHasChanged();
+
+        try
+        {
+            var data = new ReimbursementRequestData(
+                Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                DateTime.Today,
+                reimbursementData.RequestorName,
+                reimbursementData.Department,
+                reimbursementData.Phone,
+                reimbursementData.Email,
+                reimbursementData.Expenses.Select(e => new ExpenseLineItem(e.Date, e.Description, e.Category, e.Amount)).ToList(),
+                reimbursementData.Notes
+            );
+
+            // Create transactions if requested
+            if (reimbursementData.CreateTransactions)
+            {
+                var createdCount = 0;
+                foreach (var expense in reimbursementData.Expenses.Where(e => e.Amount > 0 && e.CategoryId > 0))
+                {
+                    var transaction = new CreateTransactionRequest(
+                        expense.Date,
+                        expense.Amount,
+                        $"{expense.Description} - Reimbursement Request {data.RequestId}",
+                        TransactionType.Expense,
+                        expense.CategoryId,
+                        FundType.Unrestricted,
+                        null, // FundId
+                        null, // ToFundId
+                        null, // DonorId
+                        null, // GrantId
+                        reimbursementData.RequestorName,
+                        null, // Tags
+                        $"REIMB-{data.RequestId}"
+                    );
+
+                    await TransactionService.CreateAsync(transaction);
+                    createdCount++;
+                }
+
+                if (createdCount > 0)
+                {
+                    await JS.InvokeVoidAsync("alert", $"Success! Created {createdCount} transaction(s) from reimbursement request. View them in Transactions page.");
+                }
+            }
+
+            var pdfBytes = PrintableFormsService.GenerateReimbursementRequestForm(data);
+            await DownloadFile(pdfBytes, $"reimbursement_request_{data.RequestId}.pdf", "application/pdf");
+            CloseForms();
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateCheckRequest()
+    {
+        if (string.IsNullOrWhiteSpace(checkRequestData.PayeeName))
+            return;
+
+        isGenerating = true;
+        StateHasChanged();
+
+        try
+        {
+            var data = new CheckRequestData(
+                Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                DateTime.Today,
+                checkRequestData.PayeeName,
+                checkRequestData.PayeeAddress,
+                checkRequestData.Amount,
+                checkRequestData.Purpose,
+                checkRequestData.AccountName,
+                checkRequestData.Category,
+                checkRequestData.RequestorName,
+                checkRequestData.Department
+            );
+
+            // Create transaction if requested
+            if (checkRequestData.CreateTransaction && checkRequestData.CategoryId > 0)
+            {
+                var transaction = new CreateTransactionRequest(
+                    DateTime.Today,
+                    checkRequestData.Amount,
+                    $"{checkRequestData.Purpose} - Check Request {data.RequestId}",
+                    TransactionType.Expense,
+                    checkRequestData.CategoryId,
+                    FundType.Unrestricted,
+                    null, // FundId
+                    null, // ToFundId
+                    null, // DonorId
+                    null, // GrantId
+                    checkRequestData.PayeeName,
+                    null, // Tags
+                    $"CHK-{data.RequestId}"
+                );
+
+                await TransactionService.CreateAsync(transaction);
+                await JS.InvokeVoidAsync("alert", "Success! Transaction created from check request. View it in Transactions page.");
+            }
+
+            var pdfBytes = PrintableFormsService.GenerateCheckRequestForm(data);
+            await DownloadFile(pdfBytes, $"check_request_{data.RequestId}.pdf", "application/pdf");
+            CloseForms();
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateExpenseReport()
+    {
+        if (string.IsNullOrWhiteSpace(expenseReportData.SubmittedBy))
+            return;
+
+        isGenerating = true;
+        StateHasChanged();
+
+        try
+        {
+            var transactions = await TransactionService.GetAllAsync(new TransactionFilterRequest(
+                expenseReportData.StartDate,
+                expenseReportData.EndDate
+            ));
+
+            var data = new ExpenseReportData(
+                Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                expenseReportData.StartDate,
+                expenseReportData.EndDate,
+                expenseReportData.SubmittedBy,
+                transactions.Items.Where(t => t.Type == TransactionType.Expense)
+                    .Select(t => new ExpenseLineItem(t.Date, t.Description ?? "", t.CategoryName ?? "", t.Amount, t.Payee, t.FundName))
+                    .ToList()
+            );
+
+            var pdfBytes = PrintableFormsService.GenerateExpenseReport(data);
+            await DownloadFile(pdfBytes, $"expense_report_{data.ReportId}.pdf", "application/pdf");
+            CloseForms();
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateBlankGrantApplication()
+    {
+        var pdfBytes = PrintableFormsService.GenerateGrantApplicationForm();
+        await DownloadFile(pdfBytes, "grant_application_form.pdf", "application/pdf");
+    }
+
+    private async Task DownloadFile(byte[] content, string fileName, string contentType)
+    {
+        var base64 = Convert.ToBase64String(content);
+        await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+    }
+
+    private void AddExpenseItem()
+    {
+        reimbursementData.Expenses.Add(new ExpenseItemModel
+        {
+            Date = DateTime.Today,
+            Category = "General"
+        });
+        StateHasChanged();
+    }
+
+    private void RemoveExpenseItem(ExpenseItemModel item)
+    {
+        reimbursementData.Expenses.Remove(item);
+        StateHasChanged();
+    }
+
+    // Form models
+    private class ReimbursementFormModel
+    {
+        public string RequestorName { get; set; } = "";
+        public string Department { get; set; } = "";
+        public string Phone { get; set; } = "";
+        public string Email { get; set; } = "";
+        public List<ExpenseItemModel> Expenses { get; set; } = new() { new ExpenseItemModel() };
+        public string? Notes { get; set; }
+        public bool CreateTransactions { get; set; } = true;
+    }
+
+    private class ExpenseItemModel
+    {
+        public DateTime Date { get; set; } = DateTime.Today;
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "General";
+        public int CategoryId { get; set; }
+        public decimal Amount { get; set; }
+    }
+
+    private class CheckRequestFormModel
+    {
+        public string PayeeName { get; set; } = "";
+        public string? PayeeAddress { get; set; }
+        public decimal Amount { get; set; }
+        public string Purpose { get; set; } = "";
+        public string AccountName { get; set; } = "General Fund";
+        public string Category { get; set; } = "General Expense";
+        public int CategoryId { get; set; }
+        public string RequestorName { get; set; } = "";
+        public string Department { get; set; } = "";
+        public bool CreateTransaction { get; set; } = true;
+    }
+
+    private class ExpenseReportFormModel
+    {
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public string SubmittedBy { get; set; } = "";
+    }
+}

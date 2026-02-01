@@ -1,0 +1,74 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="chart-container">
+    <canvas id="@ChartId"></canvas>
+</div>
+
+@code {
+    [Parameter] public string ChartId { get; set; } = $"lineChart_{Guid.NewGuid():N}";
+    [Parameter] public string[] Labels { get; set; } = Array.Empty<string>();
+    [Parameter] public List<ChartDataset> Datasets { get; set; } = new();
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public bool BeginAtZero { get; set; } = true;
+
+    private bool isRendered = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || !isRendered)
+        {
+            await RenderChart();
+            isRendered = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (isRendered && Labels.Any() && Datasets.Any())
+        {
+            await RenderChart();
+        }
+    }
+
+    private async Task RenderChart()
+    {
+        if (!Labels.Any() || !Datasets.Any()) return;
+
+        var datasets = Datasets.Select(ds => new
+        {
+            label = ds.Label,
+            data = ds.Data,
+            borderColor = ds.BorderColor,
+            backgroundColor = ds.BackgroundColor,
+            fill = ds.Fill
+        }).ToArray();
+
+        await JS.InvokeVoidAsync("chartInterop.createLineChart", ChartId, Labels, datasets, new { });
+    }
+
+    public async Task UpdateData(string[] labels, List<ChartDataset> datasets)
+    {
+        Labels = labels;
+        Datasets = datasets;
+        await RenderChart();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("chartInterop.destroyChart", ChartId);
+        }
+        catch { }
+    }
+
+    public class ChartDataset
+    {
+        public string Label { get; set; } = "";
+        public decimal[] Data { get; set; } = Array.Empty<decimal>();
+        public string BorderColor { get; set; } = "#C41E3A";
+        public string BackgroundColor { get; set; } = "rgba(196, 30, 58, 0.1)";
+        public bool Fill { get; set; } = true;
+    }
+}

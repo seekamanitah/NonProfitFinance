@@ -1,0 +1,77 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="chart-container">
+    <canvas id="@ChartId"></canvas>
+</div>
+
+@code {
+    [Parameter] public string ChartId { get; set; } = $"pieChart_{Guid.NewGuid():N}";
+    [Parameter] public string[] Labels { get; set; } = Array.Empty<string>();
+    [Parameter] public decimal[] Data { get; set; } = Array.Empty<decimal>();
+    [Parameter] public string[]? Colors { get; set; }
+    [Parameter] public bool ShowLegend { get; set; } = true;
+    [Parameter] public string LegendPosition { get; set; } = "right";
+
+    private bool isRendered = false;
+
+    private static readonly string[] DefaultColors = new[]
+    {
+        "#C41E3A", "#28a745", "#ffc107", "#17a2b8",
+        "#6c757d", "#e83e8c", "#fd7e14", "#6610f2",
+        "#20c997", "#343a40", "#007bff", "#dc3545"
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || !isRendered)
+        {
+            await RenderChart();
+            isRendered = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (isRendered && Labels.Any() && Data.Any())
+        {
+            await RenderChart();
+        }
+    }
+
+    private async Task RenderChart()
+    {
+        if (!Labels.Any() || !Data.Any()) return;
+
+        var colors = Colors ?? DefaultColors.Take(Labels.Length).ToArray();
+
+        await JS.InvokeVoidAsync("chartInterop.createPieChart", ChartId, Labels, Data, colors, new
+        {
+            plugins = new
+            {
+                legend = new
+                {
+                    position = LegendPosition,
+                    display = ShowLegend
+                }
+            }
+        });
+    }
+
+    public async Task UpdateData(string[] labels, decimal[] data, string[]? colors = null)
+    {
+        Labels = labels;
+        Data = data;
+        Colors = colors;
+        await RenderChart();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("chartInterop.destroyChart", ChartId);
+        }
+        catch { }
+    }
+}

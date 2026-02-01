@@ -1,0 +1,106 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="nav-menu">
+    <NavLink class="nav-item" href="/landing" Match="NavLinkMatch.All">
+        <i class="fas fa-home"></i>
+        <span>Home</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/dashboard">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </NavLink>
+    
+    <div class="nav-section">Finances</div>
+    
+    <NavLink class="nav-item" href="/transactions">
+        <i class="fas fa-exchange-alt"></i>
+        <span>Transactions</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/categories">
+        <i class="fas fa-tags"></i>
+        <span>Categories</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/funds">
+        <i class="fas fa-wallet"></i>
+        <span>Accounts</span>
+    </NavLink>
+    
+    <div class="nav-section">Relationships</div>
+    
+    <NavLink class="nav-item" href="/donors">
+        <i class="fas fa-heart"></i>
+        <span>Donors</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/grants">
+        <i class="fas fa-hand-holding-usd"></i>
+        <span>Grants</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/documents">
+        <i class="fas fa-folder-open"></i>
+        <span>Documents</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/forms">
+        <i class="fas fa-file-alt"></i>
+        <span>Forms</span>
+    </NavLink>
+    
+    <div class="nav-section">Analysis</div>
+    
+    <NavLink class="nav-item" href="/reports">
+        <i class="fas fa-chart-bar"></i>
+        <span>Reports</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/budgets">
+        <i class="fas fa-calculator"></i>
+        <span>Budgets</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/compliance">
+        <i class="fas fa-clipboard-check"></i>
+        <span>Compliance</span>
+    </NavLink>
+    
+    <div class="nav-section">System</div>
+    
+    <NavLink class="nav-item" href="/import-export">
+        <i class="fas fa-file-import"></i>
+        <span>Import/Export</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/bank-connections">
+        <i class="fas fa-university"></i>
+        <span>Bank Connections</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/settings">
+        <i class="fas fa-cog"></i>
+        <span>Settings</span>
+    </NavLink>
+    
+    <NavLink class="nav-item" href="/accessibility-settings">
+        <i class="fas fa-universal-access"></i>
+        <span>Accessibility</span>
+    </NavLink>
+    
+    <div class="nav-section">Support</div>
+    
+    <NavLink class="nav-item" href="/help">
+        <i class="fas fa-question-circle"></i>
+        <span>Help & Docs</span>
+    </NavLink>
+</nav>
+
+<style>
+    .nav-item.active {
+        background: var(--color-primary) !important;
+        color: var(--color-white) !important;
+        border-left: 3px solid var(--color-white);
+    }
+</style>

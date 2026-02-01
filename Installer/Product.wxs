@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  
+  <?define ProductName="NonProfit Finance Manager" ?>
+  <?define ProductVersion="1.0.0" ?>
+  <?define Manufacturer="Your Organization" ?>
+  <?define UpgradeCode="12345678-1234-1234-1234-123456789ABC" ?>
+  
+  <Product Id="*" 
+           Name="$(var.ProductName)" 
+           Language="1033" 
+           Version="$(var.ProductVersion)" 
+           Manufacturer="$(var.Manufacturer)" 
+           UpgradeCode="$(var.UpgradeCode)">
+    
+    <Package InstallerVersion="500" 
+             Compressed="yes" 
+             InstallScope="perMachine"
+             Description="NonProfit Finance Management System"
+             Comments="Financial management for nonprofit organizations"
+             Manufacturer="$(var.Manufacturer)" />
+
+    <!-- Upgrade settings -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- .NET 10 Runtime check -->
+    <Property Id="DOTNET10RUNTIME">
+      <RegistrySearch Id="FindDotNet10"
+                      Root="HKLM"
+                      Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+                      Name="Version"
+                      Type="raw" />
+    </Property>
+
+    <!-- Note: .NET 10 runtime check is informational only -->
+    <!-- Users will need to install .NET 10 Desktop Runtime separately -->
+    <!-- Download from: https://dotnet.microsoft.com/download/dotnet/10.0 -->
+
+    <!-- Features -->
+    <Feature Id="ProductFeature" 
+             Title="NonProfit Finance Manager" 
+             Level="1"
+             Description="Main application files"
+             Display="expand"
+             ConfigurableDirectory="INSTALLFOLDER">
+      
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DatabaseFile" />
+      <ComponentRef Id="ConfigFiles" />
+      <ComponentRef Id="ConfigFilesProd" />
+    </Feature>
+
+    <!-- UI -->
+    <UIRef Id="WixUI_InstallDir" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    
+    <!-- Custom dialogs -->
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="dialog.bmp" />
+
+    <!-- Installation folder -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="ManufacturerFolder" Name="$(var.Manufacturer)">
+          <Directory Id="INSTALLFOLDER" Name="NonProfit Finance Manager">
+            
+            <!-- Application files -->
+            <Directory Id="WwwRootFolder" Name="wwwroot" />
+            <Directory Id="DataFolder" Name="Data" />
+            <Directory Id="BackupsFolder" Name="backups" />
+            <Directory Id="LogsFolder" Name="logs" />
+            
+          </Directory>
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="NonProfit Finance Manager"/>
+      </Directory>
+
+      <!-- Desktop -->
+      <Directory Id="DesktopFolder" Name="Desktop" />
+    </Directory>
+
+    <!-- Shortcuts -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="StartMenuShortcut" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="NonProfit Finance Manager"
+                  Description="Financial management for nonprofits"
+                  Target="[#NonProfitFinance.exe]"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon.exe" />
+        <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall"/>
+        <RegistryValue Root="HKCU" 
+                       Key="Software\[Manufacturer]\[ProductName]" 
+                       Name="installed" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut Id="DesktopShortcut"
+                  Name="NonProfit Finance Manager"
+                  Description="Financial management for nonprofits"
+                  Target="[#NonProfitFinance.exe]"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon.exe" />
+        <RegistryValue Root="HKCU" 
+                       Key="Software\[Manufacturer]\[ProductName]" 
+                       Name="desktop" 
+                       Type="integer" 
+                       Value="1" 
+                       KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Database and config -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="DatabaseFile" Guid="*">
+        <File Id="DatabaseFile" 
+              Source="$(var.PublishDir)NonProfitFinance.db" 
+              Name="NonProfitFinance.db"
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ConfigFiles" Guid="A1B2C3D4-E5F6-4A5B-8C7D-9E8F7A6B5C4D">
+        <File Id="AppSettingsJson" 
+              Source="$(var.PublishDir)appsettings.json" 
+              Name="appsettings.json" 
+              KeyPath="yes" />
+      </Component>
+      
+      <Component Id="ConfigFilesProd" Guid="B2C3D4E5-F6A7-5B6C-9D8E-0F9A8B7C6D5E">
+        <File Id="AppSettingsProdJson" 
+              Source="$(var.PublishDir)appsettings.Production.json" 
+              Name="appsettings.Production.json" 
+              KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Icon -->
+    <Icon Id="AppIcon.exe" SourceFile="$(var.PublishDir)NonProfitFinance.exe" />
+
+  </Product>
+
+  <!-- Component groups for files -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="*">
+        <File Id="NonProfitFinance.exe" 
+              Source="$(var.PublishDir)NonProfitFinance.exe" 
+              KeyPath="yes" />
+      </Component>
+      
+      <Component Id="MainDll" Guid="*">
+        <File Id="NonProfitFinance.dll" 
+              Source="$(var.PublishDir)NonProfitFinance.dll" 
+              KeyPath="yes" />
+      </Component>
+
+      <!-- NOTE: Add more DLL components as needed -->
+      <!-- Run harvest-files.ps1 to auto-generate all file components -->
+    </ComponentGroup>
+  </Fragment>
+</Wix>

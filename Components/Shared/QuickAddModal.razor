@@ -1,0 +1,199 @@
+@inject ICategoryService CategoryService
+@inject ITransactionService TransactionService
+
+<div class="modal-backdrop" @onclick="Close">
+    <div class="modal" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">Quick Add Transaction</h3>
+            <button class="modal-close" @onclick="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div class="tabs">
+                <div class="tab @(transactionType == TransactionType.Income ? "active" : "")" 
+                     @onclick="SetIncome">
+                    <i class="fas fa-arrow-down text-success"></i> Income
+                </div>
+                <div class="tab @(transactionType == TransactionType.Expense ? "active" : "")" 
+                     @onclick="SetExpense">
+                    <i class="fas fa-arrow-up text-danger"></i> Expense
+                </div>
+            </div>
+            
+            <div class="form-group mt-3">
+                <label class="form-label">Amount *</label>
+                <input type="number" step="0.01" class="form-control" 
+                       @bind="transaction.Amount" placeholder="0.00" />
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-control" @bind="transaction.Date" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Category *</label>
+                    <select class="form-control" @bind="transaction.CategoryId">
+                        <option value="0">Select category...</option>
+                        @foreach (var cat in filteredCategories)
+                        {
+                            <option value="@cat.Id">@cat.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-control" 
+                       @bind="transaction.Description" placeholder="Enter description..." />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Payee</label>
+                <input type="text" class="form-control" 
+                       @bind="transaction.Payee" placeholder="Enter payee name..." />
+            </div>
+            
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mt-2">
+                    <i class="fas fa-exclamation-circle"></i> @errorMessage
+                </div>
+            }
+            
+            @if (successMessage)
+            {
+                <div class="alert alert-success mt-2">
+                    <i class="fas fa-check-circle"></i> Transaction saved successfully!
+                </div>
+            }
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn btn-secondary" @onclick="Close">Cancel</button>
+            <button class="btn btn-primary" @onclick="HandleSubmit" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    <i class="fas fa-save"></i>
+                }
+                Save Transaction
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+    
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    private TransactionModel transaction = new();
+    private TransactionType transactionType = TransactionType.Expense;
+    private List<CategoryDto> categories = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+    private bool successMessage = false;
+
+    private IEnumerable<CategoryDto> filteredCategories => categories
+        .Where(c => c.Type == (transactionType == TransactionType.Income ? CategoryType.Income : CategoryType.Expense));
+
+    protected override async Task OnInitializedAsync()
+    {
+        transaction.Date = DateTime.Today;
+        try
+        {
+            categories = await CategoryService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load categories: {ex.Message}";
+        }
+    }
+
+    private void SetIncome()
+    {
+        transactionType = TransactionType.Income;
+        transaction.CategoryId = 0;
+        StateHasChanged();
+    }
+
+    private void SetExpense()
+    {
+        transactionType = TransactionType.Expense;
+        transaction.CategoryId = 0;
+        StateHasChanged();
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        successMessage = false;
+        
+        if (transaction.Amount <= 0)
+        {
+            errorMessage = "Please enter a valid amount.";
+            return;
+        }
+        
+        if (transaction.CategoryId == 0)
+        {
+            errorMessage = "Please select a category.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            await TransactionService.CreateAsync(new CreateTransactionRequest(
+                transaction.Date,
+                transaction.Amount,
+                transaction.Description,
+                transactionType,
+                transaction.CategoryId,
+                FundType.Unrestricted,
+                null, // FundId
+                null, // ToFundId
+                null, // DonorId
+                null, // GrantId
+                transaction.Payee
+            ));
+
+            successMessage = true;
+            await Task.Delay(500); // Brief pause to show success
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private class TransactionModel
+    {
+        public DateTime Date { get; set; }
+        public decimal Amount { get; set; }
+        public string? Description { get; set; }
+        public int CategoryId { get; set; }
+        public string? Payee { get; set; }
+    }
+}

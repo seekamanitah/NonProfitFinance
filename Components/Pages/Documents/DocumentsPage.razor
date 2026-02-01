@@ -1,0 +1,568 @@
+@page "/documents"
+@using NonProfitFinance.Models
+@inject IDocumentService DocumentService
+@inject IGrantService GrantService
+@inject IDonorService DonorService
+@inject ITextToSpeechService TtsService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Documents - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Document Storage</h2>
+        <p class="text-muted">Manage and organize your documents</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowUploadModal">
+        <i class="fas fa-upload"></i> Upload Document
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex gap-3 flex-wrap align-center">
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
+                <input type="text" class="form-control" placeholder="Search documents..." 
+                       @bind="searchTerm" @bind:event="oninput" />
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <select class="form-control" @bind="typeFilter">
+                    <option value="">All Types</option>
+                    @foreach (var type in Enum.GetValues<DocumentType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <select class="form-control" @bind="grantFilter">
+                    <option value="">All Grants</option>
+                    @foreach (var grant in grants)
+                    {
+                        <option value="@grant.Id">@grant.Name</option>
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <select class="form-control" @bind="donorFilter">
+                    <option value="">All Donors</option>
+                    @foreach (var donor in donors)
+                    {
+                        <option value="@donor.Id">@donor.Name</option>
+                    }
+                </select>
+            </div>
+            
+            <label class="d-flex align-center gap-2" style="margin-bottom: 0;">
+                <input type="checkbox" @bind="includeArchived" />
+                Include Archived
+            </label>
+            
+            <button class="btn btn-outline" @onclick="LoadDocuments">
+                <i class="fas fa-search"></i> Search
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Documents Grid -->
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else
+{
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
+        @foreach (var doc in FilteredDocuments)
+        {
+            <div class="card @(doc.IsArchived ? "text-muted" : "")">
+                <div class="card-body">
+                    <div class="d-flex gap-2 align-center mb-2">
+                        <i class="fas @GetFileIcon(doc.ContentType)" style="font-size: 2rem; color: var(--color-primary);"></i>
+                        <div style="flex: 1; overflow: hidden;">
+                            <h4 style="margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" 
+                                title="@doc.OriginalFileName">
+                                @doc.OriginalFileName
+                            </h4>
+                            <small class="text-muted">@FormatFileSize(doc.FileSize)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <span class="badge @GetTypeBadgeClass(doc.Type)">@doc.Type</span>
+                        @if (doc.IsArchived)
+                        {
+                            <span class="badge badge-warning">Archived</span>
+                        }
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(doc.Description))
+                    {
+                        <p class="text-muted mb-2" style="font-size: 0.85rem;">@doc.Description</p>
+                    }
+                    
+                    @if (doc.GrantName != null)
+                    {
+                        <div class="mb-1">
+                            <i class="fas fa-hand-holding-usd text-muted"></i>
+                            <small>@doc.GrantName</small>
+                        </div>
+                    }
+                    
+                    @if (doc.DonorName != null)
+                    {
+                        <div class="mb-1">
+                            <i class="fas fa-heart text-muted"></i>
+                            <small>@doc.DonorName</small>
+                        </div>
+                    }
+                    
+                    <div class="text-muted mb-2" style="font-size: 0.8rem;">
+                        <i class="fas fa-clock"></i> @doc.UploadedAt.ToString("MMM dd, yyyy")
+                    </div>
+                    
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline" @onclick="() => DownloadDocument(doc)" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        @if (IsImageFile(doc.ContentType))
+                        {
+                            <button class="btn btn-sm btn-outline" @onclick="() => ExtractText(doc)" title="Extract Text (OCR)">
+                                <i class="fas fa-text-recognition"></i>
+                            </button>
+                        }
+                        <button class="btn btn-sm btn-outline" @onclick="() => EditDocument(doc)" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline" @onclick="() => ToggleArchive(doc)" 
+                                title="@(doc.IsArchived ? "Restore" : "Archive")">
+                            <i class="fas @(doc.IsArchived ? "fa-undo" : "fa-archive")"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteDocument(doc)" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (!FilteredDocuments.Any())
+        {
+            <div class="card">
+                <div class="card-body text-center text-muted">
+                    <i class="fas fa-folder-open" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>No documents found. Upload your first document to get started.</p>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Upload Modal -->
+@if (showUploadModal)
+{
+    <div class="modal-backdrop" @onclick="CloseUploadModal">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">Upload Document</h3>
+                <button class="modal-close" @onclick="CloseUploadModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select File *</label>
+                    <InputFile OnChange="HandleFileSelected" class="form-control" 
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.gif,.zip" />
+                </div>
+                
+                @if (selectedFile != null)
+                {
+                    <div class="alert alert-info">
+                        <i class="fas @GetFileIcon(selectedFile.ContentType)"></i>
+                        @selectedFile.Name (@FormatFileSize(selectedFile.Size))
+                    </div>
+                }
+                
+                <div class="form-group">
+                    <label class="form-label">Document Type</label>
+                    <select class="form-control" @bind="uploadType">
+                        @foreach (var type in Enum.GetValues<DocumentType>())
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" @bind="uploadDescription" rows="2" 
+                              placeholder="Optional description..."></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Link to Grant (optional)</label>
+                        <select class="form-control" @bind="uploadGrantId">
+                            <option value="">None</option>
+                            @foreach (var grant in grants)
+                            {
+                                <option value="@grant.Id">@grant.Name</option>
+                            }
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Link to Donor (optional)</label>
+                        <select class="form-control" @bind="uploadDonorId">
+                            <option value="">None</option>
+                            @foreach (var donor in donors)
+                            {
+                                <option value="@donor.Id">@donor.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tags</label>
+                    <input type="text" class="form-control" @bind="uploadTags" 
+                           placeholder="Comma-separated tags..." />
+                </div>
+                
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> @uploadError
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseUploadModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="UploadDocument" disabled="@(isUploading || selectedFile == null)">
+                    @if (isUploading)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-upload"></i>
+                    }
+                    Upload
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Edit Modal -->
+@if (editingDocument != null)
+{
+    <div class="modal-backdrop" @onclick="CloseEditModal">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Document</h3>
+                <button class="modal-close" @onclick="CloseEditModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">File Name</label>
+                    <input type="text" class="form-control" value="@editingDocument.OriginalFileName" disabled />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Document Type</label>
+                    <select class="form-control" @bind="editType">
+                        @foreach (var type in Enum.GetValues<DocumentType>())
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" @bind="editDescription" rows="2"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Tags</label>
+                    <input type="text" class="form-control" @bind="editTags" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseEditModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveDocumentEdit">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- OCR Modal -->
+<OcrModal DocumentId="selectedDocumentForOcr" 
+          IsVisible="showOcrModal" 
+          OnClose="CloseOcrModal" 
+          OnReceiptDetected="HandleReceiptDetected" />
+
+@code {
+    private List<DocumentDto> documents = new();
+    private List<GrantDto> grants = new();
+    private List<DonorDto> donors = new();
+    private bool isLoading = true;
+    
+    // Filters
+    private string searchTerm = "";
+    private DocumentType? typeFilter;
+    private int? grantFilter;
+    private int? donorFilter;
+    private bool includeArchived = false;
+    
+    // Upload
+    private bool showUploadModal = false;
+    private IBrowserFile? selectedFile;
+    private DocumentType uploadType = DocumentType.General;
+    private string uploadDescription = "";
+    private int? uploadGrantId;
+    private int? uploadDonorId;
+    private string uploadTags = "";
+    private string? uploadError;
+    private bool isUploading = false;
+    
+    // Edit
+    private DocumentDto? editingDocument;
+    private DocumentType editType;
+    private string editDescription = "";
+    private string editTags = "";
+
+    // OCR
+    private bool showOcrModal = false;
+    private int selectedDocumentForOcr = 0;
+
+    private IEnumerable<DocumentDto> FilteredDocuments => documents
+        .Where(d => string.IsNullOrEmpty(searchTerm) || 
+                    d.OriginalFileName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (d.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    protected override async Task OnInitializedAsync()
+    {
+        grants = await GrantService.GetAllAsync();
+        donors = await DonorService.GetAllAsync();
+        await LoadDocuments();
+    }
+
+    private async Task LoadDocuments()
+    {
+        isLoading = true;
+        var filter = new DocumentFilterRequest(
+            typeFilter,
+            grantFilter,
+            donorFilter,
+            null,
+            includeArchived,
+            null
+        );
+        documents = await DocumentService.GetAllAsync(filter);
+        isLoading = false;
+    }
+
+    // Upload methods
+    private void ShowUploadModal()
+    {
+        showUploadModal = true;
+        selectedFile = null;
+        uploadType = DocumentType.General;
+        uploadDescription = "";
+        uploadGrantId = null;
+        uploadDonorId = null;
+        uploadTags = "";
+        uploadError = null;
+    }
+
+    private void CloseUploadModal()
+    {
+        showUploadModal = false;
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadError = null;
+    }
+
+    private async Task UploadDocument()
+    {
+        if (selectedFile == null) return;
+
+        isUploading = true;
+        uploadError = null;
+
+        try
+        {
+            using var stream = selectedFile.OpenReadStream(50 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var request = new UploadDocumentRequest(
+                string.IsNullOrWhiteSpace(uploadDescription) ? null : uploadDescription,
+                uploadType,
+                uploadGrantId,
+                uploadDonorId,
+                null,
+                string.IsNullOrWhiteSpace(uploadTags) ? null : uploadTags
+            );
+
+            await DocumentService.UploadAsync(memoryStream, selectedFile.Name, selectedFile.ContentType, request);
+            
+            showUploadModal = false;
+            await LoadDocuments();
+        }
+        catch (Exception ex)
+        {
+            uploadError = ex.Message;
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    // Download
+    private async Task DownloadDocument(DocumentDto doc)
+    {
+        var result = await DocumentService.DownloadAsync(doc.Id);
+        if (result.HasValue)
+        {
+            var base64 = Convert.ToBase64String(result.Value.Content);
+            await JS.InvokeVoidAsync("downloadFile", result.Value.FileName, result.Value.ContentType, base64);
+        }
+    }
+
+    // Edit methods
+    private void EditDocument(DocumentDto doc)
+    {
+        editingDocument = doc;
+        editType = doc.Type;
+        editDescription = doc.Description ?? "";
+        editTags = doc.Tags ?? "";
+    }
+
+    private void CloseEditModal()
+    {
+        editingDocument = null;
+    }
+
+    private async Task SaveDocumentEdit()
+    {
+        if (editingDocument == null) return;
+
+        await DocumentService.UpdateAsync(editingDocument.Id, new UpdateDocumentRequest(
+            string.IsNullOrWhiteSpace(editDescription) ? null : editDescription,
+            editType,
+            string.IsNullOrWhiteSpace(editTags) ? null : editTags,
+            editingDocument.IsArchived
+        ));
+
+        editingDocument = null;
+        await LoadDocuments();
+    }
+
+    // Archive/Delete
+    private async Task ToggleArchive(DocumentDto doc)
+    {
+        await DocumentService.UpdateAsync(doc.Id, new UpdateDocumentRequest(
+            doc.Description,
+            doc.Type,
+            doc.Tags,
+            !doc.IsArchived
+        ));
+        await LoadDocuments();
+    }
+
+    private async Task DeleteDocument(DocumentDto doc)
+    {
+        await DocumentService.DeleteAsync(doc.Id);
+        await LoadDocuments();
+    }
+
+    // Helpers
+    private string GetFileIcon(string contentType) => contentType switch
+    {
+        var t when t.StartsWith("image/") => "fa-file-image",
+        var t when t.Contains("pdf") => "fa-file-pdf",
+        var t when t.Contains("word") || t.Contains("document") => "fa-file-word",
+        var t when t.Contains("excel") || t.Contains("spreadsheet") => "fa-file-excel",
+        var t when t.Contains("zip") || t.Contains("rar") => "fa-file-archive",
+        var t when t.Contains("text") => "fa-file-alt",
+        _ => "fa-file"
+    };
+
+    private string GetTypeBadgeClass(DocumentType type) => type switch
+    {
+        DocumentType.GrantAgreement or DocumentType.GrantReport => "badge-info",
+        DocumentType.Receipt or DocumentType.Invoice => "badge-warning",
+        DocumentType.Contract => "badge-danger",
+        DocumentType.TaxDocument or DocumentType.Compliance => "badge-success",
+        _ => ""
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:N1} KB";
+        return $"{bytes / (1024.0 * 1024.0):N1} MB";
+    }
+
+    // OCR methods
+    private bool IsImageFile(string contentType)
+    {
+        return contentType.StartsWith("image/");
+    }
+
+    private void ExtractText(DocumentDto doc)
+    {
+        selectedDocumentForOcr = doc.Id;
+        showOcrModal = true;
+    }
+
+    private void CloseOcrModal()
+    {
+        showOcrModal = false;
+        selectedDocumentForOcr = 0;
+    }
+
+    private void HandleReceiptDetected(ReceiptData receiptData)
+    {
+        // Navigate to transaction form with pre-filled data from receipt
+        var queryParams = new Dictionary<string, string?>
+        {
+            ["fromReceipt"] = "true",
+            ["amount"] = receiptData.Total?.ToString("F2"),
+            ["description"] = receiptData.Merchant,
+            ["date"] = receiptData.Date?.ToString("yyyy-MM-dd"),
+            ["payee"] = receiptData.Merchant
+        };
+
+        var query = string.Join("&", queryParams
+            .Where(kvp => !string.IsNullOrEmpty(kvp.Value))
+            .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value!)}"));
+
+        // Announce with TTS
+        TtsService.AnnounceSuccessAsync($"Receipt processed. Creating transaction for {receiptData.Merchant}");
+
+        CloseOcrModal();
+        Navigation.NavigateTo($"/transactions?{query}");
+    }
+}

@@ -1,0 +1,222 @@
+@page "/transactions/recycle-bin"
+@inject ITransactionService TransactionService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Recycle Bin - NonProfit Finance</PageTitle>
+
+<PageHeader Title="Recycle Bin">
+    <a href="/transactions" class="btn btn-secondary">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to Transactions
+    </a>
+</PageHeader>
+
+@if (isLoading)
+{
+    <div class="loading" role="status" aria-busy="true">
+        <div class="spinner"></div>
+        <span>Loading deleted transactions...</span>
+    </div>
+}
+else if (deletedTransactions == null || !deletedTransactions.Any())
+{
+    <EmptyState 
+        Icon="fa-trash-restore"
+        Title="Recycle Bin Empty"
+        Description="There are no deleted transactions to recover." />
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-trash" aria-hidden="true"></i> 
+                Deleted Transactions (@deletedTransactions.Count)
+            </h3>
+            @if (deletedTransactions.Any())
+            {
+                <button class="btn btn-danger btn-sm" @onclick="ShowEmptyBinConfirm" disabled="@isProcessing">
+                    <i class="fas fa-trash-alt" aria-hidden="true"></i> Empty Bin
+                </button>
+            }
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-3">
+                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                Deleted transactions are kept for 30 days before permanent deletion.
+            </p>
+            
+            <div class="data-table-container">
+                <table class="data-table" role="grid" aria-label="Deleted transactions">
+                    <thead>
+                        <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Description</th>
+                            <th scope="col">Amount</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var transaction in deletedTransactions)
+                        {
+                            <tr>
+                                <td>@transaction.Date.ToString("MMM d, yyyy")</td>
+                                <td>@(transaction.Description ?? "No description")</td>
+                                <td class="amount @(transaction.Type == TransactionType.Income ? "income" : "expense")">
+                                    @transaction.Amount.ToString("C")
+                                </td>
+                                <td>
+                                    <span class="badge @(transaction.Type == TransactionType.Income ? "badge-income" : "badge-expense")">
+                                        @transaction.Type
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-success" 
+                                            @onclick="() => RestoreTransaction(transaction.Id)"
+                                            disabled="@isProcessing"
+                                            title="Restore transaction"
+                                            aria-label="Restore transaction @transaction.Id">
+                                        <i class="fas fa-undo" aria-hidden="true"></i> Restore
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" 
+                                            @onclick="() => ShowDeleteConfirm(transaction)"
+                                            disabled="@isProcessing"
+                                            title="Permanently delete"
+                                            aria-label="Permanently delete transaction @transaction.Id">
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showConfirmDialog)
+{
+    <ConfirmDialog 
+        IsVisible="true"
+        Title="@confirmTitle"
+        Message="@confirmMessage"
+        Type="ConfirmDialog.ConfirmationType.Delete"
+        ShowWarning="true"
+        WarningMessage="This action cannot be undone."
+        OnConfirmClicked="OnConfirmDelete"
+        OnCancelClicked="() => showConfirmDialog = false"
+        IsProcessing="@isProcessing" />
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success" role="alert" aria-live="polite">
+        <i class="fas fa-check-circle" aria-hidden="true"></i> @successMessage
+    </div>
+}
+
+@code {
+    private List<TransactionDto>? deletedTransactions;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private bool showConfirmDialog = false;
+    private string confirmTitle = "";
+    private string confirmMessage = "";
+    private int? transactionToDelete;
+    private bool emptyBinMode = false;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDeletedTransactions();
+    }
+
+    private async Task LoadDeletedTransactions()
+    {
+        isLoading = true;
+        try
+        {
+            deletedTransactions = await TransactionService.GetDeletedAsync(100);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RestoreTransaction(int id)
+    {
+        isProcessing = true;
+        try
+        {
+            var result = await TransactionService.RestoreAsync(id);
+            if (result)
+            {
+                successMessage = "Transaction restored successfully.";
+                await LoadDeletedTransactions();
+                _ = ClearSuccessMessage();
+            }
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void ShowDeleteConfirm(TransactionDto transaction)
+    {
+        transactionToDelete = transaction.Id;
+        emptyBinMode = false;
+        confirmTitle = "Permanently Delete";
+        confirmMessage = $"Are you sure you want to permanently delete this ${transaction.Amount:N2} transaction?";
+        showConfirmDialog = true;
+    }
+
+    private void ShowEmptyBinConfirm()
+    {
+        transactionToDelete = null;
+        emptyBinMode = true;
+        confirmTitle = "Empty Recycle Bin";
+        confirmMessage = $"Are you sure you want to permanently delete all {deletedTransactions?.Count ?? 0} transactions?";
+        showConfirmDialog = true;
+    }
+
+    private async Task OnConfirmDelete()
+    {
+        isProcessing = true;
+        try
+        {
+            if (emptyBinMode)
+            {
+                // Delete all
+                foreach (var t in deletedTransactions ?? [])
+                {
+                    await TransactionService.PermanentDeleteAsync(t.Id);
+                }
+                successMessage = "Recycle bin emptied.";
+            }
+            else if (transactionToDelete.HasValue)
+            {
+                await TransactionService.PermanentDeleteAsync(transactionToDelete.Value);
+                successMessage = "Transaction permanently deleted.";
+            }
+            
+            showConfirmDialog = false;
+            await LoadDeletedTransactions();
+            _ = ClearSuccessMessage();
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task ClearSuccessMessage()
+    {
+        await Task.Delay(3000);
+        successMessage = null;
+        StateHasChanged();
+    }
+}

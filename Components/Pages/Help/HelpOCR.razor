@@ -1,0 +1,246 @@
+@page "/help/ocr"
+
+<div class="help-content">
+    <h1><i class="fas fa-text-recognition"></i> OCR (Text Recognition)</h1>
+    
+    <div class="help-section">
+        <h2>What is OCR?</h2>
+        <p>
+            <strong>OCR (Optical Character Recognition)</strong> allows you to extract text from images of receipts, 
+            invoices, and other documents. The system automatically detects and parses receipt data to help you 
+            create transactions faster.
+        </p>
+    </div>
+
+    <div class="help-section">
+        <h2>Setup Requirements</h2>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Important:</strong> OCR requires Tesseract language files to be installed.
+        </div>
+        
+        <h3>Installation Steps:</h3>
+        <ol>
+            <li>Create a <code>tessdata</code> folder in the application root directory</li>
+            <li>Download <code>eng.traineddata</code> from 
+                <a href="https://github.com/tesseract-ocr/tessdata" target="_blank" rel="noopener">
+                    Tesseract GitHub
+                </a>
+            </li>
+            <li>Place the file in the <code>tessdata</code> folder</li>
+            <li>Restart the application</li>
+            <li>Verify status in <strong>Settings ? Accessibility</strong></li>
+        </ol>
+    </div>
+
+    <div class="help-section">
+        <h2>How to Use OCR</h2>
+        
+        <h3>Scanning a Receipt:</h3>
+        <ol>
+            <li>Go to <strong>Documents</strong> page</li>
+            <li>Upload an image file (JPG, PNG, BMP, GIF)</li>
+            <li>Click the <kbd><i class="fas fa-text-recognition"></i> Extract Text</kbd> button on the image</li>
+            <li>Wait for OCR processing (1-5 seconds)</li>
+            <li>Review the extracted text and data</li>
+        </ol>
+
+        <h3>Creating Transaction from Receipt:</h3>
+        <ol>
+            <li>After OCR processing completes</li>
+            <li>If receipt data is detected, you'll see:
+                <ul>
+                    <li>Merchant name</li>
+                    <li>Transaction date</li>
+                    <li>Total amount</li>
+                    <li>Line items (if detected)</li>
+                </ul>
+            </li>
+            <li>Click <kbd>Create Transaction</kbd> button</li>
+            <li>System automatically opens transaction form with pre-filled data</li>
+            <li>Review and adjust as needed</li>
+            <li>Save the transaction</li>
+        </ol>
+    </div>
+
+    <div class="help-section">
+        <h2>Supported Features</h2>
+        <ul class="feature-list">
+            <li><i class="fas fa-check text-success"></i> Extract text from images</li>
+            <li><i class="fas fa-check text-success"></i> Automatic receipt parsing</li>
+            <li><i class="fas fa-check text-success"></i> Merchant name detection</li>
+            <li><i class="fas fa-check text-success"></i> Date extraction</li>
+            <li><i class="fas fa-check text-success"></i> Total amount extraction</li>
+            <li><i class="fas fa-check text-success"></i> Line item parsing</li>
+            <li><i class="fas fa-check text-success"></i> Confidence scoring</li>
+            <li><i class="fas fa-check text-success"></i> Image preprocessing</li>
+        </ul>
+    </div>
+
+    <div class="help-section">
+        <h2>Best Practices</h2>
+        <div class="tip-box">
+            <h3>?? Image Quality Tips:</h3>
+            <ul>
+                <li>Use good lighting when taking photos</li>
+                <li>Keep camera steady to avoid blur</li>
+                <li>Capture entire receipt in frame</li>
+                <li>Avoid shadows and reflections</li>
+                <li>Use higher resolution (300 DPI recommended)</li>
+                <li>Keep receipt flat (not crumpled)</li>
+            </ul>
+        </div>
+
+        <div class="tip-box">
+            <h3>? For Best Results:</h3>
+            <ul>
+                <li>Clear, printed text works best</li>
+                <li>Avoid handwriting (not well supported)</li>
+                <li>Straight, non-rotated images</li>
+                <li>Good contrast between text and background</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Troubleshooting</h2>
+        
+        <h3>OCR Not Working:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> "OCR engine not initialized" error</p>
+            <p><strong>Solution:</strong></p>
+            <ol>
+                <li>Verify <code>tessdata</code> folder exists</li>
+                <li>Check <code>eng.traineddata</code> file is present</li>
+                <li>Restart the application</li>
+                <li>Check application logs for errors</li>
+            </ol>
+        </div>
+
+        <h3>Low Accuracy:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> Poor text extraction or wrong data</p>
+            <p><strong>Solutions:</strong></p>
+            <ul>
+                <li>Use higher resolution images</li>
+                <li>Improve lighting conditions</li>
+                <li>Avoid skewed/rotated images</li>
+                <li>Ensure receipt is clearly visible</li>
+                <li>Try rescanning with better quality</li>
+            </ul>
+        </div>
+
+        <h3>No Receipt Data Detected:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> Text extracted but no receipt data shown</p>
+            <p><strong>Reason:</strong> System couldn't identify receipt format</p>
+            <p><strong>Solution:</strong> Manually enter transaction using extracted text as reference</p>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Time Savings</h2>
+        <div class="stats-box">
+            <h3>Before OCR:</h3>
+            <p>~10 steps, 2-3 minutes per receipt</p>
+            
+            <h3>With OCR:</h3>
+            <p>~5 steps, 30 seconds per receipt</p>
+            
+            <h3>Result:</h3>
+            <p class="text-success"><strong>60% reduction in data entry time!</strong></p>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Privacy & Security</h2>
+        <div class="alert alert-success">
+            <i class="fas fa-shield-alt"></i>
+            <strong>Your Data is Safe:</strong>
+            <ul>
+                <li>All OCR processing happens locally on your computer</li>
+                <li>No images sent to external servers</li>
+                <li>No cloud processing</li>
+                <li>Completely offline capable</li>
+                <li>Images stored securely in your Documents folder</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Technical Details</h2>
+        <table class="table">
+            <tr>
+                <th>OCR Engine</th>
+                <td>Tesseract 5.2.0</td>
+            </tr>
+            <tr>
+                <th>Supported Formats</th>
+                <td>JPG, JPEG, PNG, BMP, GIF</td>
+            </tr>
+            <tr>
+                <th>Max File Size</th>
+                <td>50 MB</td>
+            </tr>
+            <tr>
+                <th>Processing Time</th>
+                <td>1-5 seconds (depends on image size)</td>
+            </tr>
+            <tr>
+                <th>Languages</th>
+                <td>English (more available via traineddata files)</td>
+            </tr>
+            <tr>
+                <th>License</th>
+                <td>Apache 2.0 (Free & Open Source)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="help-navigation">
+        <a href="/help/voice" class="btn btn-outline">
+            Next: Voice Features <i class="fas fa-arrow-right"></i>
+        </a>
+        <a href="/help" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Back to Help
+        </a>
+    </div>
+</div>
+
+<style>
+    .stats-box {
+        background: var(--color-card);
+        padding: 1.5rem;
+        border-radius: 8px;
+        border-left: 4px solid var(--color-success);
+    }
+
+    .troubleshooting-box {
+        background: var(--color-background);
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+
+    .tip-box {
+        background: var(--color-info-bg, #e3f2fd);
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--color-info, #2196f3);
+    }
+
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .feature-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+</style>

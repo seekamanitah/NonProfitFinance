@@ -1,0 +1,466 @@
+@page "/transactions/recurring"
+@inject IRecurringTransactionService RecurringService
+@inject ICategoryService CategoryService
+@rendermode InteractiveServer
+
+<PageTitle>Recurring Transactions - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Recurring Transactions</h2>
+        <p class="text-muted">Manage automated recurring income and expenses</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/transactions" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Back to Transactions
+        </a>
+        <button class="btn btn-outline" @onclick="ProcessDueTransactions" disabled="@isProcessing">
+            @if (isProcessing)
+            {
+                <span class="spinner"></span>
+            }
+            else
+            {
+                <i class="fas fa-play"></i>
+            }
+            Process Due
+        </button>
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <i class="fas fa-plus"></i> Add Recurring
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(processMessage))
+{
+    <div class="alert @(processSuccess ? "alert-success" : "alert-danger") mb-3">
+        <i class="fas @(processSuccess ? "fa-check-circle" : "fa-exclamation-circle")"></i>
+        @processMessage
+    </div>
+}
+
+<!-- Upcoming Section -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-calendar-alt"></i> Upcoming (Next 30 Days)</h3>
+    </div>
+    <div class="card-body">
+        @if (upcoming.Any())
+        {
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var item in upcoming)
+                {
+                    <div class="badge @(item.Type == TransactionType.Income ? "badge-income" : "badge-expense")" 
+                         style="padding: 0.75rem; font-size: 0.9rem;">
+                        <div>@item.Name</div>
+                        <div style="font-weight: normal;">
+                            @item.Amount.ToString("C") • @item.NextDate.ToString("MMM d") 
+                            (@item.DaysUntil days)
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="text-muted text-center">No upcoming recurring transactions</p>
+        }
+    </div>
+</div>
+
+<!-- Recurring Templates List -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-sync-alt"></i> Recurring Templates</h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        @if (isLoading)
+        {
+            <div class="loading" style="padding: 2rem;">
+                <div class="spinner"></div>
+            </div>
+        }
+        else if (templates.Any())
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Pattern</th>
+                        <th class="text-right">Amount</th>
+                        <th>Next Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var template in templates)
+                    {
+                        <tr class="@(!template.IsActive ? "text-muted" : "")">
+                            <td>
+                                <strong>@template.Name</strong>
+                                <br />
+                                <small class="text-muted">@template.TotalOccurrences processed</small>
+                            </td>
+                            <td>
+                                <span class="badge @(template.Type == TransactionType.Income ? "badge-income" : "badge-expense")">
+                                    @template.Type
+                                </span>
+                            </td>
+                            <td>@(template.CategoryName ?? "—")</td>
+                            <td>
+                                @GetPatternDisplay(template.Pattern, template.Interval)
+                            </td>
+                            <td class="text-right amount @(template.Type == TransactionType.Income ? "income" : "expense")">
+                                @template.Amount.ToString("C")
+                            </td>
+                            <td>
+                                @if (template.NextOccurrence.HasValue)
+                                {
+                                    <span>@template.NextOccurrence.Value.ToString("MMM d, yyyy")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (template.IsActive)
+                                {
+                                    <span class="badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">Paused</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline" @onclick="() => SkipNext(template)" 
+                                            title="Skip next occurrence" disabled="@(!template.IsActive)">
+                                        <i class="fas fa-forward"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline" @onclick="() => ToggleActive(template)"
+                                            title="@(template.IsActive ? "Pause" : "Activate")">
+                                        <i class="fas @(template.IsActive ? "fa-pause" : "fa-play")"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteTemplate(template)" 
+                                            title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center text-muted" style="padding: 2rem;">
+                <i class="fas fa-sync-alt" style="font-size: 2rem;"></i>
+                <p class="mt-2">No recurring transactions set up yet.</p>
+                <button class="btn btn-primary" @onclick="ShowAddForm">
+                    <i class="fas fa-plus"></i> Create First Recurring Transaction
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+@if (showForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForm">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Recurring Transaction</h3>
+                <button class="modal-close" @onclick="CloseForm">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs mb-3">
+                    <div class="tab @(formType == TransactionType.Income ? "active" : "")"
+                         @onclick="() => formType = TransactionType.Income">
+                        <i class="fas fa-arrow-down text-success"></i> Income
+                    </div>
+                    <div class="tab @(formType == TransactionType.Expense ? "active" : "")"
+                         @onclick="() => formType = TransactionType.Expense">
+                        <i class="fas fa-arrow-up text-danger"></i> Expense
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-control" @bind="formName" placeholder="e.g., Monthly Rent" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount *</label>
+                        <input type="number" class="form-control" @bind="formAmount" step="0.01" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category *</label>
+                        <select class="form-control" @bind="formCategoryId">
+                            <option value="0">Select category...</option>
+                            @foreach (var cat in filteredCategories)
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Pattern</label>
+                        <select class="form-control" @bind="formPattern">
+                            <option value="@RecurrencePattern.Monthly">Monthly</option>
+                            <option value="@RecurrencePattern.Weekly">Weekly</option>
+                            <option value="@RecurrencePattern.BiWeekly">Bi-Weekly</option>
+                            <option value="@RecurrencePattern.Quarterly">Quarterly</option>
+                            <option value="@RecurrencePattern.Yearly">Yearly</option>
+                            <option value="@RecurrencePattern.Daily">Daily</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Every X periods</label>
+                        <input type="number" class="form-control" @bind="formInterval" min="1" max="12" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" @bind="formStartDate" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Date (optional)</label>
+                        <input type="date" class="form-control" @bind="formEndDate" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-control" @bind="formDescription" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> @formError
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CloseForm">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveRecurring" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RecurringTransactionDto> templates = new();
+    private List<UpcomingRecurringDto> upcoming = new();
+    private List<CategoryDto> categories = new();
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private bool showForm = false;
+    private bool isSaving = false;
+    private string? processMessage;
+    private bool processSuccess;
+
+    // Form fields
+    private string formName = "";
+    private decimal formAmount = 0;
+    private int formCategoryId = 0;
+    private TransactionType formType = TransactionType.Expense;
+    private RecurrencePattern formPattern = RecurrencePattern.Monthly;
+    private int formInterval = 1;
+    private DateTime formStartDate = DateTime.Today;
+    private DateTime? formEndDate;
+    private string? formDescription;
+    private string? formError;
+
+    private IEnumerable<CategoryDto> filteredCategories => categories
+        .Where(c => c.Type == (formType == TransactionType.Income ? CategoryType.Income : CategoryType.Expense));
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CategoryService.GetAllAsync();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            templates = await RecurringService.GetAllAsync();
+            upcoming = await RecurringService.GetUpcomingAsync(30);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        formName = "";
+        formAmount = 0;
+        formCategoryId = 0;
+        formType = TransactionType.Expense;
+        formPattern = RecurrencePattern.Monthly;
+        formInterval = 1;
+        formStartDate = DateTime.Today;
+        formEndDate = null;
+        formDescription = null;
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+    }
+
+    private async Task SaveRecurring()
+    {
+        if (string.IsNullOrWhiteSpace(formName))
+        {
+            formError = "Name is required";
+            return;
+        }
+        if (formAmount <= 0)
+        {
+            formError = "Amount must be greater than zero";
+            return;
+        }
+        if (formCategoryId == 0)
+        {
+            formError = "Please select a category";
+            return;
+        }
+
+        isSaving = true;
+        formError = null;
+
+        try
+        {
+            await RecurringService.CreateAsync(new CreateRecurringTransactionRequest(
+                formName,
+                formAmount,
+                formType,
+                formCategoryId,
+                formPattern,
+                formInterval,
+                formStartDate,
+                formEndDate,
+                null, null, null, null,
+                formDescription
+            ));
+
+            showForm = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ProcessDueTransactions()
+    {
+        isProcessing = true;
+        processMessage = null;
+
+        try
+        {
+            var result = await RecurringService.ProcessDueTransactionsAsync();
+            processSuccess = result.FailedCount == 0;
+            processMessage = result.TotalProcessed == 0 
+                ? "No transactions due for processing."
+                : $"Processed {result.SuccessCount} of {result.TotalProcessed} recurring transactions.";
+            
+            if (result.Errors.Any())
+            {
+                processMessage += " Errors: " + string.Join("; ", result.Errors);
+            }
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            processSuccess = false;
+            processMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task SkipNext(RecurringTransactionDto template)
+    {
+        await RecurringService.SkipNextOccurrenceAsync(template.Id);
+        await LoadData();
+    }
+
+    private async Task ToggleActive(RecurringTransactionDto template)
+    {
+        await RecurringService.UpdateAsync(template.Id, new UpdateRecurringTransactionRequest(
+            template.Name,
+            template.Amount,
+            template.CategoryId,
+            template.Pattern,
+            template.Interval,
+            template.EndDate,
+            !template.IsActive
+        ));
+        await LoadData();
+    }
+
+    private async Task DeleteTemplate(RecurringTransactionDto template)
+    {
+        await RecurringService.DeleteAsync(template.Id);
+        await LoadData();
+    }
+
+    private string GetPatternDisplay(RecurrencePattern pattern, int interval)
+    {
+        var patternName = pattern switch
+        {
+            RecurrencePattern.Daily => "day",
+            RecurrencePattern.Weekly => "week",
+            RecurrencePattern.BiWeekly => "2 weeks",
+            RecurrencePattern.Monthly => "month",
+            RecurrencePattern.Quarterly => "quarter",
+            RecurrencePattern.Yearly => "year",
+            _ => "period"
+        };
+
+        return interval == 1 
+            ? $"Every {patternName}" 
+            : $"Every {interval} {patternName}s";
+    }
+}

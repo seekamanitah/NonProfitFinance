@@ -1,0 +1,10 @@
+{
+  "AutoBackupEnabled": true,
+  "Schedule": 1,
+  "BackupTime": "09:29:00",
+  "BackupDirectory": "C:\\Users\\tech\\AppData\\Roaming\\NonProfitFinance\\Backups",
+  "RetentionCount": 10,
+  "RetentionDays": 30,
+  "LastAutoBackup": null,
+  "CompressBackups": true
+}

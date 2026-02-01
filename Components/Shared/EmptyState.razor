@@ -1,0 +1,53 @@
+@* Empty state component for lists with no data *@
+
+<div class="empty-state" role="status" aria-live="polite">
+    <div class="empty-state-icon">
+        <i class="fas @Icon" aria-hidden="true"></i>
+    </div>
+    <h3 class="empty-state-title">@Title</h3>
+    <p class="empty-state-description">@Description</p>
+    @if (ShowAction && OnActionClick.HasDelegate)
+    {
+        <button class="btn btn-primary" @onclick="OnActionClick">
+            <i class="fas @ActionIcon" aria-hidden="true"></i> @ActionText
+        </button>
+    }
+</div>
+
+<style>
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        color: var(--color-gray-400);
+        margin-bottom: 1rem;
+    }
+
+    .empty-state-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state-description {
+        margin-bottom: 1.5rem;
+        max-width: 400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+</style>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "fa-inbox";
+    [Parameter] public string Title { get; set; } = "No Data Found";
+    [Parameter] public string Description { get; set; } = "There are no items to display.";
+    [Parameter] public bool ShowAction { get; set; } = false;
+    [Parameter] public string ActionText { get; set; } = "Add New";
+    [Parameter] public string ActionIcon { get; set; } = "fa-plus";
+    [Parameter] public EventCallback OnActionClick { get; set; }
+}

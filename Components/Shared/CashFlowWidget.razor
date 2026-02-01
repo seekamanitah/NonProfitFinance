@@ -1,0 +1,185 @@
+@using NonProfitFinance.Services
+@inject ICashFlowService CashFlowService
+@inject IJSRuntime JS
+
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-between align-center">
+            <h3 class="card-title"><i class="fas fa-chart-line"></i> Cash Flow Forecast</h3>
+            <select class="form-control" style="width: 150px;" @bind="forecastDays" @bind:after="LoadForecast">
+                <option value="30">30 Days</option>
+                <option value="60">60 Days</option>
+                <option value="90">90 Days</option>
+                <option value="180">180 Days</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        }
+        else if (forecast != null)
+        {
+            <!-- Compact Summary Grid -->
+            <div class="cash-flow-summary">
+                <div class="cash-flow-metric">
+                    <div class="metric-label">Current Balance</div>
+                    <div class="metric-value">@forecast.CurrentBalance.ToString("C0")</div>
+                </div>
+                <div class="cash-flow-metric">
+                    <div class="metric-label">Projected (@forecastDays days)</div>
+                    <div class="metric-value @(forecast.ProjectedEndBalance >= 0 ? "positive" : "negative")">
+                        @forecast.ProjectedEndBalance.ToString("C0")
+                    </div>
+                </div>
+                <div class="cash-flow-metric">
+                    <div class="metric-label">Net Cash Flow</div>
+                    <div class="metric-value @(forecast.NetProjectedCashFlow >= 0 ? "positive" : "negative")">
+                        @(forecast.NetProjectedCashFlow >= 0 ? "+" : "")@forecast.NetProjectedCashFlow.ToString("C0")
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts (Compact) -->
+            @if (forecast.Alerts.Any())
+            {
+                <div class="cash-flow-alerts">
+                    @foreach (var alert in forecast.Alerts.Take(2))
+                    {
+                        <div class="alert-compact @GetAlertClass(alert.Type)">
+                            <i class="fas @GetAlertIcon(alert.Type)"></i>
+                            <span>@alert.Date.ToString("MMM d"): @alert.Message</span>
+                        </div>
+                    }
+                    @if (forecast.Alerts.Count > 2)
+                    {
+                        <small class="text-muted">+@(forecast.Alerts.Count - 2) more</small>
+                    }
+                </div>
+            }
+
+            <!-- Upcoming Transactions (Compact List) -->
+            <div class="upcoming-transactions-compact">
+                <h4 class="section-title">
+                    Upcoming Transactions (@forecast.UpcomingTransactions.Count)
+                </h4>
+                @if (forecast.UpcomingTransactions.Any())
+                {
+                    <div class="transactions-list">
+                        @foreach (var tx in forecast.UpcomingTransactions.Take(5))
+                        {
+                            <div class="transaction-row">
+                                <div class="transaction-info">
+                                    <span class="transaction-desc">@tx.Description</span>
+                                    <span class="transaction-meta">@tx.Date.ToString("MMM d") • @((int)(tx.Confidence * 100))%</span>
+                                </div>
+                                <div class="transaction-amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
+                                    @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C0")
+                                </div>
+                            </div>
+                        }
+                        @if (forecast.UpcomingTransactions.Count > 5)
+                        {
+                            <div class="text-center mt-2">
+                                <small class="text-muted">+@(forecast.UpcomingTransactions.Count - 5) more</small>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted" style="margin: 0.5rem 0;">No projected transactions</p>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="text-muted">Unable to load cash flow forecast</p>
+        }
+    </div>
+</div>
+
+@code {
+private NonProfitFinance.Services.CashFlowForecast? forecast;
+private bool isLoading = true;
+private int forecastDays = 90;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForecast();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && forecast != null)
+        {
+            await RenderChart();
+        }
+    }
+
+    private async Task LoadForecast()
+    {
+        isLoading = true;
+        try
+        {
+            forecast = await CashFlowService.GetForecastAsync(forecastDays);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RenderChart()
+    {
+        if (forecast == null) return;
+
+        var labels = forecast.DailyBalances
+            .Where((_, i) => i % Math.Max(1, forecast.DailyBalances.Count / 30) == 0) // Sample for readability
+            .Select(d => d.Date.ToString("MMM d"))
+            .ToArray();
+
+        var balanceData = forecast.DailyBalances
+            .Where((_, i) => i % Math.Max(1, forecast.DailyBalances.Count / 30) == 0)
+            .Select(d => (double)d.Balance)
+            .ToArray();
+
+        var datasets = new[]
+        {
+            new
+            {
+                label = "Projected Balance",
+                data = balanceData,
+                borderColor = "#28a745",
+                backgroundColor = "rgba(40, 167, 69, 0.1)",
+                fill = true,
+                tension = 0.3
+            }
+        };
+
+        await JS.InvokeVoidAsync("chartInterop.createLineChart", 
+            "cashFlowChart", 
+            labels, 
+            datasets,
+            new { maintainAspectRatio = false });
+    }
+
+    private string GetAlertClass(CashFlowAlertType type) => type switch
+    {
+        CashFlowAlertType.NegativeBalance => "alert-danger",
+        CashFlowAlertType.LowBalance => "alert-warning",
+        CashFlowAlertType.LargeExpense => "alert-info",
+        _ => "alert-info"
+    };
+
+    private string GetAlertIcon(CashFlowAlertType type) => type switch
+    {
+        CashFlowAlertType.NegativeBalance => "fa-exclamation-circle",
+        CashFlowAlertType.LowBalance => "fa-exclamation-triangle",
+        CashFlowAlertType.LargeExpense => "fa-info-circle",
+        _ => "fa-info-circle"
+    };
+}

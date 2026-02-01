@@ -1,0 +1,280 @@
+@page "/donors"
+@inject IDonorService DonorService
+@rendermode InteractiveServer
+
+<PageTitle>Donors - NonProfit Finance</PageTitle>
+
+<!-- Filter Bar -->
+<div class="d-flex justify-between align-center mb-3">
+    <div class="d-flex gap-3 align-center">
+        <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" class="form-control" placeholder="Search donors..." 
+                   @bind="searchTerm" @bind:event="oninput" style="width: 250px;" />
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <select class="form-control" @bind="typeFilter">
+                <option value="">All Types</option>
+                @foreach (var type in Enum.GetValues<DonorType>())
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+        </div>
+        
+        <label class="d-flex align-center gap-2">
+            <input type="checkbox" @bind="showInactive" @bind:after="StateHasChanged" /> Show Inactive
+        </label>
+    </div>
+    
+    <button class="btn btn-primary" @onclick="ShowAddForm">
+        <i class="fas fa-plus"></i> Add Donor
+    </button>
+</div>
+
+<!-- Donor Cards -->
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else
+{
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
+        @foreach (var donor in FilteredDonors)
+        {
+            <div class="card @(!donor.IsActive ? "text-muted" : "")" style="cursor: pointer;" 
+                 @onclick="() => SelectDonor(donor)">
+                <div class="card-body">
+                    <div class="d-flex justify-between align-center mb-2">
+                        <h4 style="margin: 0;">
+                            @if (donor.IsAnonymous)
+                            {
+                                <i class="fas fa-user-secret text-muted"></i>
+                            }
+                            @donor.Name
+                        </h4>
+                        <span class="badge @GetTypeBadgeClass(donor.Type)">@donor.Type</span>
+                    </div>
+                    
+                    <div class="d-flex justify-between mb-2">
+                        <span class="text-muted">Total Contributions</span>
+                        <span class="amount income" style="font-size: 1.25rem; font-weight: 600;">
+                            @donor.TotalContributions.ToString("C0")
+                        </span>
+                    </div>
+                    
+                    @if (donor.LastContributionDate.HasValue)
+                    {
+                        <div class="d-flex justify-between text-muted" style="font-size: 0.85rem;">
+                            <span>Last Contribution</span>
+                            <span>@donor.LastContributionDate.Value.ToString("MMM dd, yyyy")</span>
+                        </div>
+                    }
+                    
+                    @if (!string.IsNullOrEmpty(donor.Email))
+                    {
+                        <div class="mt-2 text-muted" style="font-size: 0.85rem;">
+                            <i class="fas fa-envelope"></i> @donor.Email
+                        </div>
+                    }
+                    
+                    @if (!donor.IsActive)
+                    {
+                        <span class="badge badge-warning mt-2">Inactive</span>
+                    }
+                </div>
+            </div>
+        }
+        
+        @if (!FilteredDonors.Any())
+        {
+            <div class="card">
+                <div class="card-body text-center text-muted">
+                    No donors found
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Donor Detail Modal -->
+@if (selectedDonor != null)
+{
+    <div class="modal-backdrop" @onclick="CloseDetail">
+        <div class="modal" style="max-width: 700px;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">@selectedDonor.Name</h3>
+                <button class="modal-close" @onclick="CloseDetail">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row mb-3">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <span class="badge @GetTypeBadgeClass(selectedDonor.Type)">@selectedDonor.Type</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <span class="badge @(selectedDonor.IsActive ? "badge-success" : "badge-warning")">
+                            @(selectedDonor.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Total Contributions</label>
+                        <div class="metric-value positive">@selectedDonor.TotalContributions.ToString("C0")</div>
+                    </div>
+                </div>
+                
+                <div class="form-row mb-3">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <p>@(selectedDonor.Email ?? "—")</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <p>@(selectedDonor.Phone ?? "—")</p>
+                    </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label">Address</label>
+                    <p>@(selectedDonor.Address ?? "—")</p>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(selectedDonor.Notes))
+                {
+                    <div class="form-group mb-3">
+                        <label class="form-label">Notes</label>
+                        <p>@selectedDonor.Notes</p>
+                    </div>
+                }
+                
+                <h4 class="mb-2">Contribution History</h4>
+                @if (donorContributions.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tx in donorContributions.Take(10))
+                            {
+                                <tr>
+                                    <td>@tx.Date.ToString("MMM dd, yyyy")</td>
+                                    <td>@(tx.Description ?? tx.CategoryName)</td>
+                                    <td class="text-right amount income">@tx.Amount.ToString("C")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No contributions recorded</p>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => EditDonor(selectedDonor)">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-secondary" @onclick="CloseDetail">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add/Edit Form Modal -->
+@if (showForm)
+{
+    <DonorFormModal 
+        Donor="editingDonor"
+        OnSave="OnDonorSaved"
+        OnCancel="CloseForm" />
+}
+
+@code {
+    private List<DonorDto> donors = new();
+    private List<TransactionDto> donorContributions = new();
+    private DonorDto? selectedDonor;
+    private DonorDto? editingDonor;
+    private string searchTerm = "";
+    private DonorType? typeFilter;
+    private bool showInactive = false;
+    private bool isLoading = true;
+    private bool showForm = false;
+
+    private IEnumerable<DonorDto> FilteredDonors => donors
+        .Where(d => showInactive || d.IsActive)
+        .Where(d => string.IsNullOrEmpty(searchTerm) || 
+                    d.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (d.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(d => !typeFilter.HasValue || d.Type == typeFilter.Value)
+        .OrderByDescending(d => d.TotalContributions);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDonors();
+    }
+
+    private async Task LoadDonors()
+    {
+        isLoading = true;
+        donors = await DonorService.GetAllAsync(includeInactive: true);
+        isLoading = false;
+    }
+
+    private async Task SelectDonor(DonorDto donor)
+    {
+        selectedDonor = donor;
+        donorContributions = await DonorService.GetContributionHistoryAsync(donor.Id);
+    }
+
+    private void CloseDetail()
+    {
+        selectedDonor = null;
+        donorContributions = new();
+        StateHasChanged();
+    }
+
+    private void ShowAddForm()
+    {
+        editingDonor = null;
+        showForm = true;
+        StateHasChanged();
+    }
+
+    private void EditDonor(DonorDto donor)
+    {
+        editingDonor = donor;
+        selectedDonor = null;
+        showForm = true;
+        StateHasChanged();
+    }
+
+    private async Task OnDonorSaved()
+    {
+        showForm = false;
+        await LoadDonors();
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+    }
+
+    private string GetTypeBadgeClass(DonorType type) => type switch
+    {
+        DonorType.Individual => "badge-info",
+        DonorType.Corporate => "badge-success",
+        DonorType.Foundation => "badge-warning",
+        DonorType.Government => "badge-danger",
+        _ => "badge-info"
+    };
+}

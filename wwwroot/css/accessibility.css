@@ -1,0 +1,212 @@
+/* ============================================
+   Accessibility Styles
+   ============================================ */
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Focus visible styles */
+*:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* High contrast mode */
+body.high-contrast {
+    --bg-primary: #000000;
+    --bg-secondary: #1a1a1a;
+    --bg-card: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: #ffffff;
+    --color-primary: #ffff00;
+    --color-success: #00ff00;
+    --color-danger: #ff0000;
+    --color-warning: #ffa500;
+}
+
+body.high-contrast .btn {
+    border: 2px solid currentColor;
+}
+
+body.high-contrast .card {
+    border: 2px solid var(--border-color);
+}
+
+/* Reduced motion */
+body.reduced-motion *,
+body.reduced-motion *::before,
+body.reduced-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+}
+
+/* Focus outline always visible when enabled */
+body.show-focus-outline *:focus {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Keyboard shortcut hints */
+.keyboard-hint {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.keyboard-shortcuts-help {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 10000;
+    box-shadow: var(--shadow-xl);
+}
+
+.keyboard-shortcuts-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+}
+
+.shortcut-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.shortcut-item:last-child {
+    border-bottom: none;
+}
+
+.shortcut-keys {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.shortcut-key {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Tooltips with delay */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    background: var(--bg-tooltip, #333);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transition-delay: 0.5s;
+}
+
+body.reduced-motion [data-tooltip]:hover::after {
+    transition-delay: 0s;
+}
+
+/* ARIA live region styling */
+[aria-live] {
+    position: absolute;
+    clip: rect(1px, 1px, 1px, 1px);
+    overflow: hidden;
+    height: 1px;
+    width: 1px;
+}
+
+/* Skip to content link */
+.skip-to-content {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--color-primary);
+    color: white;
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    z-index: 10000;
+    transition: top 0.2s;
+}
+
+.skip-to-content:focus {
+    top: 0;
+}
+
+/* Larger click targets for accessibility */
+body.large-click-targets button,
+body.large-click-targets .btn,
+body.large-click-targets a {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1.5rem;
+}
+
+/* Font size adjustments */
+body.font-size-small {
+    font-size: 14px;
+}
+
+body.font-size-large {
+    font-size: 18px;
+}
+
+body.font-size-xlarge {
+    font-size: 22px;
+}

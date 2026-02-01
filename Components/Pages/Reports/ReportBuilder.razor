@@ -1,0 +1,665 @@
+@page "/reports"
+@inject IReportService ReportService
+@inject ICategoryService CategoryService
+@inject IFundService FundService
+@inject IDonorService DonorService
+@inject IGrantService GrantService
+@inject IPdfExportService PdfExportService
+@inject IImportExportService ImportExportService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Reports - NonProfit Finance</PageTitle>
+
+<!-- Report Configuration -->
+<div class="card mb-3">
+    <div class="card-header">
+        <div class="d-flex justify-between align-center">
+            <h3 class="card-title"><i class="fas fa-cog"></i> Report Settings</h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline btn-sm" @onclick="ShowSavePresetDialog">
+                    <i class="fas fa-save"></i> Save Preset
+                </button>
+                <select class="form-control" style="width: 200px;" @onchange="LoadPreset">
+                    <option value="">Load Preset...</option>
+                    @foreach (var preset in savedPresets)
+                    {
+                        <option value="@preset.Id">@preset.Name @(preset.IsDefault ? "?" : "")</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Report Period</label>
+                <select class="form-control" @onchange="OnPeriodChange">
+                    <option value="month">This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="ytd" selected>Year to Date</option>
+                    <option value="year">Last 12 Months</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" @bind="startDate" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" @bind="endDate" />
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Filter By</label>
+                <select class="form-control" @bind="filterType">
+                    <option value="all">All Data</option>
+                    <option value="fund">By Account</option>
+                    <option value="category">By Category</option>
+                    <option value="donor">By Donor</option>
+                    <option value="grant">By Grant</option>
+                </select>
+            </div>
+            
+            @if (filterType == "fund")
+            {
+                <div class="form-group">
+                    <label class="form-label">Account</label>
+                    <select class="form-control" @bind="selectedFundId">
+                        <option value="">All Accounts</option>
+                        @foreach (var fund in funds)
+                        {
+                            <option value="@fund.Id">@fund.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            
+            @if (filterType == "category")
+            {
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select class="form-control" @bind="selectedCategoryId">
+                        <option value="">All Categories</option>
+                        @foreach (var category in categories)
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            
+            @if (filterType == "donor")
+            {
+                <div class="form-group">
+                    <label class="form-label">Donor</label>
+                    <select class="form-control" @bind="selectedDonorId">
+                        <option value="">All Donors</option>
+                        @foreach (var donor in donors)
+                        {
+                            <option value="@donor.Id">@donor.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            
+            @if (filterType == "grant")
+            {
+                <div class="form-group">
+                    <label class="form-label">Grant</label>
+                    <select class="form-control" @bind="selectedGrantId">
+                        <option value="">All Grants</option>
+                        @foreach (var grant in grants)
+                        {
+                            <option value="@grant.Id">@grant.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            
+            <div class="form-group" style="align-self: flex-end;">
+                <button class="btn btn-primary" @onclick="GenerateReport">
+                    <i class="fas fa-sync"></i> Generate Report
+                </button>
+            </div>
+        </div>
+        
+        <!-- Export Options -->
+        <div class="d-flex gap-2 mt-3">
+            <div class="dropdown">
+                <button class="btn btn-outline" @onclick="ToggleExportMenu">
+                    <i class="fas fa-download"></i> Export <i class="fas fa-caret-down"></i>
+                </button>
+                @if (showExportMenu)
+                {
+                    <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
+                        <button class="dropdown-item" @onclick="ExportToPdf">
+                            <i class="fas fa-file-pdf text-danger"></i> Export to PDF
+                        </button>
+                        <button class="dropdown-item" @onclick="ExportToExcel">
+                            <i class="fas fa-file-excel text-success"></i> Export to Excel
+                        </button>
+                        <hr style="margin: 0.5rem 0;" />
+                        <button class="dropdown-item" @onclick="ExportTransactionsPdf">
+                            <i class="fas fa-file-pdf text-danger"></i> Transaction Report (PDF)
+                        </button>
+                        <button class="dropdown-item" @onclick="ExportDonorsPdf">
+                            <i class="fas fa-file-pdf text-danger"></i> Donor Report (PDF)
+                        </button>
+                        <button class="dropdown-item" @onclick="ExportGrantsPdf">
+                            <i class="fas fa-file-pdf text-danger"></i> Grant Report (PDF)
+                        </button>
+                    </div>
+                }
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <select class="form-control" @bind="selectedTheme" style="width: auto;">
+                    <option value="Modern">Modern Theme</option>
+                    <option value="Classic">Classic Theme</option>
+                    <option value="FireDepartment">Fire Dept Theme</option>
+                    <option value="Dark">Dark Theme</option>
+                    <option value="Light">Light Theme</option>
+                </select>
+            </div>
+        </div>
+        
+        @if (isExporting)
+        {
+            <div class="alert alert-info mt-2">
+                <span class="spinner"></span> Generating export...
+            </div>
+        }
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+        <span>Generating report...</span>
+    </div>
+}
+else if (summary != null)
+{
+    <!-- Summary Cards -->
+    <div class="metric-cards">
+        <MetricCard 
+            Title="Total Income" 
+            Value="@summary.TotalIncome.ToString("C0")"
+            Icon="fa-arrow-down"
+            IconType="income" />
+        
+        <MetricCard 
+            Title="Total Expenses" 
+            Value="@summary.TotalExpenses.ToString("C0")"
+            Icon="fa-arrow-up"
+            IconType="expense" />
+        
+        <MetricCard 
+            Title="Net Income" 
+            Value="@summary.NetIncome.ToString("C0")"
+            Icon="fa-balance-scale"
+            IconType="@(summary.NetIncome >= 0 ? "income" : "expense")"
+            ValueClass="@(summary.NetIncome >= 0 ? "positive" : "negative")" />
+        
+        <MetricCard 
+            Title="Net Margin" 
+            Value="@GetNetMargin()"
+            Icon="fa-percentage"
+            IconType="neutral" />
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Income by Category</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="incomeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Expenses by Category</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trend Chart -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">Monthly Trend</h3>
+        </div>
+        <div class="card-body">
+            <div class="chart-container" style="height: 350px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detail Tables -->
+    <div class="charts-grid">
+        <!-- Income Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Income Breakdown</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-right">Amount</th>
+                            <th class="text-right">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in summary.IncomeByCategory)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="tree-color" style="background: @(cat.Color ?? "#28a745");"></span>
+                                    @cat.CategoryName
+                                </td>
+                                <td class="text-right amount income">@cat.Amount.ToString("C0")</td>
+                                <td class="text-right">@cat.Percentage.ToString("N1")%</td>
+                            </tr>
+                        }
+                        <tr style="font-weight: 600; background: var(--bg-primary);">
+                            <td>Total</td>
+                            <td class="text-right amount income">@summary.TotalIncome.ToString("C0")</td>
+                            <td class="text-right">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Expense Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Expense Breakdown</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-right">Amount</th>
+                            <th class="text-right">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in summary.ExpensesByCategory)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="tree-color" style="background: @(cat.Color ?? "#dc3545");"></span>
+                                    @cat.CategoryName
+                                </td>
+                                <td class="text-right amount expense">@cat.Amount.ToString("C0")</td>
+                                <td class="text-right">@cat.Percentage.ToString("N1")%</td>
+                            </tr>
+                        }
+                        <tr style="font-weight: 600; background: var(--bg-primary);">
+                            <td>Total</td>
+                            <td class="text-right amount expense">@summary.TotalExpenses.ToString("C0")</td>
+                            <td class="text-right">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+}
+
+@if (showSavePresetDialog)
+{
+    <div class="modal-backdrop" @onclick="CloseSavePresetDialog">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Save Report Preset</h3>
+                <button class="modal-close" @onclick="CloseSavePresetDialog">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Preset Name *</label>
+                    <input type="text" class="form-control" @bind="presetName" placeholder="e.g., Monthly Expense Report" />
+                </div>
+                <div class="form-group">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="presetIsDefault" />
+                        Set as default preset
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseSavePresetDialog">Cancel</button>
+                <button class="btn btn-primary" @onclick="SavePreset">
+                    <i class="fas fa-save"></i> Save Preset
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+private DateTime startDate = new DateTime(DateTime.Today.Year, 1, 1);
+private DateTime endDate = DateTime.Today;
+private string filterType = "all";
+private int? selectedFundId;
+private int? selectedCategoryId;
+private int? selectedDonorId;
+private int? selectedGrantId;
+private List<FundDto> funds = new();
+private List<CategoryDto> categories = new();
+private List<DonorDto> donors = new();
+private List<GrantDto> grants = new();
+private IncomeExpenseSummaryDto? summary;
+private List<TrendDataDto> trendData = new();
+private bool isLoading = false;
+private bool isExporting = false;
+private bool showExportMenu = false;
+private string selectedTheme = "Modern";
+private List<ReportPreset> savedPresets = new();
+private bool showSavePresetDialog = false;
+private string presetName = "";
+private bool presetIsDefault = false;
+
+protected override async Task OnInitializedAsync()
+{
+    funds = await FundService.GetAllAsync();
+    categories = await CategoryService.GetAllAsync();
+    donors = await DonorService.GetAllAsync();
+    grants = await GrantService.GetAllAsync(null);
+    await LoadSavedPresets();
+    await GenerateReport();
+}
+
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (!isLoading && summary != null)
+    {
+        await RenderCharts();
+    }
+}
+
+private void ToggleExportMenu()
+{
+    showExportMenu = !showExportMenu;
+}
+
+private async Task ExportToPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var request = new ReportRequest(startDate, endDate, ReportType.IncomeStatement, theme, true, true, null, selectedFundId);
+        var pdfBytes = await PdfExportService.GenerateFinancialReportAsync(request);
+        await DownloadFile(pdfBytes, $"financial_report_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportToExcel()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var excelBytes = await ImportExportService.ExportFinancialReportToExcelAsync(startDate, endDate);
+        await DownloadFile(excelBytes, $"financial_report_{DateTime.Now:yyyyMMdd}.xlsx", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportTransactionsPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var filter = new TransactionFilterRequest(startDate, endDate);
+        var pdfBytes = await PdfExportService.GenerateTransactionReportAsync(filter);
+        await DownloadFile(pdfBytes, $"transactions_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportDonorsPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var pdfBytes = await PdfExportService.GenerateDonorReportAsync();
+        await DownloadFile(pdfBytes, $"donors_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportGrantsPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var pdfBytes = await PdfExportService.GenerateGrantReportAsync();
+        await DownloadFile(pdfBytes, $"grants_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task DownloadFile(byte[] content, string fileName, string contentType)
+{
+    var base64 = Convert.ToBase64String(content);
+    await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+}
+
+private async Task GenerateReport()
+{
+    isLoading = true;
+    StateHasChanged();
+
+    try
+    {
+        // Build filter based on selected filter type
+        int? categoryId = filterType == "category" ? selectedCategoryId : null;
+        int? fundId = filterType == "fund" ? selectedFundId : null;
+        int? donorId = filterType == "donor" ? selectedDonorId : null;
+        int? grantId = filterType == "grant" ? selectedGrantId : null;
+        
+        var filter = new ReportFilterRequest(startDate, endDate, categoryId, fundId, donorId, grantId);
+        summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
+        trendData = await ReportService.GetTrendDataAsync(startDate, endDate, "monthly");
+    }
+    finally
+    {
+        isLoading = false;
+    }
+}
+
+private async Task RenderCharts()
+{
+    if (summary == null) return;
+
+        // Income pie chart
+        if (summary.IncomeByCategory.Any())
+        {
+            await JS.InvokeVoidAsync("chartInterop.createPieChart", "incomeChart",
+                summary.IncomeByCategory.Select(c => c.CategoryName).ToArray(),
+                summary.IncomeByCategory.Select(c => c.Amount).ToArray(),
+                summary.IncomeByCategory.Select(c => c.Color ?? "#28a745").ToArray(),
+                new { });
+        }
+
+        // Expense pie chart
+        if (summary.ExpensesByCategory.Any())
+        {
+            await JS.InvokeVoidAsync("chartInterop.createPieChart", "expenseChart",
+                summary.ExpensesByCategory.Select(c => c.CategoryName).ToArray(),
+                summary.ExpensesByCategory.Select(c => c.Amount).ToArray(),
+                summary.ExpensesByCategory.Select(c => c.Color ?? "#dc3545").ToArray(),
+                new { });
+        }
+
+        // Trend line chart
+        if (trendData.Any())
+        {
+            await JS.InvokeVoidAsync("chartInterop.createBarChart", "trendChart",
+                trendData.Select(t => t.Period.ToString("MMM yy")).ToArray(),
+                new[]
+                {
+                    new { label = "Income", data = trendData.Select(t => t.Income).ToArray(), backgroundColor = "#28a745" },
+                    new { label = "Expenses", data = trendData.Select(t => t.Expenses).ToArray(), backgroundColor = "#dc3545" }
+                },
+                new { });
+        }
+    }
+
+    private async Task OnPeriodChange(ChangeEventArgs e)
+    {
+        var period = e.Value?.ToString();
+        var today = DateTime.Today;
+
+        switch (period)
+        {
+            case "month":
+                startDate = new DateTime(today.Year, today.Month, 1);
+                endDate = today;
+                break;
+            case "quarter":
+                var quarterStart = new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1);
+                startDate = quarterStart;
+                endDate = today;
+                break;
+            case "ytd":
+                startDate = new DateTime(today.Year, 1, 1);
+                endDate = today;
+                break;
+            case "year":
+                startDate = today.AddYears(-1);
+                endDate = today;
+                break;
+        }
+
+        await GenerateReport();
+    }
+
+    private string GetNetMargin()
+    {
+        if (summary == null || summary.TotalIncome == 0) return "0.0%";
+        return $"{(summary.NetIncome / summary.TotalIncome * 100):N1}%";
+    }
+
+    private async Task LoadSavedPresets()
+    {
+        // Load from database (will implement service)
+        savedPresets = new List<ReportPreset>(); // Placeholder
+    }
+
+    private void ShowSavePresetDialog()
+    {
+        presetName = $"Report {DateTime.Now:MMM d, yyyy}";
+        presetIsDefault = false;
+        showSavePresetDialog = true;
+    }
+
+    private void CloseSavePresetDialog()
+    {
+        showSavePresetDialog = false;
+    }
+
+    private async Task SavePreset()
+    {
+        if (string.IsNullOrWhiteSpace(presetName))
+        {
+            return;
+        }
+
+        var preset = new ReportPreset
+        {
+            Name = presetName,
+            ReportType = "Financial",
+            StartDate = startDate,
+            EndDate = endDate,
+            FilterType = filterType,
+            AccountId = selectedFundId,
+            CategoryId = selectedCategoryId,
+            DonorId = selectedDonorId,
+            GrantId = selectedGrantId,
+            PdfTheme = selectedTheme,
+            IsDefault = presetIsDefault
+        };
+
+        // Save to database (will implement)
+        savedPresets.Add(preset);
+        
+        showSavePresetDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadPreset(ChangeEventArgs e)
+    {
+        var presetId = e.Value?.ToString();
+        if (string.IsNullOrEmpty(presetId)) return;
+
+        var preset = savedPresets.FirstOrDefault(p => p.Id.ToString() == presetId);
+        if (preset == null) return;
+
+        startDate = preset.StartDate ?? DateTime.Today.AddYears(-1);
+        endDate = preset.EndDate ?? DateTime.Today;
+        filterType = preset.FilterType ?? "all";
+        selectedFundId = preset.AccountId;
+        selectedCategoryId = preset.CategoryId;
+        selectedDonorId = preset.DonorId;
+        selectedGrantId = preset.GrantId;
+        selectedTheme = preset.PdfTheme ?? "Modern";
+
+        await GenerateReport();
+    }
+}

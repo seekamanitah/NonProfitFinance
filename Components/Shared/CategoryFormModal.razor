@@ -1,0 +1,216 @@
+@inject ICategoryService CategoryService
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit Category" : "Add Category")</h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <InputText class="form-control" @bind-Value="model.Name" placeholder="Category name" />
+                    <ValidationMessage For="@(() => model.Name)" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Description" 
+                                   placeholder="Optional description" rows="2" />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Color</label>
+                        <div class="d-flex gap-2 align-center">
+                            <input type="color" class="form-control" style="width: 50px; height: 38px; padding: 2px;"
+                                   @bind="model.Color" />
+                            <input type="text" class="form-control" @bind="model.Color" 
+                                   placeholder="#000000" style="width: 100px;" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Icon</label>
+                        <InputSelect class="form-control" @bind-Value="model.Icon">
+                            <option value="">No icon</option>
+                            <option value="fa-dollar-sign">💵 Dollar</option>
+                            <option value="fa-heart">❤️ Heart</option>
+                            <option value="fa-users">👥 Users</option>
+                            <option value="fa-building">🏢 Building</option>
+                            <option value="fa-truck">🚚 Truck</option>
+                            <option value="fa-tools">🔧 Tools</option>
+                            <option value="fa-graduation-cap">🎓 Education</option>
+                            <option value="fa-file-invoice">📄 Invoice</option>
+                        </InputSelect>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Parent Category</label>
+                        <InputSelect class="form-control" @bind-Value="model.ParentId">
+                            <option value="">Root level (no parent)</option>
+                            @foreach (var cat in AvailableParents)
+                            {
+                                <option value="@cat.Id">@cat.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Budget Limit</label>
+                        <InputNumber class="form-control" @bind-Value="model.BudgetLimit" 
+                                     placeholder="Optional limit" />
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Sort Order</label>
+                    <InputNumber class="form-control" @bind-Value="model.SortOrder" 
+                                 style="width: 100px;" />
+                    <small class="text-muted">Lower numbers appear first</small>
+                </div>
+                
+                @if (errorMessage != null)
+                {
+                    <div class="alert alert-danger mt-3">
+                        <i class="fas fa-exclamation-circle"></i> @errorMessage
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    @(IsEdit ? "Update" : "Create") Category
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CategoryDto? Category { get; set; }
+    [Parameter] public int? ParentId { get; set; }
+    [Parameter] public CategoryType CategoryType { get; set; }
+    [Parameter] public List<CategoryDto> AllCategories { get; set; } = new();
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private CategoryFormModel model = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    private bool IsEdit => Category != null;
+    
+    private IEnumerable<CategoryDto> AvailableParents => AllCategories
+        .Where(c => c.Type == CategoryType && c.Id != Category?.Id && !c.IsArchived);
+
+    protected override void OnInitialized()
+    {
+        if (Category != null)
+        {
+            model = new CategoryFormModel
+            {
+                Name = Category.Name,
+                Description = Category.Description,
+                Color = Category.Color ?? "#6c757d",
+                Icon = Category.Icon,
+                ParentId = Category.ParentId,
+                BudgetLimit = Category.BudgetLimit,
+                SortOrder = Category.SortOrder
+            };
+        }
+        else
+        {
+            model.ParentId = ParentId;
+            model.Color = CategoryType == CategoryType.Income ? "#28a745" : "#dc3545";
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            errorMessage = "Name is required.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await CategoryService.UpdateAsync(Category!.Id, new UpdateCategoryRequest(
+                    model.Name!,
+                    model.Description,
+                    model.Color,
+                    model.Icon,
+                    model.BudgetLimit,
+                    model.ParentId,
+                    model.SortOrder
+                ));
+            }
+            else
+            {
+                await CategoryService.CreateAsync(new CreateCategoryRequest(
+                    model.Name!,
+                    model.Description,
+                    model.Color,
+                    model.Icon,
+                    CategoryType,
+                    model.BudgetLimit,
+                    model.ParentId,
+                    model.SortOrder
+                ));
+            }
+
+            await OnSave.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred: " + ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private class CategoryFormModel
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Color { get; set; } = "#6c757d";
+        public string? Icon { get; set; }
+        public int? ParentId { get; set; }
+        public decimal? BudgetLimit { get; set; }
+        public int SortOrder { get; set; } = 0;
+    }
+}

@@ -1,0 +1,276 @@
+@using NonProfitFinance.Models
+@using NonProfitFinance.DTOs
+@inject IBudgetService BudgetService
+@inject ICategoryService CategoryService
+
+<div class="modal-backdrop" @onclick="Close">
+    <div class="modal" @onclick:stopPropagation="true" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit" : "Create") Budget</h3>
+            <button class="modal-close" @onclick="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> @errorMessage
+                </div>
+            }
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Budget Name *</label>
+                    <input type="text" class="form-control" @bind="model.Name" placeholder="e.g., FY 2024 Operating Budget" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Fiscal Year *</label>
+                    <input type="number" class="form-control" @bind="model.FiscalYear" min="2020" max="2050" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="model.IsActive" />
+                        Active Budget
+                    </label>
+                </div>
+            </div>
+            
+            <hr />
+            
+            <div class="d-flex justify-between align-center mb-3">
+                <h4 style="margin: 0;">Category Budget Amounts</h4>
+                <button class="btn btn-sm btn-outline" @onclick="AddAllCategories">
+                    <i class="fas fa-plus"></i> Add All Categories
+                </button>
+            </div>
+            
+            @if (model.LineItems.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th style="width: 150px;">Budget Amount</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in model.LineItems)
+                        {
+                            <tr>
+                                <td>
+                                    <select class="form-control" @bind="item.CategoryId">
+                                        <option value="0">Select category...</option>
+                                        @foreach (var cat in expenseCategories)
+                                        {
+                                            <option value="@cat.Id">@cat.Name</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" class="form-control" 
+                                           @bind="item.Amount" placeholder="0.00" />
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-icon text-danger" 
+                                            @onclick="() => RemoveLineItem(item)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: 600; background: var(--bg-secondary);">
+                            <td>Total Budget</td>
+                            <td>@model.LineItems.Sum(i => i.Amount).ToString("C2")</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> No budget line items yet. Click "Add Line Item" or "Add All Categories" to start.
+                </div>
+            }
+            
+            <button class="btn btn-outline mt-2" @onclick="AddLineItem">
+                <i class="fas fa-plus"></i> Add Line Item
+            </button>
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn btn-outline" @onclick="Close">Cancel</button>
+            <button class="btn btn-primary" @onclick="HandleSubmit" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    <i class="fas fa-save"></i>
+                }
+                @(IsEdit ? "Update" : "Create") Budget
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public BudgetDto? Budget { get; set; }
+    
+    [Parameter]
+    public bool IsEdit { get; set; }
+    
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+    
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    private BudgetModel model = new();
+    private List<CategoryDto> expenseCategories = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allCategories = await CategoryService.GetAllAsync();
+        expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense && !c.IsArchived).ToList();
+        
+        if (IsEdit && Budget != null)
+        {
+            model = new BudgetModel
+            {
+                Id = Budget.Id,
+                Name = Budget.Name,
+                FiscalYear = Budget.FiscalYear,
+                IsActive = Budget.IsActive,
+                LineItems = Budget.LineItems.Select(li => new BudgetLineItemModel
+                {
+                    CategoryId = li.CategoryId,
+                    Amount = li.BudgetAmount
+                }).ToList()
+            };
+        }
+        else
+        {
+            model.Name = $"FY {DateTime.Today.Year} Budget";
+            model.FiscalYear = DateTime.Today.Year;
+            model.IsActive = true;
+        }
+    }
+
+    private void AddLineItem()
+    {
+        model.LineItems.Add(new BudgetLineItemModel());
+    }
+
+    private void RemoveLineItem(BudgetLineItemModel item)
+    {
+        model.LineItems.Remove(item);
+    }
+
+    private void AddAllCategories()
+    {
+        foreach (var category in expenseCategories)
+        {
+            if (!model.LineItems.Any(li => li.CategoryId == category.Id))
+            {
+                model.LineItems.Add(new BudgetLineItemModel
+                {
+                    CategoryId = category.Id,
+                    Amount = 0
+                });
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        
+        // Validation
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            errorMessage = "Please enter a budget name.";
+            return;
+        }
+        
+        if (model.FiscalYear < 2020 || model.FiscalYear > 2050)
+        {
+            errorMessage = "Please enter a valid year between 2020 and 2050.";
+            return;
+        }
+        
+        var validItems = model.LineItems.Where(li => li.CategoryId > 0 && li.Amount > 0).ToList();
+        if (!validItems.Any())
+        {
+            errorMessage = "Please add at least one budget line item with a category and amount.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            if (IsEdit && Budget != null)
+            {
+                var updateRequest = new UpdateBudgetRequest(
+                    model.Name,
+                    model.IsActive,
+                    validItems.Select(li => new CreateBudgetLineItemRequest(li.CategoryId, li.Amount)).ToList()
+                );
+                
+                await BudgetService.UpdateAsync(Budget.Id, updateRequest);
+            }
+            else
+            {
+                var createRequest = new CreateBudgetRequest(
+                    model.Name,
+                    model.FiscalYear,
+                    validItems.Select(li => new CreateBudgetLineItemRequest(li.CategoryId, li.Amount)).ToList()
+                );
+                
+                await BudgetService.CreateAsync(createRequest);
+            }
+
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private class BudgetModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int FiscalYear { get; set; }
+        public bool IsActive { get; set; }
+        public List<BudgetLineItemModel> LineItems { get; set; } = new();
+    }
+
+    private class BudgetLineItemModel
+    {
+        public int CategoryId { get; set; }
+        public decimal Amount { get; set; }
+    }
+}

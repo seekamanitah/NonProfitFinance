@@ -1,0 +1,234 @@
+@page "/bank-connections"
+@inject IBankConnectionService BankService
+@rendermode InteractiveServer
+
+<PageTitle>Bank Connections - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Bank Connections</h2>
+        <p class="text-muted">Connect bank accounts for automatic transaction import</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ConnectBank" disabled="@isConnecting">
+        @if (isConnecting)
+        {
+            <span class="spinner"></span>
+        }
+        else
+        {
+            <i class="fas fa-link"></i>
+        }
+        Connect Bank Account
+    </button>
+</div>
+
+<!-- Feature Info -->
+<div class="alert alert-info mb-3">
+    <i class="fas fa-info-circle"></i>
+    <strong>Coming Soon:</strong> Bank integration via Plaid allows automatic import of transactions from your bank accounts.
+    This feature requires Plaid API credentials.
+</div>
+
+<!-- Connected Accounts -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-university"></i> Connected Accounts</h3>
+    </div>
+    <div class="card-body">
+        @if (accounts.Any())
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Institution</th>
+                        <th>Account</th>
+                        <th>Type</th>
+                        <th class="text-right">Balance</th>
+                        <th>Last Synced</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var account in accounts)
+                    {
+                        <tr>
+                            <td>
+                                <i class="fas fa-university text-muted"></i>
+                                @account.InstitutionName
+                            </td>
+                            <td>
+                                @account.AccountName
+                                <br />
+                                <small class="text-muted">****@account.AccountMask</small>
+                            </td>
+                            <td>@account.AccountType</td>
+                            <td class="text-right">@(account.CurrentBalance?.ToString("C") ?? "—")</td>
+                            <td>
+                                @if (account.LastSynced.HasValue)
+                                {
+                                    <span>@account.LastSynced.Value.ToString("MMM d, h:mm tt")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Never</span>
+                                }
+                            </td>
+                            <td>
+                                @if (account.IsActive)
+                                {
+                                    <span class="badge badge-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">Disconnected</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline" @onclick="() => SyncAccount(account)" title="Sync">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline text-danger" @onclick="() => DisconnectAccount(account)" title="Disconnect">
+                                        <i class="fas fa-unlink"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="text-center text-muted" style="padding: 2rem;">
+                <i class="fas fa-university" style="font-size: 3rem; opacity: 0.3;"></i>
+                <p class="mt-3">No bank accounts connected yet.</p>
+                <p style="font-size: 0.9rem;">
+                    Connect your bank account to automatically import transactions and keep your records up to date.
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Pending Transactions -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Transactions</h3>
+    </div>
+    <div class="card-body">
+        @if (pendingTransactions.Any())
+        {
+            <p class="text-muted mb-3">Review and categorize imported transactions:</p>
+            @foreach (var tx in pendingTransactions)
+            {
+                <div class="d-flex justify-between align-center mb-2 p-2" 
+                     style="border: 1px solid var(--border-color); border-radius: 4px;">
+                    <div>
+                        <strong>@tx.MerchantName</strong>
+                        <br />
+                        <small class="text-muted">@tx.Date.ToString("MMM d") • @tx.AccountName</small>
+                    </div>
+                    <div class="text-right">
+                        <span class="amount @(tx.IsIncome ? "income" : "expense")">
+                            @(tx.IsIncome ? "+" : "-")@Math.Abs(tx.Amount).ToString("C")
+                        </span>
+                        <br />
+                        @if (!string.IsNullOrEmpty(tx.SuggestedCategory))
+                        {
+                            <small class="text-muted">Suggested: @tx.SuggestedCategory</small>
+                        }
+                    </div>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline text-success" title="Approve">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline text-danger" title="Dismiss">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <p class="text-muted text-center">No pending transactions to review.</p>
+        }
+    </div>
+</div>
+
+<!-- Setup Instructions -->
+<div class="card mt-3">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cog"></i> Setup Instructions</h3>
+    </div>
+    <div class="card-body">
+        <p>To enable bank integration:</p>
+        <ol>
+            <li>Create a Plaid account at <a href="https://plaid.com" target="_blank">plaid.com</a></li>
+            <li>Get your API credentials (Client ID and Secret)</li>
+            <li>Add credentials to <code>appsettings.json</code>:
+                <pre style="background: var(--bg-secondary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem;">{
+  "Plaid": {
+    "ClientId": "your-client-id",
+    "Secret": "your-secret",
+    "Environment": "sandbox"
+  }
+}</pre>
+            </li>
+            <li>Restart the application</li>
+        </ol>
+        <p class="text-muted" style="font-size: 0.9rem;">
+            <i class="fas fa-info-circle"></i>
+            Plaid offers a free sandbox environment for testing.
+        </p>
+    </div>
+</div>
+
+@code {
+    private List<BankAccountDto> accounts = new();
+    private List<PendingBankTransactionDto> pendingTransactions = new();
+    private bool isConnecting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        accounts = await BankService.GetConnectedAccountsAsync();
+        pendingTransactions = await BankService.GetPendingTransactionsAsync();
+    }
+
+    private async Task ConnectBank()
+    {
+        isConnecting = true;
+        try
+        {
+            // In production, this would initiate Plaid Link
+            await BankService.CreateLinkTokenAsync("user");
+        }
+        catch (NotImplementedException)
+        {
+            // Expected - feature not yet implemented
+        }
+        finally
+        {
+            isConnecting = false;
+        }
+    }
+
+    private async Task SyncAccount(BankAccountDto account)
+    {
+        await BankService.SyncTransactionsAsync(account.Id);
+        await LoadData();
+    }
+
+    private async Task DisconnectAccount(BankAccountDto account)
+    {
+        await BankService.DisconnectAccountAsync(account.Id);
+        await LoadData();
+    }
+}

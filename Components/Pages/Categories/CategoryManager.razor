@@ -1,0 +1,210 @@
+@page "/categories"
+@inject ICategoryService CategoryService
+@rendermode InteractiveServer
+
+<PageTitle>Categories - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div class="tabs" style="border-bottom: none; margin-bottom: 0;">
+        <div class="tab @(activeTab == CategoryType.Income ? "active" : "")" 
+             @onclick="() => SwitchTab(CategoryType.Income)">
+            <i class="fas fa-arrow-down text-success"></i> Income Categories
+        </div>
+        <div class="tab @(activeTab == CategoryType.Expense ? "active" : "")" 
+             @onclick="() => SwitchTab(CategoryType.Expense)">
+            <i class="fas fa-arrow-up text-danger"></i> Expense Categories
+        </div>
+    </div>
+    
+    <button class="btn btn-primary" @onclick="ShowAddForm">
+        <i class="fas fa-plus"></i> Add Category
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        }
+        else if (!categoryTree.Any())
+        {
+            <div class="text-center text-muted" style="padding: 2rem;">
+                No categories found. Click "Add Category" to create one.
+            </div>
+        }
+        else
+        {
+            <div class="category-tree">
+                @foreach (var category in categoryTree)
+                {
+                    <CategoryTreeItem 
+                        Category="category"
+                        SelectedId="selectedCategory?.Id"
+                        OnSelect="SelectCategory"
+                        OnEdit="EditCategory"
+                        OnArchive="ArchiveCategory"
+                        OnAddChild="AddChildCategory" />
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Selected Category Details -->
+@if (selectedCategory != null)
+{
+    <div class="card mt-3">
+        <div class="card-header">
+            <h3 class="card-title">
+                <span class="tree-color" style="background: @(selectedCategory.Color ?? "#6c757d");"></span>
+                @selectedCategory.Name
+            </h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline" @onclick="() => EditCategory(selectedCategory)">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                @if (selectedCategory.IsArchived)
+                {
+                    <button class="btn btn-sm btn-success" @onclick="() => RestoreCategory(selectedCategory)">
+                        <i class="fas fa-undo"></i> Restore
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-sm btn-warning" @onclick="() => ArchiveCategory(selectedCategory)">
+                        <i class="fas fa-archive"></i> Archive
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <p>@(selectedCategory.Description ?? "No description")</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Budget Limit</label>
+                    <p>@(selectedCategory.BudgetLimit?.ToString("C") ?? "Not set")</p>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <span class="badge @(selectedCategory.Type == CategoryType.Income ? "badge-income" : "badge-expense")">
+                        @selectedCategory.Type
+                    </span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <span class="badge @(selectedCategory.IsArchived ? "badge-warning" : "badge-success")">
+                        @(selectedCategory.IsArchived ? "Archived" : "Active")
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Category Form Modal -->
+@if (showForm)
+{
+    <CategoryFormModal 
+        Category="editingCategory"
+        ParentId="parentIdForNew"
+        CategoryType="activeTab"
+        AllCategories="allCategories"
+        OnSave="OnCategorySaved"
+        OnCancel="CloseForm" />
+}
+
+@code {
+    private CategoryType activeTab = CategoryType.Expense;
+    private List<CategoryDto> categoryTree = new();
+    private List<CategoryDto> allCategories = new();
+    private CategoryDto? selectedCategory;
+    private CategoryDto? editingCategory;
+    private int? parentIdForNew;
+    private bool isLoading = true;
+    private bool showForm = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        isLoading = true;
+        categoryTree = await CategoryService.GetTreeAsync(activeTab);
+        allCategories = await CategoryService.GetAllAsync(activeTab, includeArchived: true);
+        isLoading = false;
+    }
+
+    private async Task SwitchTab(CategoryType type)
+    {
+        activeTab = type;
+        selectedCategory = null;
+        await LoadCategories();
+    }
+
+    private void SelectCategory(CategoryDto category)
+    {
+        selectedCategory = category;
+    }
+
+    private void ShowAddForm()
+    {
+        editingCategory = null;
+        parentIdForNew = null;
+        showForm = true;
+    }
+
+    private void AddChildCategory(CategoryDto parent)
+    {
+        editingCategory = null;
+        parentIdForNew = parent.Id;
+        showForm = true;
+    }
+
+    private void EditCategory(CategoryDto category)
+    {
+        editingCategory = category;
+        parentIdForNew = null;
+        showForm = true;
+    }
+
+    private async Task ArchiveCategory(CategoryDto category)
+    {
+        await CategoryService.ArchiveAsync(category.Id);
+        await LoadCategories();
+        if (selectedCategory?.Id == category.Id)
+        {
+            selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+        }
+    }
+
+    private async Task RestoreCategory(CategoryDto category)
+    {
+        await CategoryService.RestoreAsync(category.Id);
+        await LoadCategories();
+        if (selectedCategory?.Id == category.Id)
+        {
+            selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+        }
+    }
+
+    private async Task OnCategorySaved()
+    {
+        showForm = false;
+        await LoadCategories();
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+    }
+}

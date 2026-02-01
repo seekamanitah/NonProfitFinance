@@ -1,0 +1,332 @@
+/* ===================================================
+   THEME FIX - Comprehensive Dark/Light Mode Support
+   Apply these styles to ensure proper theming
+   =================================================== */
+
+/* CORE ELEMENTS - Must use CSS variables */
+body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.main-content {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.page-content {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* CARDS - Use theme variables */
+.card {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-header {
+    background-color: var(--bg-card) !important;
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-body {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+/* FORMS - Inputs, selects, textareas */
+.form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="search"],
+select,
+textarea {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.form-label,
+label {
+    color: var(--text-primary) !important;
+}
+
+/* TABLES */
+.table,
+.data-table {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.table thead,
+.data-table thead {
+    background-color: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+.table th,
+.data-table th {
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+.table td,
+.data-table td {
+    border-bottom-color: var(--border-light) !important;
+    color: var(--text-primary) !important;
+}
+
+.table tbody tr:hover,
+.data-table tbody tr:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* MODALS */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+.modal {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-header {
+    background-color: var(--bg-card) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+.modal-body {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-footer {
+    background-color: var(--bg-card) !important;
+    border-top-color: var(--border-color) !important;
+}
+
+.modal-title,
+.modal-close {
+    color: var(--text-primary) !important;
+}
+
+/* BUTTONS - Outline variant */
+.btn-outline {
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    background-color: transparent !important;
+}
+
+.btn-outline:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--text-primary) !important;
+}
+
+.btn-secondary {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* BADGES */
+.badge {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* TEXT COLORS */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+/* BORDERS */
+.border,
+.border-top,
+.border-bottom,
+.border-left,
+.border-right {
+    border-color: var(--border-color) !important;
+}
+
+/* SIDEBAR - Ensure it stays dark in both modes */
+.sidebar {
+    background: linear-gradient(180deg, #212529 0%, #1a1a1a 100%) !important;
+    color: #ffffff !important;
+}
+
+.sidebar-header {
+    border-bottom-color: #495057 !important;
+}
+
+.nav-item {
+    color: #adb5bd !important;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+}
+
+.nav-item.active {
+    background-color: var(--color-primary) !important;
+    color: #ffffff !important;
+}
+
+/* MAIN HEADER */
+.main-header {
+    background-color: var(--bg-secondary) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+/* ALERTS in Dark Mode */
+[data-theme="dark"] .alert-warning {
+    background-color: rgba(210, 153, 34, 0.15) !important;
+    border-color: var(--color-warning) !important;
+    color: var(--color-warning) !important;
+}
+
+[data-theme="dark"] .alert-danger {
+    background-color: rgba(248, 81, 73, 0.15) !important;
+    border-color: var(--color-danger) !important;
+    color: var(--color-danger) !important;
+}
+
+[data-theme="dark"] .alert-success {
+    background-color: rgba(46, 160, 67, 0.15) !important;
+    border-color: var(--color-success) !important;
+    color: var(--color-success) !important;
+}
+
+[data-theme="dark"] .alert-info {
+    background-color: rgba(88, 166, 255, 0.15) !important;
+    border-color: var(--color-info) !important;
+    color: var(--color-info) !important;
+}
+
+/* DROPDOWNS & SELECT MENUS */
+.dropdown-menu,
+select option {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* PAGINATION */
+.pagination .page-link {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.pagination .page-link:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+}
+
+/* CHARTS GRID & METRIC CARDS */
+.charts-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.metric-card {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* FILTER BAR */
+.filter-bar {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* HELP CONTENT */
+.help-content {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.help-content h1,
+.help-content h2,
+.help-content h3,
+.help-content h4 {
+    color: var(--text-primary) !important;
+}
+
+.help-content p,
+.help-content li {
+    color: var(--text-primary) !important;
+}
+
+.help-section {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* CODE BLOCKS */
+code,
+pre {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+kbd {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* TRANSITIONS for smooth theme changes */
+* {
+    transition: background-color 0.2s ease, 
+                color 0.2s ease, 
+                border-color 0.2s ease;
+}
+
+/* Exclude transitions on animations and specific elements */
+*:focus,
+*:hover,
+.spinner,
+[class*="animate"] {
+    transition-duration: 0s;
+}

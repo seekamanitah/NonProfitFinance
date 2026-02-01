@@ -1,0 +1,300 @@
+<!-- Transactions Help -->
+<div class="help-section">
+    <nav class="help-breadcrumb">
+        <a href="/help">Help</a> / <span>Transactions</span>
+    </nav>
+    
+    <h1><i class="fas fa-exchange-alt"></i> Transactions</h1>
+    <p class="help-intro">Everything you need to know about recording financial transactions.</p>
+    
+    <!-- Overview -->
+    <div class="help-block">
+        <h2>What is a Transaction?</h2>
+        <p>
+            A transaction represents any financial event - money coming in (income), 
+            money going out (expense), or money moving between accounts (transfer).
+        </p>
+        
+        <div class="transaction-types">
+            <div class="tx-type income">
+                <i class="fas fa-arrow-down"></i>
+                <h4>Income</h4>
+                <p>Money received: donations, grants, fundraising, dues</p>
+            </div>
+            <div class="tx-type expense">
+                <i class="fas fa-arrow-up"></i>
+                <h4>Expense</h4>
+                <p>Money spent: bills, supplies, equipment, services</p>
+            </div>
+            <div class="tx-type transfer">
+                <i class="fas fa-arrows-alt-h"></i>
+                <h4>Transfer</h4>
+                <p>Money moved between accounts within your organization</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Field Descriptions -->
+    <div class="help-block">
+        <h2><i class="fas fa-list"></i> Transaction Fields Explained</h2>
+        
+        <table class="help-table field-table">
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Required</th>
+                    <th>Description</th>
+                    <th>Example</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Date</strong></td>
+                    <td>? Yes</td>
+                    <td>When the transaction occurred</td>
+                    <td>01/15/2024</td>
+                </tr>
+                <tr>
+                    <td><strong>Type</strong></td>
+                    <td>? Yes</td>
+                    <td>Income, Expense, or Transfer</td>
+                    <td>Expense</td>
+                </tr>
+                <tr>
+                    <td><strong>Amount</strong></td>
+                    <td>? Yes</td>
+                    <td>Dollar amount (always positive)</td>
+                    <td>$250.00</td>
+                </tr>
+                <tr>
+                    <td><strong>Category</strong></td>
+                    <td>? Yes</td>
+                    <td>Classification for reporting</td>
+                    <td>Equipment & Supplies</td>
+                </tr>
+                <tr>
+                    <td><strong>Account</strong></td>
+                    <td>? No</td>
+                    <td>Which fund this affects</td>
+                    <td>General Fund</td>
+                </tr>
+                <tr>
+                    <td><strong>Payee/Donor</strong></td>
+                    <td>? No</td>
+                    <td>Who you paid or who paid you</td>
+                    <td>Fire Equipment Co.</td>
+                </tr>
+                <tr>
+                    <td><strong>Description</strong></td>
+                    <td>? No</td>
+                    <td>Notes about the transaction</td>
+                    <td>Purchased new hose nozzles</td>
+                </tr>
+                <tr>
+                    <td><strong>PO Number</strong></td>
+                    <td>? No</td>
+                    <td>Purchase order reference</td>
+                    <td>PO-2024-0015</td>
+                </tr>
+                <tr>
+                    <td><strong>Reference #</strong></td>
+                    <td>? No</td>
+                    <td>Check number or invoice number</td>
+                    <td>CHK-1234</td>
+                </tr>
+                <tr>
+                    <td><strong>Donor</strong></td>
+                    <td>? No</td>
+                    <td>Link to donor record (for income)</td>
+                    <td>John Smith</td>
+                </tr>
+                <tr>
+                    <td><strong>Grant</strong></td>
+                    <td>? No</td>
+                    <td>Link to grant (if grant-funded)</td>
+                    <td>FEMA AFG 2024</td>
+                </tr>
+                <tr>
+                    <td><strong>Account Type</strong></td>
+                    <td>? No</td>
+                    <td>Unrestricted, Restricted, etc.</td>
+                    <td>Restricted</td>
+                </tr>
+                <tr>
+                    <td><strong>Tags</strong></td>
+                    <td>? No</td>
+                    <td>Additional labels for filtering</td>
+                    <td>annual-fundraiser, 2024</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- How to Record -->
+    <div class="help-block">
+        <h2><i class="fas fa-plus-circle"></i> Recording Transactions</h2>
+        
+        <h3>Method 1: Quick Add (Fastest)</h3>
+        <ol>
+            <li>Press <kbd>Ctrl</kbd> + <kbd>N</kbd> or click the Quick Add button</li>
+            <li>Select Income or Expense</li>
+            <li>Enter amount, description, and category</li>
+            <li>Click Save</li>
+        </ol>
+        <p class="help-note-inline">
+            <i class="fas fa-info-circle"></i> Quick Add is great for simple transactions. Use Full Form for detailed entries.
+        </p>
+        
+        <h3>Method 2: Full Transaction Form</h3>
+        <ol>
+            <li>Navigate to <strong>Transactions</strong></li>
+            <li>Click <strong>Add Transaction</strong></li>
+            <li>Fill in all required and optional fields</li>
+            <li>Click <strong>Save Transaction</strong></li>
+        </ol>
+    </div>
+    
+    <!-- Split Transactions -->
+    <div class="help-block">
+        <h2><i class="fas fa-code-branch"></i> Split Transactions</h2>
+        <p>
+            Sometimes one payment covers multiple categories. For example, a $500 check might 
+            cover $300 for equipment and $200 for training supplies.
+        </p>
+        
+        <div class="help-example">
+            <h4>Example Split Transaction:</h4>
+            <table class="help-table">
+                <tr>
+                    <th>Total Amount</th>
+                    <td colspan="2">$500.00</td>
+                </tr>
+                <tr>
+                    <th>Split 1</th>
+                    <td>Equipment & Supplies</td>
+                    <td>$300.00</td>
+                </tr>
+                <tr>
+                    <th>Split 2</th>
+                    <td>Training Materials</td>
+                    <td>$200.00</td>
+                </tr>
+            </table>
+        </div>
+        
+        <h4>How to Create a Split:</h4>
+        <ol>
+            <li>In the transaction form, enable "Split Transaction"</li>
+            <li>Add each category and amount</li>
+            <li>Ensure splits total to the transaction amount</li>
+            <li>Save</li>
+        </ol>
+    </div>
+    
+    <!-- Linking to Donors/Grants -->
+    <div class="help-block">
+        <h2><i class="fas fa-link"></i> Linking Transactions</h2>
+        
+        <h3>Linking to a Donor</h3>
+        <p>When recording a donation, link it to the donor to:</p>
+        <ul>
+            <li>Automatically update their giving history</li>
+            <li>Generate year-end tax receipts</li>
+            <li>Track donor retention metrics</li>
+        </ul>
+        
+        <h3>Linking to a Grant</h3>
+        <p>When spending grant funds, link the expense to the grant to:</p>
+        <ul>
+            <li>Track grant spending vs. award amount</li>
+            <li>Ensure compliance with grant restrictions</li>
+            <li>Generate grant expense reports</li>
+        </ul>
+        
+        <div class="help-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Important:</strong> Always link grant expenses! This is critical for grant reporting and compliance.
+        </div>
+    </div>
+    
+    <!-- Filtering & Searching -->
+    <div class="help-block">
+        <h2><i class="fas fa-filter"></i> Finding Transactions</h2>
+        
+        <h3>Filter Options:</h3>
+        <ul>
+            <li><strong>Date Range</strong> - Show transactions within a period</li>
+            <li><strong>Type</strong> - Income, Expense, or Transfer only</li>
+            <li><strong>Category</strong> - Filter by category</li>
+            <li><strong>Account</strong> - Show only one account's transactions</li>
+            <li><strong>Search</strong> - Search descriptions, payees, tags</li>
+        </ul>
+        
+        <h3>Quick Search Tips:</h3>
+        <ul>
+            <li>Press <kbd>Ctrl</kbd> + <kbd>F</kbd> for global search</li>
+            <li>Search by payee name: "Fire Equipment"</li>
+            <li>Search by PO number: "PO-2024"</li>
+            <li>Search by description: "training hose"</li>
+        </ul>
+    </div>
+    
+    <!-- Best Practices -->
+    <div class="help-block">
+        <h2><i class="fas fa-star"></i> Best Practices</h2>
+        
+        <div class="best-practices">
+            <div class="practice-item">
+                <div class="practice-icon good">?</div>
+                <div class="practice-content">
+                    <h4>Be Consistent with Descriptions</h4>
+                    <p>Use clear, consistent naming so you can search later.</p>
+                </div>
+            </div>
+            
+            <div class="practice-item">
+                <div class="practice-icon good">?</div>
+                <div class="practice-content">
+                    <h4>Always Assign Categories</h4>
+                    <p>Every transaction needs a category for accurate reporting.</p>
+                </div>
+            </div>
+            
+            <div class="practice-item">
+                <div class="practice-icon good">?</div>
+                <div class="practice-content">
+                    <h4>Link Donations to Donors</h4>
+                    <p>This enables tax receipts and donor tracking.</p>
+                </div>
+            </div>
+            
+            <div class="practice-item">
+                <div class="practice-icon good">?</div>
+                <div class="practice-content">
+                    <h4>Use PO Numbers for Purchases</h4>
+                    <p>Creates an audit trail and helps with reconciliation.</p>
+                </div>
+            </div>
+            
+            <div class="practice-item">
+                <div class="practice-icon bad">?</div>
+                <div class="practice-content">
+                    <h4>Avoid Vague Descriptions</h4>
+                    <p>Don't use "Stuff" or "Misc" - be specific!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Related Topics -->
+    <div class="help-related">
+        <h3>Related Topics</h3>
+        <div class="related-links">
+            <a href="/help/categories"><i class="fas fa-folder"></i> Categories</a>
+            <a href="/help/accounts"><i class="fas fa-wallet"></i> Accounts</a>
+            <a href="/help/donors"><i class="fas fa-heart"></i> Donors</a>
+            <a href="/help/grants"><i class="fas fa-hand-holding-usd"></i> Grants</a>
+            <a href="/help/recurring"><i class="fas fa-sync"></i> Recurring Transactions</a>
+        </div>
+    </div>
+</div>

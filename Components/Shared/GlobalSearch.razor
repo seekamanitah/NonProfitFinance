@@ -1,0 +1,260 @@
+@inject ITransactionService TransactionService
+@inject IDonorService DonorService
+@inject IGrantService GrantService
+@inject ICategoryService CategoryService
+@inject NavigationManager Navigation
+
+<div class="global-search">
+<div class="search-input-wrapper">
+    <i class="fas fa-search search-icon"></i>
+    <input type="text" 
+           class="search-input" 
+           placeholder="Search transactions, donors, grants... (Press Enter to open first result)" 
+           @bind="searchQuery"
+           @bind:event="oninput"
+           @onfocus="OnFocus"
+           @onblur="OnBlur"
+           @onkeydown="HandleKeyDown"
+           @onkeydown:preventDefault="@(handleKeyDownPreventDefault)" />
+    @if (!string.IsNullOrEmpty(searchQuery))
+    {
+        <button class="search-clear" @onclick="ClearSearch" @onclick:stopPropagation="true" title="Clear search (ESC)">
+            <i class="fas fa-times"></i>
+        </button>
+    }
+    @if (!string.IsNullOrEmpty(searchQuery) && results.Any())
+    {
+        <button class="search-button" @onclick="() => NavigateToResult(results.First())" title="Go to first result (Enter)">
+            <i class="fas fa-arrow-right"></i>
+        </button>
+    }
+</div>
+
+@if (showResults && results.Any())
+{
+    <div class="search-results">
+        <div class="search-results-header">
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                Press <kbd>Enter</kbd> to open first result or click any item
+            </small>
+        </div>
+        @foreach (var result in results.Take(10))
+        {
+            <div class="search-result-item" 
+                 @onclick="() => NavigateToResult(result)"
+                 @onclick:stopPropagation="true"
+                 tabindex="0">
+                <div class="result-icon">
+                    <i class="fas @GetResultIcon(result.Type)"></i>
+                </div>
+                <div class="result-content">
+                    <div class="result-title">@result.Title</div>
+                    <div class="result-subtitle">@result.Subtitle</div>
+                </div>
+                <div class="result-meta">
+                    <span class="result-type-badge">@result.Type</span>
+                    <i class="fas fa-arrow-right result-arrow"></i>
+                </div>
+            </div>
+        }
+        @if (results.Count > 10)
+        {
+            <div class="search-result-footer">
+                <small><i class="fas fa-layer-group"></i> Showing 10 of @results.Count results</small>
+            </div>
+        }
+    </div>
+}
+    else if (showResults && !string.IsNullOrWhiteSpace(searchQuery) && !results.Any())
+    {
+        <div class="search-results">
+            <div class="search-no-results">
+                <i class="fas fa-search"></i>
+                <p>No results found for "@searchQuery"</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+private string _searchQuery = "";
+private string searchQuery
+{
+    get => _searchQuery;
+    set
+    {
+        _searchQuery = value;
+        _ = PerformSearch(); // Trigger search when value changes
+    }
+}
+private List<SearchResult> results = new();
+private bool showResults = false;
+private System.Timers.Timer? debounceTimer;
+private bool handleKeyDownPreventDefault = false;
+
+private async Task OnFocus()
+{
+    if (!string.IsNullOrWhiteSpace(searchQuery))
+    {
+        showResults = true;
+        await PerformSearch();
+    }
+}
+
+private void OnBlur()
+{
+    // Delay hiding to allow click events
+    Task.Delay(300).ContinueWith(_ => InvokeAsync(() =>
+    {
+        showResults = false;
+        StateHasChanged();
+    }));
+}
+
+private async Task PerformSearch()
+{
+    if (string.IsNullOrWhiteSpace(searchQuery))
+    {
+        results.Clear();
+        showResults = false;
+        StateHasChanged();
+        return;
+    }
+
+    showResults = true;
+    StateHasChanged();
+
+    debounceTimer?.Stop();
+    debounceTimer?.Dispose();
+
+    debounceTimer = new System.Timers.Timer(300);
+    debounceTimer.Elapsed += async (sender, args) =>
+    {
+        debounceTimer?.Stop();
+        await InvokeAsync(async () =>
+        {
+            await SearchAll(searchQuery);
+            StateHasChanged();
+        });
+    };
+    debounceTimer.Start();
+}
+
+    private async Task SearchAll(string query)
+    {
+        results.Clear();
+        var lowerQuery = query.ToLower();
+
+        // Search Transactions
+        var transactions = await TransactionService.GetAllAsync(new DTOs.TransactionFilterRequest(
+            DateTime.Today.AddYears(-2), 
+            DateTime.Today
+        ));
+
+        foreach (var tx in transactions.Items.Where(t => 
+            (t.Description != null && t.Description.ToLower().Contains(lowerQuery)) ||
+            (t.Payee != null && t.Payee.ToLower().Contains(lowerQuery)) ||
+            (t.CategoryName != null && t.CategoryName.ToLower().Contains(lowerQuery))
+        ).Take(5))
+        {
+            results.Add(new SearchResult
+            {
+                Type = "Transaction",
+                Title = tx.Description ?? "Transaction",
+                Subtitle = $"{tx.Date:MMM d, yyyy} • {tx.Amount:C} • {tx.CategoryName}",
+                Url = $"/transactions?id={tx.Id}"
+            });
+        }
+
+        // Search Donors
+        var donors = await DonorService.GetAllAsync();
+        foreach (var donor in donors.Where(d => d.Name.ToLower().Contains(lowerQuery)).Take(5))
+        {
+            results.Add(new SearchResult
+            {
+                Type = "Donor",
+                Title = donor.Name,
+                Subtitle = $"{donor.Type} • {donor.TotalContributions:C} contributed",
+                Url = $"/donors?id={donor.Id}"
+            });
+        }
+
+        // Search Grants
+        var grants = await GrantService.GetAllAsync(null);
+        foreach (var grant in grants.Where(g => 
+            g.Name.ToLower().Contains(lowerQuery) || 
+            (g.GrantorName != null && g.GrantorName.ToLower().Contains(lowerQuery))
+        ).Take(5))
+        {
+            results.Add(new SearchResult
+            {
+                Type = "Grant",
+                Title = grant.Name,
+                Subtitle = $"{grant.GrantorName} • {grant.Amount:C} • {grant.Status}",
+                Url = $"/grants?id={grant.Id}"
+            });
+        }
+
+        // Search Categories
+        var categories = await CategoryService.GetAllAsync();
+        foreach (var cat in categories.Where(c => c.Name.ToLower().Contains(lowerQuery)).Take(3))
+        {
+            results.Add(new SearchResult
+            {
+                Type = "Category",
+                Title = cat.Name,
+                Subtitle = $"{cat.Type} category",
+                Url = $"/categories?id={cat.Id}"
+            });
+        }
+
+        results = results.OrderBy(r => r.Type).ToList();
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
+        results.Clear();
+        showResults = false;
+        StateHasChanged();
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            ClearSearch();
+        }
+        else if (e.Key == "Enter")
+        {
+            if (results.Any())
+            {
+                NavigateToResult(results.First());
+            }
+        }
+    }
+
+    private void NavigateToResult(SearchResult result)
+    {
+        Navigation.NavigateTo(result.Url);
+        ClearSearch();
+    }
+
+    private string GetResultIcon(string type) => type switch
+    {
+        "Transaction" => "fa-receipt",
+        "Donor" => "fa-heart",
+        "Grant" => "fa-hand-holding-usd",
+        "Category" => "fa-tags",
+        _ => "fa-file"
+    };
+
+    private class SearchResult
+    {
+        public string Type { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Subtitle { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+}

@@ -1,0 +1,25 @@
+@* Page header with title and optional quick add button *@
+
+<div class="page-header">
+    <div class="page-header-left">
+        <h1>@Title</h1>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <p class="text-muted" style="margin: 0.25rem 0 0 0;">@Subtitle</p>
+        }
+    </div>
+    <div class="page-header-right">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "";
+    
+    [Parameter]
+    public string? Subtitle { get; set; }
+    
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

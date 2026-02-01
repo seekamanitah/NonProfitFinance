@@ -1,0 +1,307 @@
+@page "/help/voice"
+
+<div class="help-content">
+    <h1><i class="fas fa-volume-up"></i> Voice Features (Text-to-Speech)</h1>
+    
+    <div class="help-section">
+        <h2>What is Text-to-Speech (TTS)?</h2>
+        <p>
+            <strong>Text-to-Speech</strong> reads important messages and announcements aloud, making the application 
+            more accessible for users with visual impairments or those who prefer audio feedback.
+        </p>
+    </div>
+
+    <div class="help-section">
+        <h2>No Setup Required!</h2>
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            <strong>Ready to Use:</strong> Voice features work immediately using your browser's built-in 
+            speech synthesis. No installation or configuration needed!
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Enabling Voice Features</h2>
+        <ol>
+            <li>Go to <strong>Settings ? Accessibility</strong></li>
+            <li>Toggle <strong>"Enable Text-to-Speech"</strong> ON</li>
+            <li>Adjust speech rate if desired (0.5x to 2.0x)</li>
+            <li>Click <kbd>Speak</kbd> to test</li>
+        </ol>
+    </div>
+
+    <div class="help-section">
+        <h2>What Gets Announced</h2>
+        
+        <h3>Automatic Announcements:</h3>
+        <ul class="feature-list">
+            <li>
+                <i class="fas fa-dollar-sign text-success"></i>
+                <strong>Transaction Saved:</strong>
+                "Transaction saved. [Description] for $[Amount]"
+            </li>
+            <li>
+                <i class="fas fa-exclamation-circle text-danger"></i>
+                <strong>Validation Errors:</strong>
+                "Error: [Error message]"
+            </li>
+            <li>
+                <i class="fas fa-file-pdf text-info"></i>
+                <strong>Report Generated:</strong>
+                "Report generated: [Report name]"
+            </li>
+            <li>
+                <i class="fas fa-check-circle text-success"></i>
+                <strong>Success Messages:</strong>
+                Confirms completed actions
+            </li>
+            <li>
+                <i class="fas fa-text-recognition text-primary"></i>
+                <strong>OCR Complete:</strong>
+                "Text extraction complete"
+            </li>
+        </ul>
+    </div>
+
+    <div class="help-section">
+        <h2>Keyboard Shortcuts</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>Shortcut</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Toggle TTS On/Off</td>
+                    <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></td>
+                </tr>
+                <tr>
+                    <td>Stop Speaking</td>
+                    <td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Adjusting Speech Settings</h2>
+        
+        <h3>Speech Rate:</h3>
+        <p>Control how fast text is spoken:</p>
+        <ul>
+            <li><strong>0.5x:</strong> Slower (easier to understand)</li>
+            <li><strong>1.0x:</strong> Normal speed (default)</li>
+            <li><strong>1.5x:</strong> Faster</li>
+            <li><strong>2.0x:</strong> Very fast</li>
+        </ul>
+        
+        <div class="tip-box">
+            <i class="fas fa-lightbulb"></i>
+            <strong>Tip:</strong> Adjust the speed in Settings ? Accessibility until you find a comfortable pace.
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Manual Text-to-Speech</h2>
+        <p>In certain areas, you can manually trigger speech:</p>
+        
+        <h3>OCR Results:</h3>
+        <ol>
+            <li>Extract text from an image using OCR</li>
+            <li>Click <kbd><i class="fas fa-volume-up"></i> Read Aloud</kbd></li>
+            <li>System reads the extracted text</li>
+            <li>Click <kbd><i class="fas fa-stop"></i> Stop</kbd> to interrupt</li>
+        </ol>
+    </div>
+
+    <div class="help-section">
+        <h2>Browser Compatibility</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Browser</th>
+                    <th>Support</th>
+                    <th>Quality</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><i class="fab fa-chrome"></i> Chrome</td>
+                    <td><span class="badge bg-success">Excellent</span></td>
+                    <td>?????</td>
+                </tr>
+                <tr>
+                    <td><i class="fab fa-edge"></i> Edge</td>
+                    <td><span class="badge bg-success">Excellent</span></td>
+                    <td>?????</td>
+                </tr>
+                <tr>
+                    <td><i class="fab fa-firefox"></i> Firefox</td>
+                    <td><span class="badge bg-success">Good</span></td>
+                    <td>????</td>
+                </tr>
+                <tr>
+                    <td><i class="fab fa-safari"></i> Safari</td>
+                    <td><span class="badge bg-success">Good</span></td>
+                    <td>????</td>
+                </tr>
+                <tr>
+                    <td><i class="fab fa-internet-explorer"></i> IE11</td>
+                    <td><span class="badge bg-danger">Not Supported</span></td>
+                    <td>?</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Troubleshooting</h2>
+        
+        <h3>No Speech Output:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> TTS is enabled but no sound</p>
+            <p><strong>Solutions:</strong></p>
+            <ol>
+                <li>Check system volume is not muted</li>
+                <li>Verify TTS is enabled in Settings ? Accessibility</li>
+                <li>Try a different browser (Chrome/Edge recommended)</li>
+                <li>Check browser console for errors (F12)</li>
+                <li>Reload the page</li>
+            </ol>
+        </div>
+
+        <h3>Speech Too Fast/Slow:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> Can't understand or speech is too slow</p>
+            <p><strong>Solution:</strong> Adjust speech rate in Settings ? Accessibility (0.5x - 2.0x)</p>
+        </div>
+
+        <h3>Wrong Voice/Accent:</h3>
+        <div class="troubleshooting-box">
+            <p><strong>Problem:</strong> Voice sounds unusual or wrong language</p>
+            <p><strong>Reason:</strong> Browser uses system default voice</p>
+            <p><strong>Solution:</strong></p>
+            <ul>
+                <li><strong>Windows:</strong> Settings ? Time & Language ? Speech</li>
+                <li><strong>Mac:</strong> System Preferences ? Accessibility ? Speech</li>
+                <li><strong>Linux:</strong> Depends on distribution</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Accessibility Benefits</h2>
+        <div class="alert alert-info">
+            <i class="fas fa-universal-access"></i>
+            <strong>Who Benefits:</strong>
+            <ul>
+                <li>Users with visual impairments</li>
+                <li>Users with reading difficulties</li>
+                <li>Users who prefer audio feedback</li>
+                <li>Multitasking users (hands-free operation)</li>
+                <li>Users learning to use the application</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Privacy & Security</h2>
+        <div class="alert alert-success">
+            <i class="fas fa-shield-alt"></i>
+            <strong>Your Data is Safe:</strong>
+            <ul>
+                <li>All speech processing happens in your browser</li>
+                <li>No audio recorded or stored</li>
+                <li>No data sent to external servers</li>
+                <li>Completely offline capable</li>
+                <li>No API keys or accounts required</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-section">
+        <h2>Technical Details</h2>
+        <table class="table">
+            <tr>
+                <th>Technology</th>
+                <td>Web Speech API (Browser Built-in)</td>
+            </tr>
+            <tr>
+                <th>Cost</th>
+                <td>FREE (No API fees or limits)</td>
+            </tr>
+            <tr>
+                <th>Setup Time</th>
+                <td>0 minutes (Works immediately)</td>
+            </tr>
+            <tr>
+                <th>Languages</th>
+                <td>Depends on system voices</td>
+            </tr>
+            <tr>
+                <th>Offline</th>
+                <td>Yes (Uses system voices)</td>
+            </tr>
+            <tr>
+                <th>Customizable</th>
+                <td>Speed control (0.5x - 2.0x)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>Tips & Best Practices</h2>
+        <div class="tip-box">
+            <h3>?? Pro Tips:</h3>
+            <ul>
+                <li>Start with normal speed (1.0x) and adjust as needed</li>
+                <li>Use headphones in quiet environments for better experience</li>
+                <li>Combine with screen reader for full accessibility</li>
+                <li>Test with different browsers to find best voice</li>
+                <li>Install additional system voices for more options</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="help-navigation">
+        <a href="/help/accessibility" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Back to Accessibility
+        </a>
+        <a href="/help" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Back to Help
+        </a>
+    </div>
+</div>
+
+<style>
+    .troubleshooting-box {
+        background: var(--color-background);
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--color-warning);
+    }
+
+    .tip-box {
+        background: var(--color-info-bg, #e3f2fd);
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--color-info, #2196f3);
+    }
+
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .feature-list li {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background: var(--color-card);
+        border-radius: 4px;
+        border-left: 3px solid var(--color-primary);
+    }
+</style>

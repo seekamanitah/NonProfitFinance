@@ -1,0 +1,149 @@
+@using NonProfitFinance.DTOs.Inventory
+
+<div class="category-tree-node" style="padding-left: @(Level * 20)px">
+    <div class="node-header @(IsSelected ? "selected" : "")" @onclick="OnNodeClick">
+        @if (Category.SubCategories?.Any() == true)
+        {
+            <button class="btn-expand" @onclick="ToggleExpand" @onclick:stopPropagation="true">
+                @(isExpanded ? "?" : "?")
+            </button>
+        }
+        else
+        {
+            <span class="no-expand"></span>
+        }
+
+        <span class="node-icon">???</span>
+        <span class="node-name">@Category.Name</span>
+        <span class="node-count">(@Category.ItemCount)</span>
+
+        <div class="node-actions" @onclick:stopPropagation="true">
+            <button class="btn btn-icon btn-sm" @onclick="() => OnEdit.InvokeAsync(Category)" title="Edit">
+                ??
+            </button>
+            @if (Category.ItemCount == 0 && (Category.SubCategories?.Count ?? 0) == 0)
+            {
+                <button class="btn btn-icon btn-sm" @onclick="() => OnDelete.InvokeAsync(Category)" title="Delete">
+                    ???
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (isExpanded && Category.SubCategories?.Any() == true)
+    {
+        @foreach (var subCategory in Category.SubCategories)
+        {
+            <CategoryTreeNode Category="@subCategory" 
+                            Level="@(Level + 1)"
+                            OnEdit="OnEdit"
+                            OnDelete="OnDelete"
+                            OnSelect="OnSelect" />
+        }
+    }
+</div>
+
+<style>
+    .category-tree-node {
+        margin-bottom: 0.25rem;
+    }
+
+    .node-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .node-header:hover {
+        background: var(--gray-50, #f9fafb);
+    }
+
+    .node-header.selected {
+        background: var(--primary-light, #fef2f2);
+        color: var(--primary-color, #dc2626);
+        font-weight: 600;
+    }
+
+    .btn-expand {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.75rem;
+        color: var(--text-secondary, #6b7280);
+    }
+
+    .btn-expand:hover {
+        color: var(--text-primary, #111827);
+    }
+
+    .no-expand {
+        width: 24px;
+        display: inline-block;
+    }
+
+    .node-icon {
+        font-size: 1.125rem;
+    }
+
+    .node-name {
+        flex: 1;
+    }
+
+    .node-count {
+        color: var(--text-secondary, #6b7280);
+        font-size: 0.875rem;
+    }
+
+    .node-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .node-header:hover .node-actions {
+        opacity: 1;
+    }
+
+    .btn-icon {
+        padding: 0.25rem 0.5rem;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: transform 0.2s;
+    }
+
+    .btn-icon:hover {
+        transform: scale(1.2);
+    }
+</style>
+
+@code {
+    [Parameter] public InventoryCategoryDto Category { get; set; } = null!;
+    [Parameter] public int Level { get; set; }
+    [Parameter] public EventCallback<InventoryCategoryDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<InventoryCategoryDto> OnDelete { get; set; }
+    [Parameter] public EventCallback<InventoryCategoryDto> OnSelect { get; set; }
+
+    private bool isExpanded = false;
+    private bool IsSelected = false;
+
+    private void ToggleExpand()
+    {
+        isExpanded = !isExpanded;
+    }
+
+    private async Task OnNodeClick()
+    {
+        IsSelected = true;
+        await OnSelect.InvokeAsync(Category);
+    }
+}

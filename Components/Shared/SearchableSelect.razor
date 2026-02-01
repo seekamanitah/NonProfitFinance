@@ -1,0 +1,140 @@
+@typeparam TItem
+@typeparam TValue
+
+<div class="searchable-select-wrapper">
+    <div class="searchable-select" @onfocusin="OnFocus" @onfocusout="OnBlur" tabindex="0">
+        <div class="searchable-select-display" @onclick="ToggleDropdown">
+            <span class="@(SelectedValue == null || (SelectedValue is int intVal && intVal == 0) ? "text-muted" : "")">
+                @(DisplayText ?? Placeholder)
+            </span>
+            <i class="fas fa-chevron-down"></i>
+        </div>
+
+        @if (isOpen)
+        {
+            <div class="searchable-select-dropdown">
+                <input type="text" 
+                       class="searchable-select-search" 
+                       placeholder="Search..." 
+                       @bind="searchTerm"
+                       @bind:event="oninput"
+                       @onclick:stopPropagation="true"
+                       autofocus />
+
+                <div class="searchable-select-options">
+                    @if (!string.IsNullOrEmpty(NullOptionText))
+                    {
+                        <div class="searchable-select-option @(SelectedValue == null ? "selected" : "")"
+                             @onclick="() => SelectItem(default(TValue), NullOptionText)">
+                            @NullOptionText
+                        </div>
+                    }
+
+                    @foreach (var item in FilteredItems)
+                    {
+                        var value = ValueSelector(item);
+                        var text = TextSelector(item);
+                        var isSelected = EqualityComparer<TValue>.Default.Equals(SelectedValue, value);
+
+                        <div class="searchable-select-option @(isSelected ? "selected" : "")"
+                             @onclick="() => SelectItem(value, text)">
+                            @text
+                        </div>
+                    }
+
+                    @if (!FilteredItems.Any())
+                    {
+                        <div class="searchable-select-no-results">
+                            No results found
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public IEnumerable<TItem> Items { get; set; } = Enumerable.Empty<TItem>();
+
+    [Parameter]
+    public TValue? SelectedValue { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue?> SelectedValueChanged { get; set; }
+
+    [Parameter]
+    public Func<TItem, TValue> ValueSelector { get; set; } = _ => default(TValue)!;
+
+    [Parameter]
+    public Func<TItem, string> TextSelector { get; set; } = _ => "";
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Select...";
+
+    [Parameter]
+    public string? NullOptionText { get; set; }
+
+    [Parameter]
+    public bool SortAlphabetically { get; set; } = true;
+
+    private bool isOpen = false;
+    private string searchTerm = "";
+    private string? DisplayText => Items.FirstOrDefault(i => EqualityComparer<TValue>.Default.Equals(ValueSelector(i), SelectedValue)) is TItem item 
+        ? TextSelector(item) 
+        : null;
+
+    private IEnumerable<TItem> FilteredItems
+    {
+        get
+        {
+            var items = Items.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                items = items.Where(i => TextSelector(i).Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (SortAlphabetically)
+            {
+                items = items.OrderBy(i => TextSelector(i));
+            }
+
+            return items;
+        }
+    }
+
+    private void ToggleDropdown()
+    {
+        isOpen = !isOpen;
+        if (isOpen)
+        {
+            searchTerm = "";
+        }
+    }
+
+    private void OnFocus()
+    {
+        // Keep dropdown open when focused
+    }
+
+    private void OnBlur()
+    {
+        // Delay to allow click events
+        Task.Delay(200).ContinueWith(_ => InvokeAsync(() =>
+        {
+            isOpen = false;
+            StateHasChanged();
+        }));
+    }
+
+    private async Task SelectItem(TValue? value, string text)
+    {
+        SelectedValue = value;
+        await SelectedValueChanged.InvokeAsync(value);
+        isOpen = false;
+        searchTerm = "";
+        StateHasChanged();
+    }
+}

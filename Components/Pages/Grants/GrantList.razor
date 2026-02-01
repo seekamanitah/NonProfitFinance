@@ -1,0 +1,496 @@
+@page "/grants"
+@inject IGrantService GrantService
+@inject IDocumentService DocumentService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Grants - NonProfit Finance</PageTitle>
+
+<!-- Filter Bar -->
+<div class="d-flex justify-between align-center mb-3">
+    <div class="d-flex gap-3 align-center">
+        <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" class="form-control" placeholder="Search grants..." 
+                   @bind="searchTerm" @bind:event="oninput" style="width: 250px;" />
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <select class="form-control" @bind="statusFilter">
+                <option value="">All Statuses</option>
+                @foreach (var status in Enum.GetValues<GrantStatus>())
+                {
+                    <option value="@status">@status</option>
+                }
+            </select>
+        </div>
+    </div>
+    
+    <button class="btn btn-primary" @onclick="ShowAddForm">
+        <i class="fas fa-plus"></i> Add Grant
+    </button>
+</div>
+
+<!-- Alerts Section -->
+@if (expiringGrants.Any() || upcomingReports.Any())
+{
+    <div class="mb-3">
+        @foreach (var grant in expiringGrants)
+        {
+            <div class="alert alert-warning mb-2">
+                <i class="fas fa-clock"></i>
+                <div>
+                    <strong>@grant.Name</strong> expires on @grant.EndDate?.ToString("MMM dd, yyyy")
+                    <span class="text-muted">(@DaysUntil(grant.EndDate) days remaining)</span>
+                </div>
+            </div>
+        }
+        @foreach (var grant in upcomingReports)
+        {
+            <div class="alert alert-info mb-2" style="background: rgba(23, 162, 184, 0.1); border-color: var(--color-info); color: var(--color-info);">
+                <i class="fas fa-file-alt"></i>
+                <div>
+                    <strong>@grant.Name</strong> report due on @grant.NextReportDueDate?.ToString("MMM dd, yyyy")
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Grant Cards -->
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else
+{
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));">
+        @foreach (var grant in FilteredGrants)
+        {
+            <div class="card" style="cursor: pointer;" @onclick="() => SelectGrant(grant)">
+                <div class="card-header">
+                    <h4 style="margin: 0;">@grant.Name</h4>
+                    <span class="badge @GetStatusBadgeClass(grant.Status)">@grant.Status</span>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-between mb-2">
+                        <span class="text-muted">Grantor</span>
+                        <span>@grant.GrantorName</span>
+                    </div>
+                    
+                    <div class="d-flex justify-between mb-2">
+                        <span class="text-muted">Total Amount</span>
+                        <span class="amount" style="font-weight: 600;">@grant.Amount.ToString("C0")</span>
+                    </div>
+                    
+                    <!-- Usage Progress -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-between mb-1">
+                            <span class="text-muted">Used: @grant.AmountUsed.ToString("C0")</span>
+                            <span class="text-muted">Remaining: @grant.RemainingBalance.ToString("C0")</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar @GetProgressClass(grant)" 
+                                 style="width: @GetUsagePercentage(grant)%;"></div>
+                        </div>
+                        <small class="text-muted">@GetUsagePercentage(grant).ToString("N1")% used</small>
+                    </div>
+                    
+                    <div class="d-flex justify-between text-muted" style="font-size: 0.85rem;">
+                        <span>
+                            <i class="fas fa-calendar-alt"></i> 
+                            @grant.StartDate.ToString("MMM dd, yyyy")
+                        </span>
+                        @if (grant.EndDate.HasValue)
+                        {
+                            <span>
+                                <i class="fas fa-calendar-check"></i> 
+                                @grant.EndDate.Value.ToString("MMM dd, yyyy")
+                            </span>
+                        }
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(grant.GrantNumber))
+                    {
+                        <div class="mt-2 text-muted" style="font-size: 0.85rem;">
+                            <i class="fas fa-hashtag"></i> @grant.GrantNumber
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        
+        @if (!FilteredGrants.Any())
+        {
+            <div class="card">
+                <div class="card-body text-center text-muted">
+                    No grants found
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Grant Detail Modal -->
+@if (selectedGrant != null)
+{
+    <div class="modal-backdrop" @onclick="CloseDetail">
+        <div class="modal" style="max-width: 750px;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">@selectedGrant.Name</h3>
+                <button class="modal-close" @onclick="CloseDetail">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row mb-3">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <span class="badge @GetStatusBadgeClass(selectedGrant.Status)">@selectedGrant.Status</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Grantor</label>
+                        <p>@selectedGrant.GrantorName</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Grant Number</label>
+                        <p>@(selectedGrant.GrantNumber ?? "—")</p>
+                    </div>
+                </div>
+                
+                <!-- Financial Summary -->
+                <div class="metric-cards mb-3" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="metric-card">
+                        <div class="metric-content">
+                            <div class="metric-label">Total Amount</div>
+                            <div class="metric-value">@selectedGrant.Amount.ToString("C0")</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-content">
+                            <div class="metric-label">Amount Used</div>
+                            <div class="metric-value negative">@selectedGrant.AmountUsed.ToString("C0")</div>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-content">
+                            <div class="metric-label">Remaining</div>
+                            <div class="metric-value positive">@selectedGrant.RemainingBalance.ToString("C0")</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row mb-3">
+                    <div class="form-group">
+                        <label class="form-label">Start Date</label>
+                        <p>@selectedGrant.StartDate.ToString("MMMM dd, yyyy")</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Date</label>
+                        <p>@(selectedGrant.EndDate?.ToString("MMMM dd, yyyy") ?? "No end date")</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Next Report Due</label>
+                        <p>@(selectedGrant.NextReportDueDate?.ToString("MMMM dd, yyyy") ?? "—")</p>
+                    </div>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(selectedGrant.Restrictions))
+                {
+                    <div class="form-group mb-3">
+                        <label class="form-label">Restrictions</label>
+                        <p>@selectedGrant.Restrictions</p>
+                    </div>
+                }
+                
+                @if (!string.IsNullOrEmpty(selectedGrant.ReportingRequirements))
+                {
+                    <div class="form-group mb-3">
+                        <label class="form-label">Reporting Requirements</label>
+                        <p>@selectedGrant.ReportingRequirements</p>
+                    </div>
+                }
+                
+                <div class="form-row mb-3">
+                    <div class="form-group">
+                        <label class="form-label">Contact Person</label>
+                        <p>@(selectedGrant.ContactPerson ?? "—")</p>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Email</label>
+                        <p>@(selectedGrant.ContactEmail ?? "—")</p>
+                    </div>
+                </div>
+                
+                <h4 class="mb-2">Transaction History</h4>
+                @if (grantTransactions.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tx in grantTransactions.Take(10))
+                            {
+                                <tr>
+                                    <td>@tx.Date.ToString("MMM dd, yyyy")</td>
+                                    <td>@(tx.Description ?? "—")</td>
+                                    <td>@tx.CategoryName</td>
+                                    <td class="text-right amount expense">@tx.Amount.ToString("C")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No transactions recorded</p>
+                }
+                
+                <!-- Documents Section -->
+                <h4 class="mb-2 mt-3">Documents</h4>
+                <div class="mb-2">
+                    <InputFile OnChange="HandleDocumentUpload" class="form-control" 
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" 
+                               disabled="@isUploading" />
+                </div>
+                
+                @if (isUploading)
+                {
+                    <div class="text-muted"><span class="spinner"></span> Uploading...</div>
+                }
+                
+                @if (grantDocuments.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Type</th>
+                                <th>Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var doc in grantDocuments)
+                            {
+                                <tr>
+                                    <td>
+                                        <i class="fas @GetFileIcon(doc.ContentType)"></i>
+                                        @doc.OriginalFileName
+                                    </td>
+                                    <td>@doc.Type</td>
+                                    <td>@doc.UploadedAt.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline" @onclick="() => DownloadDocument(doc.Id)" title="Download">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteDocument(doc.Id)" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No documents uploaded</p>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => EditGrant(selectedGrant)">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-secondary" @onclick="CloseDetail">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add/Edit Form Modal -->
+@if (showForm)
+{
+    <GrantFormModal 
+        Grant="editingGrant"
+        OnSave="OnGrantSaved"
+        OnCancel="CloseForm" />
+}
+
+@code {
+    private List<GrantDto> grants = new();
+    private List<GrantDto> expiringGrants = new();
+    private List<GrantDto> upcomingReports = new();
+    private List<TransactionDto> grantTransactions = new();
+    private GrantDto? selectedGrant;
+    private GrantDto? editingGrant;
+    private string searchTerm = "";
+    private GrantStatus? statusFilter;
+    private bool isLoading = true;
+    private bool showForm = false;
+    private List<DocumentDto> grantDocuments = new();
+    private bool isUploading = false;
+
+    private IEnumerable<GrantDto> FilteredGrants => grants
+        .Where(g => string.IsNullOrEmpty(searchTerm) || 
+                    g.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    g.GrantorName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+        .Where(g => !statusFilter.HasValue || g.Status == statusFilter.Value)
+        .OrderByDescending(g => g.StartDate);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGrants();
+        expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
+        upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);
+    }
+
+    private async Task LoadGrants()
+    {
+        isLoading = true;
+        grants = await GrantService.GetAllAsync();
+        isLoading = false;
+    }
+
+    private async Task SelectGrant(GrantDto grant)
+    {
+        selectedGrant = grant;
+        grantTransactions = await GrantService.GetUsageHistoryAsync(grant.Id);
+        grantDocuments = await DocumentService.GetByGrantIdAsync(grant.Id);
+    }
+
+    private void CloseDetail()
+    {
+        selectedGrant = null;
+        grantTransactions = new();
+        grantDocuments = new();
+        StateHasChanged();
+    }
+
+    private void ShowAddForm()
+    {
+        editingGrant = null;
+        showForm = true;
+        StateHasChanged();
+    }
+
+    private void EditGrant(GrantDto grant)
+    {
+        editingGrant = grant;
+        selectedGrant = null;
+        showForm = true;
+        StateHasChanged();
+    }
+
+    private async Task OnGrantSaved()
+    {
+        showForm = false;
+        await LoadGrants();
+        expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
+        upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        StateHasChanged();
+    }
+
+    private decimal GetUsagePercentage(GrantDto grant)
+    {
+        if (grant.Amount == 0) return 0;
+        return (grant.AmountUsed / grant.Amount) * 100;
+    }
+
+    private string GetProgressClass(GrantDto grant)
+    {
+        var pct = GetUsagePercentage(grant);
+        if (pct >= 90) return "danger";
+        if (pct >= 75) return "warning";
+        return "success";
+    }
+
+    private int DaysUntil(DateTime? date)
+    {
+        if (!date.HasValue) return 0;
+        return (int)(date.Value - DateTime.Today).TotalDays;
+    }
+
+    private string GetStatusBadgeClass(GrantStatus status) => status switch
+    {
+        GrantStatus.Active => "badge-success",
+        GrantStatus.Pending => "badge-warning",
+        GrantStatus.Completed => "badge-info",
+        GrantStatus.Expired => "badge-danger",
+        GrantStatus.Rejected => "badge-danger",
+        _ => "badge-info"
+    };
+
+    // Document methods
+    private async Task HandleDocumentUpload(InputFileChangeEventArgs e)
+    {
+        if (selectedGrant == null) return;
+
+        isUploading = true;
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(50 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var request = new UploadDocumentRequest(
+                null,
+                DocumentType.GrantAgreement,
+                selectedGrant.Id,
+                null,
+                null,
+                null
+            );
+
+            await DocumentService.UploadAsync(memoryStream, file.Name, file.ContentType, request);
+            grantDocuments = await DocumentService.GetByGrantIdAsync(selectedGrant.Id);
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task DownloadDocument(int documentId)
+    {
+        var result = await DocumentService.DownloadAsync(documentId);
+        if (result.HasValue)
+        {
+            var base64 = Convert.ToBase64String(result.Value.Content);
+            await JS.InvokeVoidAsync("downloadFile", result.Value.FileName, result.Value.ContentType, base64);
+        }
+    }
+
+    private async Task DeleteDocument(int documentId)
+    {
+        await DocumentService.DeleteAsync(documentId);
+        if (selectedGrant != null)
+        {
+            grantDocuments = await DocumentService.GetByGrantIdAsync(selectedGrant.Id);
+        }
+    }
+
+    private string GetFileIcon(string contentType) => contentType switch
+    {
+        var t when t.StartsWith("image/") => "fa-file-image",
+        var t when t.Contains("pdf") => "fa-file-pdf",
+        var t when t.Contains("word") || t.Contains("document") => "fa-file-word",
+        var t when t.Contains("excel") || t.Contains("spreadsheet") => "fa-file-excel",
+        var t when t.Contains("zip") || t.Contains("rar") => "fa-file-archive",
+        _ => "fa-file"
+    };
+}

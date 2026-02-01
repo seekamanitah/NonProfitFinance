@@ -1,0 +1,58 @@
+@inject IJSRuntime JS
+
+<div class="sidebar-actions">
+    <button class="btn-sidebar-action btn-quick-add" @onclick="ShowQuickAdd" title="Quick Add Transaction">
+        <i class="fas fa-plus"></i>
+        <span>Quick Add</span>
+    </button>
+    
+    <button class="btn-sidebar-action" @onclick="ToggleTheme" title="Toggle Theme">
+        <i class="fas @(currentTheme == "dark" ? "fa-sun" : "fa-moon")"></i>
+        <span>@(currentTheme == "dark" ? "Light" : "Dark") Mode</span>
+    </button>
+</div>
+
+@if (showQuickAddModal)
+{
+    <QuickAddModal OnClose="CloseQuickAdd" OnSaved="OnTransactionSaved" />
+}
+
+@code {
+    [Parameter]
+    public EventCallback OnQuickAddSaved { get; set; }
+
+    private bool showQuickAddModal = false;
+    private string currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+            StateHasChanged();
+        }
+    }
+
+    private void ShowQuickAdd()
+    {
+        showQuickAddModal = true;
+    }
+
+    private void CloseQuickAdd()
+    {
+        showQuickAddModal = false;
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = currentTheme == "light" ? "dark" : "light";
+        await JS.InvokeVoidAsync("themeManager.setTheme", currentTheme);
+        StateHasChanged();
+    }
+
+    private async Task OnTransactionSaved()
+    {
+        showQuickAddModal = false;
+        await OnQuickAddSaved.InvokeAsync();
+    }
+}

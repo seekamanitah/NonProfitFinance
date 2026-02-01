@@ -1,0 +1,137 @@
+
+/* ============================================
+   Cash Flow Widget Compact Styles
+   ============================================ */
+
+.cash-flow-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cash-flow-metric {
+    text-align: center;
+}
+
+.cash-flow-metric .metric-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cash-flow-metric .metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.cash-flow-metric .metric-value.positive {
+    color: var(--color-success);
+}
+
+.cash-flow-metric .metric-value.negative {
+    color: var(--color-danger);
+}
+
+.cash-flow-alerts {
+    margin-bottom: 1rem;
+}
+
+.alert-compact {
+    padding: 0.4rem 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.alert-compact.alert-warning {
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 3px solid var(--color-warning);
+}
+
+.alert-compact.alert-danger {
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 3px solid var(--color-danger);
+}
+
+.alert-compact.alert-info {
+    background: rgba(13, 110, 253, 0.1);
+    border-left: 3px solid var(--color-info);
+}
+
+.upcoming-transactions-compact {
+    margin-top: 1rem;
+}
+
+.upcoming-transactions-compact .section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+
+.transactions-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.transaction-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.transaction-row:last-child {
+    border-bottom: none;
+}
+
+.transaction-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.transaction-desc {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.transaction-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.transaction-amount {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.transaction-amount.income {
+    color: var(--color-success);
+}
+
+.transaction-amount.expense {
+    color: var(--color-danger);
+}
+
+@media (max-width: 768px) {
+    .cash-flow-summary {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .cash-flow-metric .metric-value {
+        font-size: 1.5rem;
+    }
+}

@@ -1,0 +1,187 @@
+/* ============================================
+   Spell Check Styling
+   ============================================ */
+
+/* Browser native spell check underline styling */
+input[spellcheck="true"],
+textarea[spellcheck="true"],
+[contenteditable="true"][spellcheck="true"] {
+    /* Ensure spell check is visible */
+}
+
+/* Custom spell check error styling (if using enhanced spell check) */
+.spellcheck-error {
+    text-decoration: underline wavy red;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+}
+
+/* Spell check suggestion dropdown */
+.spellcheck-suggestions {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    padding: 0.5rem 0;
+    z-index: 10000;
+    max-height: 200px;
+    overflow-y: auto;
+    min-width: 150px;
+}
+
+.spellcheck-suggestion-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background 0.2s;
+}
+
+.spellcheck-suggestion-item:hover {
+    background: var(--bg-hover, rgba(196, 30, 58, 0.1));
+}
+
+.spellcheck-suggestion-item.add-to-dict {
+    border-top: 1px solid var(--border-color);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+/* Spell check indicator in input (optional) */
+.input-with-spellcheck {
+    position: relative;
+}
+
+.input-with-spellcheck::after {
+    content: "?";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-success);
+    font-size: 1.2rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.input-with-spellcheck.no-errors::after {
+    opacity: 0.5;
+}
+
+/* Spell check settings in Settings page */
+.spellcheck-settings {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.spellcheck-setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-light, var(--border-color));
+}
+
+.spellcheck-setting-item:last-child {
+    border-bottom: none;
+}
+
+.spellcheck-setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.spellcheck-setting-label h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.spellcheck-setting-label p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.spellcheck-toggle {
+    /* Toggle switch styling */
+}
+
+/* Custom dictionary manager */
+.custom-dictionary {
+    margin-top: 1.5rem;
+}
+
+.custom-dictionary-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.custom-dictionary-word {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    font-size: 0.875rem;
+}
+
+.custom-dictionary-word .remove-word {
+    cursor: pointer;
+    color: var(--color-danger);
+    font-weight: bold;
+}
+
+.custom-dictionary-word .remove-word:hover {
+    opacity: 0.7;
+}
+
+/* Spell check status indicator */
+.spellcheck-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(40, 167, 69, 0.1);
+    border-radius: 20px;
+    font-size: 0.875rem;
+    color: var(--color-success);
+}
+
+.spellcheck-status.disabled {
+    background: rgba(108, 117, 125, 0.1);
+    color: var(--text-muted);
+}
+
+.spellcheck-status i {
+    font-size: 0.75rem;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .spellcheck-error {
+    text-decoration-color: #ff6b6b;
+}
+
+[data-theme="dark"] .spellcheck-suggestions {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Accessibility - Ensure spell check errors are visible in high contrast */
+body.high-contrast .spellcheck-error {
+    text-decoration: underline double red;
+    text-decoration-thickness: 3px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .spellcheck-suggestions {
+        max-width: calc(100vw - 2rem);
+    }
+}

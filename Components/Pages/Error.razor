@@ -1,0 +1,110 @@
+@page "/error"
+@using System.Diagnostics
+
+<PageTitle>Error - NonProfit Finance</PageTitle>
+
+<div class="error-page">
+    <div class="error-container">
+        <div class="error-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        
+        <h1>Something went wrong</h1>
+        
+        <p class="error-message">
+            We're sorry, but an unexpected error occurred while processing your request.
+            Our team has been notified and is working to fix the issue.
+        </p>
+        
+        @if (!string.IsNullOrEmpty(RequestId))
+        {
+            <p class="error-id">
+                <strong>Error Reference:</strong> @RequestId
+            </p>
+        }
+        
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary">
+                <i class="fas fa-home"></i> Return to Dashboard
+            </a>
+            <button class="btn btn-secondary" onclick="window.history.back()">
+                <i class="fas fa-arrow-left"></i> Go Back
+            </button>
+        </div>
+        
+        <div class="error-help">
+            <p>If this problem persists, please contact support with the error reference above.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .error-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 2rem;
+        background: var(--bg-secondary, #f3f4f6);
+    }
+    
+    .error-container {
+        max-width: 500px;
+        text-align: center;
+        background: var(--surface-color, #ffffff);
+        padding: 3rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .error-icon {
+        font-size: 4rem;
+        color: var(--danger-color, #dc2626);
+        margin-bottom: 1.5rem;
+    }
+    
+    .error-container h1 {
+        color: var(--text-primary, #111827);
+        margin-bottom: 1rem;
+        font-size: 1.75rem;
+    }
+    
+    .error-message {
+        color: var(--text-secondary, #6b7280);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+    
+    .error-id {
+        background: var(--gray-100, #f3f4f6);
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .error-help {
+        font-size: 0.875rem;
+        color: var(--text-muted, #9ca3af);
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+    
+    public string? RequestId { get; set; }
+    
+    protected override void OnInitialized()
+    {
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}

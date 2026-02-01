@@ -1,0 +1,240 @@
+@page "/funds"
+@inject IFundService FundService
+@rendermode InteractiveServer
+
+<PageTitle>Accounts - NonProfit Finance</PageTitle>
+
+<!-- Header -->
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Account Management</h2>
+        <p class="text-muted">Track restricted and unrestricted accounts</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline" @onclick="RecalculateBalances" disabled="@isRecalculating">
+            <i class="fas fa-sync"></i> Recalculate
+        </button>
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <i class="fas fa-plus"></i> Add Account
+        </button>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="metric-cards mb-3">
+    <div class="metric-card">
+        <div class="metric-icon income">
+            <i class="fas fa-unlock"></i>
+        </div>
+        <div class="metric-content">
+            <div class="metric-label">Unrestricted Accounts</div>
+            <div class="metric-value positive">@unrestrictedTotal.ToString("C0")</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon primary">
+            <i class="fas fa-lock"></i>
+        </div>
+        <div class="metric-content">
+            <div class="metric-label">Restricted Accounts</div>
+            <div class="metric-value">@restrictedTotal.ToString("C0")</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon neutral">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="metric-content">
+            <div class="metric-label">Temporarily Restricted</div>
+            <div class="metric-value">@tempRestrictedTotal.ToString("C0")</div>
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-icon expense">
+            <i class="fas fa-infinity"></i>
+        </div>
+        <div class="metric-content">
+            <div class="metric-label">Permanently Restricted</div>
+            <div class="metric-value">@permRestrictedTotal.ToString("C0")</div>
+        </div>
+    </div>
+</div>
+
+<!-- Accounts List -->
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else
+{
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
+        @foreach (var fund in funds)
+        {
+            <div class="card">
+                <div class="card-header">
+                    <h4 style="margin: 0;">@fund.Name</h4>
+                    <span class="badge @GetTypeBadgeClass(fund.Type)">@fund.Type</span>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(fund.Description))
+                    {
+                        <p class="text-muted mb-2">@fund.Description</p>
+                    }
+                    
+                    <div class="d-flex justify-between mb-2">
+                        <span class="text-muted">Current Balance</span>
+                        <span class="metric-value @(fund.Balance >= 0 ? "positive" : "negative")" style="font-size: 1.25rem;">
+                            @fund.Balance.ToString("C")
+                        </span>
+                    </div>
+                    
+                    @if (fund.TargetBalance.HasValue)
+                    {
+                        <div class="mb-2">
+                            <div class="d-flex justify-between mb-1">
+                                <span class="text-muted">Target: @fund.TargetBalance.Value.ToString("C0")</span>
+                                <span class="text-muted">@GetPercentage(fund)%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar @GetProgressClass(fund)" 
+                                     style="width: @Math.Min(GetPercentage(fund), 100)%;"></div>
+                            </div>
+                        </div>
+                    }
+                    
+                    <div class="d-flex justify-between mt-3">
+                        <span class="badge @(fund.IsActive ? "badge-success" : "badge-warning")">
+                            @(fund.IsActive ? "Active" : "Inactive")
+                        </span>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline" @onclick="() => EditFund(fund)" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteFund(fund)" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (!funds.Any())
+        {
+            <div class="card">
+                <div class="card-body text-center text-muted">
+                    <i class="fas fa-wallet" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>No funds created yet. Click "Add Fund" to get started.</p>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Add/Edit Form Modal -->
+@if (showForm)
+{
+    <FundFormModal 
+        Fund="editingFund"
+        OnSave="OnFundSaved"
+        OnCancel="CloseForm" />
+}
+
+@code {
+private List<FundDto> funds = new();
+private FundDto? editingFund;
+private bool isLoading = true;
+private bool isRecalculating = false;
+private bool showForm = false;
+    
+// Calculated summaries
+private decimal unrestrictedTotal = 0;
+private decimal restrictedTotal = 0;
+private decimal tempRestrictedTotal = 0;
+private decimal permRestrictedTotal = 0;
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadFunds();
+}
+
+private async Task LoadFunds()
+{
+    isLoading = true;
+    funds = await FundService.GetAllAsync(true);
+        
+    // Calculate totals from funds
+    unrestrictedTotal = funds.Where(f => f.Type == FundType.Unrestricted).Sum(f => f.Balance);
+    restrictedTotal = funds.Where(f => f.Type == FundType.Restricted).Sum(f => f.Balance);
+    tempRestrictedTotal = funds.Where(f => f.Type == FundType.TemporarilyRestricted).Sum(f => f.Balance);
+    permRestrictedTotal = funds.Where(f => f.Type == FundType.PermanentlyRestricted).Sum(f => f.Balance);
+        
+    isLoading = false;
+}
+
+private async Task RecalculateBalances()
+{
+    isRecalculating = true;
+    await FundService.RecalculateAllBalancesAsync();
+    await LoadFunds();
+    isRecalculating = false;
+}
+
+    private void ShowAddForm()
+    {
+        editingFund = null;
+        showForm = true;
+    }
+
+    private void EditFund(FundDto fund)
+    {
+        editingFund = fund;
+        showForm = true;
+    }
+
+    private async Task DeleteFund(FundDto fund)
+    {
+        await FundService.DeleteAsync(fund.Id);
+        await LoadFunds();
+    }
+
+    private async Task OnFundSaved()
+    {
+        showForm = false;
+        await LoadFunds();
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+    }
+
+    private decimal GetPercentage(FundDto fund)
+    {
+        if (!fund.TargetBalance.HasValue || fund.TargetBalance.Value == 0) return 0;
+        return (fund.Balance / fund.TargetBalance.Value) * 100;
+    }
+
+    private string GetProgressClass(FundDto fund)
+    {
+        var pct = GetPercentage(fund);
+        if (pct >= 100) return "success";
+        if (pct >= 75) return "";
+        if (pct >= 50) return "warning";
+        return "danger";
+    }
+
+    private string GetTypeBadgeClass(FundType type) => type switch
+    {
+        FundType.Unrestricted => "badge-success",
+        FundType.Restricted => "badge-danger",
+        FundType.TemporarilyRestricted => "badge-warning",
+        FundType.PermanentlyRestricted => "badge-info",
+        _ => "badge-info"
+    };
+}

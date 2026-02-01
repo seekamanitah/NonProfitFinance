@@ -1,0 +1,230 @@
+@inject IFundService FundService
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit Fund" : "Add Fund")</h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="modal-body">
+                <!-- Name -->
+                <div class="form-group">
+                    <label class="form-label">Fund Name *</label>
+                    <InputText class="form-control" @bind-Value="model.Name" placeholder="e.g., General Operating Fund" />
+                    <ValidationMessage For="@(() => model.Name)" />
+                </div>
+                
+                <!-- Type and Status -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Fund Type *</label>
+                        <InputSelect class="form-control" @bind-Value="model.Type">
+                            @foreach (var type in Enum.GetValues<FundType>())
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <div class="form-control" style="border: none; padding-top: 0.5rem;">
+                            <label class="d-flex align-center gap-2">
+                                <InputCheckbox @bind-Value="model.IsActive" />
+                                <span>Active</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Description" 
+                                   rows="2" placeholder="Purpose and restrictions of this fund..." />
+                </div>
+
+                <!-- Balance Section -->
+                <div class="card" style="background: var(--bg-secondary, #f8f9fa); padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 1rem 0; font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-dollar-sign" aria-hidden="true"></i>
+                        Balance Information
+                    </h4>
+                    
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Starting Balance</label>
+                            <div style="display: flex; align-items: stretch;">
+                                <span style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
+                                <InputNumber class="form-control" @bind-Value="model.StartingBalance" 
+                                             style="border-radius: 0 6px 6px 0; flex: 1;"
+                                             placeholder="0.00" step="0.01" disabled="@IsEdit" />
+                            </div>
+                            @if (IsEdit)
+                            {
+                                <small class="text-muted">Cannot be changed after creation</small>
+                            }
+                            else
+                            {
+                                <small class="text-muted">Initial fund balance at setup</small>
+                            }
+                        </div>
+                        
+                        @if (IsEdit && Fund != null)
+                        {
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">Current Balance</label>
+                                <div class="form-control" style="background: #e8f5e9; font-weight: 600; color: #2e7d32; border: 1px solid #81c784;">
+                                    @Fund.Balance.ToString("C2")
+                                </div>
+                                <small class="text-muted">Auto-calculated from transactions</small>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0; margin-top: 1rem;">
+                        <label class="form-label">Target Balance (Optional)</label>
+                        <div style="display: flex; align-items: stretch;">
+                            <span style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
+                            <InputNumber class="form-control" @bind-Value="model.TargetBalance" 
+                                         style="border-radius: 0 6px 6px 0; flex: 1;"
+                                         placeholder="0.00" step="0.01" />
+                        </div>
+                        <small class="text-muted">Goal amount for this fund</small>
+                    </div>
+                </div>
+
+                <!-- Restriction Info (if applicable) -->
+                @if (model.Type != FundType.Unrestricted)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Restriction Expiry Date (Optional)</label>
+                        <InputDate class="form-control" @bind-Value="model.RestrictionExpiryDate" />
+                        <small class="text-muted">Date when restriction ends (for temporarily restricted funds)</small>
+                    </div>
+                }
+                
+                @if (errorMessage != null)
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> @errorMessage
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    @(IsEdit ? "Update" : "Create") Fund
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public FundDto? Fund { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private FundFormModel model = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    private bool IsEdit => Fund != null;
+
+    protected override void OnInitialized()
+    {
+        if (Fund != null)
+        {
+            model = new FundFormModel
+            {
+                Name = Fund.Name,
+                Description = Fund.Description,
+                Type = Fund.Type,
+                StartingBalance = Fund.StartingBalance,
+                TargetBalance = Fund.TargetBalance,
+                IsActive = Fund.IsActive,
+                RestrictionExpiryDate = Fund.RestrictionExpiryDate
+            };
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            errorMessage = "Name is required.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await FundService.UpdateAsync(Fund!.Id, new UpdateFundRequest(
+                    model.Name!,
+                    model.Type,
+                    model.Description,
+                    model.TargetBalance,
+                    model.IsActive,
+                    null
+                ));
+            }
+            else
+            {
+                await FundService.CreateAsync(new CreateFundRequest(
+                    model.Name!,
+                    model.Type,
+                    model.Description,
+                    model.StartingBalance,
+                    model.TargetBalance,
+                    null
+                ));
+            }
+
+            await OnSave.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private class FundFormModel
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public FundType Type { get; set; } = FundType.Unrestricted;
+        public decimal StartingBalance { get; set; } = 0;
+        public decimal? TargetBalance { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime? RestrictionExpiryDate { get; set; }
+    }
+}

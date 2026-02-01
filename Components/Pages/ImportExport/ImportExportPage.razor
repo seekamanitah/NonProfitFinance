@@ -1,0 +1,393 @@
+@page "/import-export"
+@inject IImportExportService ImportExportService
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Import/Export - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Import & Export</h2>
+        <p class="text-muted">Import transactions from CSV or export your data</p>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <!-- Import Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-file-import"></i> Import Data</h3>
+        </div>
+        <div class="card-body">
+            <div class="tabs mb-3">
+                <div class="tab @(importTab == "transactions" ? "active" : "")" 
+                     @onclick="SetTransactionsTab">
+                    Transactions
+                </div>
+                <div class="tab @(importTab == "donors" ? "active" : "")" 
+                     @onclick="SetDonorsTab">
+                    Donors
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Select CSV File</label>
+                <InputFile OnChange="HandleFileSelected" class="form-control" accept=".csv" />
+            </div>
+            
+            @if (selectedFile != null)
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-file-csv"></i>
+                    Selected: @selectedFile.Name (@(selectedFile.Size / 1024) KB)
+                </div>
+                
+                <div class="form-group">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="hasHeaderRow" />
+                        File has header row
+                    </label>
+                </div>
+                
+                <h4>Column Mapping</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Date Column</label>
+                        <input type="number" class="form-control" @bind="dateColumn" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Amount Column</label>
+                        <input type="number" class="form-control" @bind="amountColumn" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description Column</label>
+                        <input type="number" class="form-control" @bind="descriptionColumn" min="0" />
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Category Column (optional)</label>
+                        <input type="number" class="form-control" @bind="categoryColumn" min="0" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date Format</label>
+                        <select class="form-control" @bind="dateFormat">
+                            <option value="yyyy-MM-dd">yyyy-MM-dd</option>
+                            <option value="MM/dd/yyyy">MM/dd/yyyy</option>
+                            <option value="dd/MM/yyyy">dd/MM/yyyy</option>
+                            <option value="M/d/yyyy">M/d/yyyy</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2 mt-3">
+                    <button class="btn btn-outline" @onclick="PreviewImport" disabled="@isProcessing">
+                        <i class="fas fa-eye"></i> Preview
+                    </button>
+                    <button class="btn btn-primary" @onclick="ExecuteImport" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-upload"></i>
+                        }
+                        Import
+                    </button>
+                </div>
+            }
+            
+            @if (importResult != null)
+            {
+                <div class="alert @(importResult.Success ? "alert-success" : "alert-warning") mt-3">
+                    <strong>Import Complete:</strong>
+                    <ul style="margin: 0.5rem 0 0 1rem;">
+                        <li>Imported: @importResult.ImportedRows rows</li>
+                        <li>Skipped: @importResult.SkippedRows rows</li>
+                        @if (importResult.Errors.Any())
+                        {
+                            <li>Errors: @importResult.Errors.Count</li>
+                        }
+                    </ul>
+                </div>
+            }
+            
+            @if (previewResult != null)
+            {
+                var validRows = previewResult.Transactions.Where(t => t.IsValid).ToList();
+                var invalidRows = previewResult.Transactions.Where(t => !t.IsValid).ToList();
+                
+                <div class="mt-3">
+                    <h4>Preview (@validRows.Count valid, @invalidRows.Count invalid)</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in validRows.Take(5))
+                            {
+                                <tr>
+                                    <td>@row.Date?.ToString("MM/dd/yyyy")</td>
+                                    <td>@row.Amount?.ToString("C")</td>
+                                    <td>@row.Description</td>
+                                    <td>@row.Category</td>
+                                    <td><span class="badge badge-success">Valid</span></td>
+                                </tr>
+                            }
+                            @foreach (var row in invalidRows.Take(3))
+                            {
+                                <tr class="text-muted">
+                                    <td colspan="4">@string.Join(", ", row.Errors)</td>
+                                    <td><span class="badge badge-danger">Invalid</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    
+    <!-- Export Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-file-export"></i> Export Data</h3>
+        </div>
+        <div class="card-body">
+            <!-- Excel Export with Data Selection -->
+            <h4>Excel Export (Select Data)</h4>
+            <p class="text-muted" style="font-size: 0.9rem;">Choose which data to include in your Excel export</p>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="exportTransactions" />
+                    <strong>Transactions</strong>
+                </label>
+                @if (exportTransactions)
+                {
+                    <div style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Start Date</label>
+                                <input type="date" class="form-control" @bind="exportStartDate" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">End Date</label>
+                                <input type="date" class="form-control" @bind="exportEndDate" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="exportCategories" />
+                    <strong>Categories</strong>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="exportDonors" />
+                    <strong>Donors</strong>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="exportGrants" />
+                    <strong>Grants</strong>
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="exportFunds" />
+                    <strong>Funds</strong>
+                </label>
+            </div>
+            
+            <button class="btn btn-primary" @onclick="ExportToExcel" disabled="@(!CanExportExcel)">
+                <i class="fas fa-file-excel"></i> Export to Excel
+            </button>
+            
+            @if (!CanExportExcel && (exportTransactions || exportCategories || exportDonors || exportGrants || exportFunds))
+            {
+                <small class="text-muted d-block mt-2">Select at least one data type to export</small>
+            }
+            
+            <hr style="margin: 1.5rem 0;" />
+            
+            <h4>Quick CSV Exports</h4>
+            <p class="text-muted" style="font-size: 0.9rem;">Export individual data types to CSV</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline" @onclick="ExportTransactionsCsv">
+                    <i class="fas fa-exchange-alt"></i> Transactions CSV
+                </button>
+                <button class="btn btn-outline" @onclick="ExportCategoriesCsv">
+                    <i class="fas fa-tags"></i> Categories CSV
+                </button>
+                <button class="btn btn-outline" @onclick="ExportDonorsCsv">
+                    <i class="fas fa-heart"></i> Donors CSV
+                </button>
+                <button class="btn btn-outline" @onclick="ExportGrantsCsv">
+                    <i class="fas fa-hand-holding-usd"></i> Grants CSV
+                </button>
+            </div>
+            
+            <hr style="margin: 1.5rem 0;" />
+            
+            <h4>Download Templates</h4>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/api/importexport/templates/transactions" class="btn btn-outline" target="_blank">
+                    <i class="fas fa-file-csv"></i> Transaction Template
+                </a>
+                <a href="/api/importexport/templates/donors" class="btn btn-outline" target="_blank">
+                    <i class="fas fa-file-csv"></i> Donor Template
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+private string importTab = "transactions";
+private IBrowserFile? selectedFile;
+private bool hasHeaderRow = true;
+private int dateColumn = 0;
+private int amountColumn = 1;
+private int descriptionColumn = 2;
+private int? categoryColumn;
+private string dateFormat = "yyyy-MM-dd";
+private bool isProcessing = false;
+    
+private DateTime exportStartDate = DateTime.Today.AddMonths(-1);
+private DateTime exportEndDate = DateTime.Today;
+
+// Excel export selections
+private bool exportTransactions = true;
+private bool exportCategories = false;
+private bool exportDonors = false;
+private bool exportGrants = false;
+private bool exportFunds = false;
+
+private bool CanExportExcel => exportTransactions || exportCategories || exportDonors || exportGrants || exportFunds;
+    
+private ImportResult? importResult;
+private ImportPreviewResult? previewResult;
+
+private void SetTransactionsTab() => importTab = "transactions";
+private void SetDonorsTab() => importTab = "donors";
+
+private void HandleFileSelected(InputFileChangeEventArgs e)
+{
+    selectedFile = e.File;
+    importResult = null;
+    previewResult = null;
+}
+
+private async Task PreviewImport()
+{
+    if (selectedFile == null) return;
+
+    isProcessing = true;
+    try
+    {
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var mapping = new ImportMappingConfig(
+                dateColumn, amountColumn, descriptionColumn,
+                categoryColumn, null, null, null, null,
+                null, null, hasHeaderRow, dateFormat);
+
+            previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task ExecuteImport()
+    {
+        if (selectedFile == null) return;
+
+        isProcessing = true;
+        try
+        {
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var mapping = new ImportMappingConfig(
+                dateColumn, amountColumn, descriptionColumn,
+                categoryColumn, null, null, null, null,
+                null, null, hasHeaderRow, dateFormat);
+
+            importResult = await ImportExportService.ImportTransactionsFromCsvAsync(memoryStream, mapping);
+            previewResult = null;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        if (!CanExportExcel) return;
+
+        var excel = await ImportExportService.ExportToExcelAsync(
+            exportTransactions ? new TransactionFilterRequest(exportStartDate, exportEndDate) : null,
+            exportCategories,
+            exportDonors,
+            exportGrants,
+            exportFunds
+        );
+        await DownloadFile(excel, $"nonprofit_data_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task ExportTransactionsCsv()
+    {
+        var filter = new TransactionFilterRequest(exportStartDate, exportEndDate);
+        var csv = await ImportExportService.ExportTransactionsToCsvAsync(filter);
+        await DownloadFile(csv, $"transactions_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+    }
+
+    private async Task ExportCategoriesCsv()
+    {
+        var csv = await ImportExportService.ExportCategoriesToCsvAsync();
+        await DownloadFile(csv, $"categories_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+    }
+
+    private async Task ExportDonorsCsv()
+    {
+        var csv = await ImportExportService.ExportDonorsToCsvAsync();
+        await DownloadFile(csv, $"donors_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+    }
+
+    private async Task ExportGrantsCsv()
+    {
+        var csv = await ImportExportService.ExportGrantsToCsvAsync();
+        await DownloadFile(csv, $"grants_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+    }
+
+    private async Task DownloadFile(byte[] content, string fileName, string contentType)
+    {
+        var base64 = Convert.ToBase64String(content);
+        await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+    }
+}

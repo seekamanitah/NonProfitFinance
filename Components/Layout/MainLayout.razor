@@ -1,0 +1,124 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject IKeyboardShortcutService KeyboardShortcuts
+@inject ISpellCheckService SpellCheck
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<!-- Skip Link for Accessibility -->
+<a href="#main-content" class="skip-link" aria-label="Skip to main content">
+    Skip to main content
+</a>
+
+<div class="app-container">
+    <aside class="sidebar @(sidebarCollapsed ? "collapsed" : "")" aria-label="Navigation sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-fire-extinguisher" aria-hidden="true"></i>
+            </div>
+            <span class="sidebar-title">NonProfit Finance</span>
+        </div>
+        
+        <NavMenu />
+    </aside>
+    
+    <div class="main-content">
+        <div class="main-header" role="banner">
+            <GlobalSearch />
+            <button class="btn btn-icon" @onclick="ShowKeyboardHelp" title="Keyboard Shortcuts (Shift+?)" aria-label="Show keyboard shortcuts">
+                <i class="fas fa-keyboard" aria-hidden="true"></i>
+            </button>
+        </div>
+        <main class="page-content" id="main-content" role="main" tabindex="-1">
+            @Body
+        </main>
+    </div>
+</div>
+
+@if (showKeyboardHelp)
+{
+    <KeyboardShortcutsHelp Show="@showKeyboardHelp" OnClose="CloseKeyboardHelp" />
+}
+
+@code {
+private bool sidebarCollapsed = false;
+private bool showKeyboardHelp = false;
+
+protected override void OnInitialized()
+{
+    // Subscribe to location changes for any future needs
+    Navigation.LocationChanged += OnLocationChanged;
+}
+
+private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+{
+    StateHasChanged();
+}
+
+protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize keyboard shortcuts
+                await KeyboardShortcuts.InitializeAsync();
+                
+                // Initialize spell check
+                await SpellCheck.InitializeAsync();
+                
+                // Register global shortcuts
+                KeyboardShortcuts.RegisterShortcut("ctrl+n", async () =>
+                {
+                    await JS.InvokeVoidAsync("eval", "document.querySelector('.btn-quick-add')?.click()");
+                });
+                
+                KeyboardShortcuts.RegisterShortcut("ctrl+f", async () =>
+                {
+                    await JS.InvokeVoidAsync("eval", "document.querySelector('.search-input')?.focus()");
+                });
+                
+                KeyboardShortcuts.RegisterShortcut("shift+?", async () =>
+                {
+                    showKeyboardHelp = true;
+                    await InvokeAsync(StateHasChanged);
+                });
+                
+                KeyboardShortcuts.RegisterShortcut("escape", async () =>
+                {
+                    if (showKeyboardHelp)
+                    {
+                        showKeyboardHelp = false;
+                        await InvokeAsync(StateHasChanged);
+                    }
+                });
+            }
+            catch
+            {
+                // Initialization failed - not critical
+            }
+        }
+    }
+
+    private void ShowKeyboardHelp()
+    {
+        showKeyboardHelp = true;
+    }
+
+    private void CloseKeyboardHelp()
+    {
+        showKeyboardHelp = false;
+    }
+
+    public void SetPageTitle(string title)
+    {
+        // No longer used, but kept for compatibility
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}
+

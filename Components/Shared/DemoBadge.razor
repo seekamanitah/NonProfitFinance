@@ -1,0 +1,17 @@
+@inject IDemoDataService DemoDataService
+
+@if (hasDemoData)
+{
+    <span class="demo-badge" title="Demo data is loaded. Go to Settings to manage.">
+        <i class="fas fa-flask"></i> DEMO
+    </span>
+}
+
+@code {
+    private bool hasDemoData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hasDemoData = await DemoDataService.HasDemoDataAsync();
+    }
+}

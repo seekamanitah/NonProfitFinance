@@ -1,0 +1,315 @@
+@page "/compliance/form990"
+@inject IForm990Service Form990Service
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Form 990 - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Form 990 Worksheet</h2>
+        <p class="text-muted">IRS Form 990 data preparation and export</p>
+    </div>
+</div>
+
+<!-- Fiscal Year Selection -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex gap-3 align-center">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Fiscal Year</label>
+                <select class="form-control" @bind="selectedYear">
+                    @for (int year = DateTime.Today.Year; year >= DateTime.Today.Year - 5; year--)
+                    {
+                        <option value="@year">@year</option>
+                    }
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0; align-self: flex-end;">
+                <button class="btn btn-primary" @onclick="LoadForm990Data">
+                    <i class="fas fa-sync"></i> Generate Worksheet
+                </button>
+            </div>
+            
+            @if (form990Data != null)
+            {
+                <div class="form-group" style="margin-bottom: 0; align-self: flex-end;">
+                    <button class="btn btn-outline" @onclick="ExportToPdf">
+                        <i class="fas fa-file-pdf text-danger"></i> Export PDF
+                    </button>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; align-self: flex-end;">
+                    <button class="btn btn-outline" @onclick="ExportToExcel">
+                        <i class="fas fa-file-excel text-success"></i> Export Excel
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else if (form990Data != null)
+{
+    <!-- Form Type Alert -->
+    <div class="alert @GetFormTypeAlertClass() mb-3">
+        <i class="fas @GetFormTypeIcon()"></i>
+        <strong>Required Form: @form990Data.RequiredFormType</strong>
+        <span class="ml-2">@GetFormTypeDescription()</span>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="metric-cards mb-3">
+        <div class="metric-card">
+            <div class="metric-icon income">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Total Revenue (Line 12)</div>
+                <div class="metric-value positive">@form990Data.TotalRevenue.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon expense">
+                <i class="fas fa-arrow-up"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Total Expenses (Line 17)</div>
+                <div class="metric-value negative">@form990Data.TotalExpenses.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon primary">
+                <i class="fas fa-balance-scale"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Net Assets (Line 21)</div>
+                <div class="metric-value">@form990Data.NetAssets.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon neutral">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Net Income (Line 18)</div>
+                <div class="metric-value @(form990Data.PartI.RevenueMinusExpenses >= 0 ? "positive" : "negative")">
+                    @form990Data.PartI.RevenueMinusExpenses.ToString("C0")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <!-- Part I - Summary -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-list-ol"></i> Part I - Summary</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Line</th>
+                            <th>Description</th>
+                            <th class="text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>6</td>
+                            <td>Gross receipts</td>
+                            <td class="text-right">@form990Data.PartI.GrossReceipts.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>8</td>
+                            <td>Contributions and grants</td>
+                            <td class="text-right">@form990Data.PartI.Contributions.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>9</td>
+                            <td>Program service revenue</td>
+                            <td class="text-right">@form990Data.PartI.ProgramServiceRevenue.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>10</td>
+                            <td>Investment income</td>
+                            <td class="text-right">@form990Data.PartI.InvestmentIncome.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>11</td>
+                            <td>Other revenue</td>
+                            <td class="text-right">@form990Data.PartI.OtherRevenue.ToString("C")</td>
+                        </tr>
+                        <tr style="font-weight: bold; background: var(--bg-secondary);">
+                            <td>12</td>
+                            <td>Total revenue</td>
+                            <td class="text-right amount income">@form990Data.PartI.TotalRevenue.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>13</td>
+                            <td>Grants and similar amounts paid</td>
+                            <td class="text-right">@form990Data.PartI.GrantsAndSimilar.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>14</td>
+                            <td>Benefits paid to members</td>
+                            <td class="text-right">@form990Data.PartI.Benefits.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>15</td>
+                            <td>Salaries and compensation</td>
+                            <td class="text-right">@form990Data.PartI.Salaries.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>16</td>
+                            <td>Other expenses</td>
+                            <td class="text-right">@form990Data.PartI.OtherExpenses.ToString("C")</td>
+                        </tr>
+                        <tr style="font-weight: bold; background: var(--bg-secondary);">
+                            <td>17</td>
+                            <td>Total expenses</td>
+                            <td class="text-right amount expense">@form990Data.PartI.TotalExpenses.ToString("C")</td>
+                        </tr>
+                        <tr style="font-weight: bold; background: var(--color-primary); color: white;">
+                            <td>18</td>
+                            <td>Revenue minus expenses</td>
+                            <td class="text-right">@form990Data.PartI.RevenueMinusExpenses.ToString("C")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Part VIII - Revenue -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-coins"></i> Part VIII - Statement of Revenue</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Line</th>
+                            <th>Description</th>
+                            <th class="text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1e</td>
+                            <td>Government grants</td>
+                            <td class="text-right">@form990Data.PartVIII.GovernmentGrants.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>1f</td>
+                            <td>Other contributions</td>
+                            <td class="text-right">@form990Data.PartVIII.OtherContributions.ToString("C")</td>
+                        </tr>
+                        <tr style="font-weight: bold; background: var(--bg-secondary);">
+                            <td>1h</td>
+                            <td>Total contributions</td>
+                            <td class="text-right">@form990Data.PartVIII.TotalContributions.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>2g</td>
+                            <td>Program service revenue</td>
+                            <td class="text-right">@form990Data.PartVIII.TotalProgramServiceRevenue.ToString("C")</td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>Investment income (interest)</td>
+                            <td class="text-right">@form990Data.PartVIII.InvestmentIncomeInterest.ToString("C")</td>
+                        </tr>
+                        <tr style="font-weight: bold; background: var(--color-primary); color: white;">
+                            <td>12</td>
+                            <td>Total revenue</td>
+                            <td class="text-right">@form990Data.PartVIII.TotalRevenue.ToString("C")</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="alert alert-warning mt-3">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Important:</strong> This worksheet is for planning purposes only. 
+        Consult with a qualified tax professional for actual IRS Form 990 filing. 
+        Some line items may require manual categorization of transactions.
+    </div>
+}
+
+@code {
+    private int selectedYear = DateTime.Today.Year - 1;
+    private Form990DataDto? form990Data;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadForm990Data();
+    }
+
+    private async Task LoadForm990Data()
+    {
+        isLoading = true;
+        try
+        {
+            form990Data = await Form990Service.GetForm990DataAsync(selectedYear);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        var pdfBytes = await Form990Service.ExportForm990ToPdfAsync(selectedYear);
+        var base64 = Convert.ToBase64String(pdfBytes);
+        await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.pdf", "application/pdf", base64);
+    }
+
+    private async Task ExportToExcel()
+    {
+        var excelBytes = await Form990Service.ExportForm990ToExcelAsync(selectedYear);
+        var base64 = Convert.ToBase64String(excelBytes);
+        await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.xlsx", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64);
+    }
+
+    private string GetFormTypeAlertClass() => form990Data?.RequiredFormType switch
+    {
+        Form990Type.Form990N => "alert-success",
+        Form990Type.Form990EZ => "alert-info",
+        Form990Type.Form990 => "alert-warning",
+        _ => "alert-info"
+    };
+
+    private string GetFormTypeIcon() => form990Data?.RequiredFormType switch
+    {
+        Form990Type.Form990N => "fa-check-circle",
+        Form990Type.Form990EZ => "fa-file-alt",
+        Form990Type.Form990 => "fa-file-contract",
+        _ => "fa-file"
+    };
+
+    private string GetFormTypeDescription() => form990Data?.RequiredFormType switch
+    {
+        Form990Type.Form990N => "e-Postcard (gross receipts ? $50,000)",
+        Form990Type.Form990EZ => "Short form (gross receipts < $200,000 and assets < $500,000)",
+        Form990Type.Form990 => "Full form (gross receipts ? $200,000 or assets ? $500,000)",
+        Form990Type.Form990PF => "Private Foundation",
+        _ => ""
+    };
+}

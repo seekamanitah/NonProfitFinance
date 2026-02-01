@@ -1,0 +1,143 @@
+AI guide:
+
+### Expanded AI-Friendly Development Plan for TradeFlow FSM: Personal HVAC Job Estimator App
+
+This expanded guide builds on the initial AI-assisted development blueprint for TradeFlow FSM, your personal HVAC estimator app for residential services like furnace installations, AC repairs, and ductwork tune-ups. Designed for solo use, it emphasizes quick estimates from customer assets (e.g., serial-tracked condensers with BTU/fuel details), inventory pulls, basic scheduling, time logging, Square invoicing, and reports—with robust export/import backups (SQLite dumps or JSON subsets) for data safety on your Windows desktop or Android phone. The plan is now more granular, with sub-tasks, detailed feature breakdowns, integration specifics (e.g., Square SDK flows, Google Calendar OAuth), AI prompts for code gen/testing, and checkpoints for iterative builds. Use GitHub Copilot or Grok in Visual Studio (.NET 9) to accelerate—e.g., paste prompts into the AI chat for C#/XAML snippets, then refine with VS IntelliSense.
+
+**Total Timeline**: 40-60 hours (desktop MVP: 25-35 hours; Android: 15-20 hours). Track progress in a VS solution with branches (e.g., `feature/custom-fields`). **AI Workflow Tips**: For features, prompt "Generate [C#/XAML] for [feature] with HVAC examples like BTU validation"; for integrations, "Implement [SDK] with error handling and offline fallback." Always test offline (e.g., mock DB) before sync. Start with a clean repo: `git init TradeFlowFSM`.
+
+#### Prerequisites and Setup (1-2 Hours, Expanded)
+- **Environment Details**: Visual Studio 2022/2025 Community—install .NET desktop/mobile workloads, Git tools. NuGets (via Package Manager): EF Core.Tools (migrations), EF Core.Sqlite/SQLServer (DB), CommunityToolkit.Mvvm (MVVM), iText7 (PDF estimates), ZXing.Net.Maui (serial scans), Microsoft.Graph (Calendar), Square.Payments (invoicing), LiveCharts2 (reports), System.Text.Json (backups). Docker Desktop for remote tests.
+- **Project Granularity**: Solution (`TradeFlow.sln`) with folders:
+  - `Core/Library`: Models (e.g., Customer.cs with Id, Name, Sites collection), Services (e.g., SchemaImporter.cs for JSON presets), Repositories (EF DbContext wrapper).
+  - `Desktop/WPF App`: MainWindow.xaml (onboarding wizard), Pages (e.g., CustomerView.xaml).
+  - `Mobile/MAUI App`: MauiProgram.cs (shared Core reference), Pages (e.g., AssetPage.xaml with camera).
+  - `Presets/JSON`: HvacPreset.json (schema: `{ "Tables": [{ "Name": "Assets", "Fields": [{ "Name": "FuelType", "Type": "Enum", "Options": ["NaturalGas", "Propane", "Electric"], "Required": true }] }] }`).
+  - `Tests/Unit`: xUnit for features (e.g., WarrantyCalcTests.cs).
+- **DB Dual-Mode**: appsettings.json: `{ "DbMode": "Local", "LocalPath": "TradeFlow.db", "RemoteConnection": "Server=localhost,1433;Database=TradeFlow;User=sa;Password=..." }`. Docker: `docker-compose.yml` with SQL Server volume (`./data:/var/opt/mssql` for persistence).
+- **AI Prompt Starter**: "Create .NET solution structure: Core lib with EF DbContext for Customers/Assets (base schema), Desktop WPF app with wizard for trade selection (load JSON preset, apply migration), Mobile MAUI stub. Include appsettings.json for DB toggle and basic export service (SQLite dump to JSON)."
+- **Checkpoint**: Solution builds (Ctrl+Shift+B); wizard runs, creates empty DB. Commit "setup-v1".
+
+#### Phase 1: Core Foundation and Trade Customization (8-10 Hours, Expanded)
+Establish schema engine, wizard, and dynamic UI—ensuring HVAC presets load fields like BTU/fuel, with custom adder for extensibility. Features: Offline schema changes; backups include configs.
+
+- **Task 1: Schema Engine and Migrations (3-4 hours)**.
+  - **Feature Breakdown**: Generic base tables (Customers: Id, Name, Addresses collection; Assets: Id, CustomerId FK, Serial (unique), Model, InstallDate). Preset importer: Parse JSON → Generate EF migration (e.g., AddFuelType enum column). Custom fields: `CustomFields` table (EntityId FK, Key, Type: Text/Enum/Number/Date, Value); validation (e.g., BTU >12k regex).
+  - **Integration Details**: EF Core.Tools for migrations (`dotnet ef migrations add HvacPreset`); runtime apply via `context.Database.MigrateAsync()`. Offline: Local migrations only; sync queues schema diffs to Docker.
+  - **Backup Tie-In**: Export serializes schema (e.g., `JsonSerializer.Serialize(customFields)`); import runs reverse migration if needed.
+  - **AI Prompt**: "Expand EF DbContext: Base Assets table with Serial/Model. Add JsonSchemaImporter service: Load HvacPreset.json, create migration for fields (FuelType enum: NaturalGas/Propane/Electric, BTU int with validation >12000). Include CustomFields table for no-code adds (Type enum: Text/Enum). Generate test migration script."
+  - **Sub-Test**: Run preset import → Query DB for new columns (e.g., LINQ: `context.Assets.FirstOrDefault(a => a.FuelType == "Propane")`).
+
+- **Task 2: Onboarding Wizard and UI Adaptation (2-3 hours)**.
+  - **Feature Breakdown**: 4-step wizard: Step 1: Trade dropdown (HVAC/General) → Step 2: Preset preview (list new fields like Config enum) → Step 3: DB toggle (Local test button pings SQLite; Remote: Validate Docker connection via `SqlConnection.Open()`) → Step 4: Save config, apply migration, launch Home.
+  - **Integration Details**: MVVM: WizardViewModel with RelayCommands (e.g., `LoadPresetCommand` calls importer). UI: Dynamic forms via DataTemplates (e.g., Enum field renders ComboBox if HVAC active).
+  - **Backup Tie-In**: Wizard exports initial config JSON on complete.
+  - **AI Prompt**: "WPF Wizard XAML + ViewModel: Stepper control for trade select (dropdown loads presets), preview grid of fields (e.g., BTU for HVAC), DB toggle with connection test (SqliteConnection vs SqlConnection). Bind dynamic form templates (e.g., Enum ComboBox for FuelType)."
+  - **Sub-Test**: Select HVAC → Verify form shows BTU slider; toggle remote → Ping succeeds.
+
+- **Task 3: Backup/Sync Engine Basics (3 hours)**.
+  - **Feature Breakdown**: Export button: Options (Full DB, Trade Subset like "HVAC Assets", Schema Only); formats (SQLite .db, JSON with custom fields). Import: Parse/merge (e.g., upsert customers, prompt conflicts like "Overwrite BTU?").
+  - **Integration Details**: Service: `BackupService` with `ExportAsync` (EF to Json, ZipFile for encryption). Sync: `SyncQueue` table (ChangeType: Insert/Update, Payload JSON); TimerService polls Docker every 5min if remote toggled.
+  - **Backup Tie-In**: Core function—e.g., auto-export on schema change.
+  - **AI Prompt**: "C# BackupService: Export EF context to SQLite dump or JSON (serialize Assets with custom fields like FuelType). Import method with upsert (conflict prompt via MessageBox). Add SyncQueue table and Timer for remote push (HttpClient to Docker API endpoint)."
+  - **Sub-Test**: Add asset → Export JSON → Import to new DB → Verify FuelType preserved.
+
+**Expanded Checkpoint**: Wizard applies HVAC preset; custom field adds "SEER Rating" → Appears in asset form. Offline export works. Commit "v0.1-Foundation" with branch for customs.
+
+#### Phase 2: Universal Workflows with HVAC Defaults (10-12 Hours, Expanded)
+Roll out screens for customers/assets/estimates/inventory; HVAC preset enables fields like BTU matching. Features: Dynamic forms render customs; backups scope to workflows.
+
+- **Task 1: Customer/Site Management Screens (3-4 hours)**.
+  - **Feature Breakdown**: List: Searchable DataGrid/ListView (columns: Name, Sites Count, Last Job Date); expandable rows for site tree. Form: TabControl (Details: Bound TextBoxes; Sites: Nested ListView for addresses; History: Timeline ListView of linked jobs/assets with dates/totals).
+  - **HVAC-Specific**: Preset adds fields (e.g., "System Notes" TextBox in form: "Propane tank location?"); history filters (e.g., "Warranty-Related Only").
+  - **Integration Details**: Repository pattern (e.g., `CustomerRepository.GetWithSitesAsync()` joins EF); dynamic columns from schema (e.g., if custom "Preferred Brand," add grid header).
+  - **Backup Tie-In**: Customer export includes sites/history JSON.
+  - **AI Prompt**: "MVVM for CustomerScreen: WPF DataGrid with search (LINQ filter), expandable sites via TreeView. Form tabs with dynamic binding (e.g., HVAC 'System Notes' TextBox from preset). Include history timeline (EF join on jobs/assets)."
+  - **Sub-Test**: Add customer with 2 sites → Expand → View mock history.
+
+- **Task 2: Asset Tracking Screens (3-4 hours)**.
+  - **Feature Breakdown**: List: Hierarchical TreeView (Customer nodes > Site > Asset cards with badges: Serial, Warranty Status color-coded). Form: ScrollViewer with grouped fields (Core: Model/Serial/InstallDate; Dynamic: BTU slider for HVAC, photo grid).
+  - **HVAC-Specific**: Preset validation (e.g., Fuel required for gas units); warranty calc (DateTime.AddYears(Term) with alert popup).
+  - **Integration Details**: ZXing for serial scan (CameraPage on mobile); photo storage (local file path in DB).
+  - **Backup Tie-In**: Asset export zips photos + JSON.
+  - **AI Prompt**: "AssetScreen MVVM: TreeView hierarchy for customer/site/assets, cards with warranty badge (green if >1yr left). Dynamic form: Slider for BTU, Enum ComboBox for FuelType (HVAC preset). Add ZXing scan button and photo uploader."
+  - **Sub-Test**: Scan serial → Assign to site → Calc warranty → Alert fires.
+
+- **Task 3: Estimates/Inventory Screens (4 hours)**.
+  - **Feature Breakdown**: Estimates List: CardView (title/total/status); Form: Tabbed builder (Items: DragList from inventory, auto-qty calc; Totals: Live sum with tax slider). Inventory: Grid (searchable, low-stock highlights); deduct button logs to job.
+  - **HVAC-Specific**: Preset matching (e.g., inventory filter "BTU-Compatible"); templates (e.g., button loads "AC Repair Kit: $800 + labor").
+  - **Integration Details**: iText7 for PDF (estimate with serials); dynamic line items from customs.
+  - **Backup Tie-In**: Estimate export as PDF + JSON lines.
+  - **AI Prompt**: "ProposalScreen: List of estimate cards with totals. Builder form: Tab for inventory drag (ObservableCollection), BTU filter dropdown (HVAC). Inventory grid with deduct log to job. Generate PDF with iText7 (include asset serials)."
+  - **Sub-Test**: Drag part to estimate → Match BTU → Deduct qty → PDF preview.
+
+**Expanded Checkpoint**: Full chain: Customer add → Asset log → Inventory pull → Estimate build. Custom field "Efficiency Rating" adds to form. Offline deducts queue. Commit "v0.2-Workflows".
+
+#### Phase 3: Operations and Financial Layers (8-10 Hours, Expanded)
+Deepen with scheduling/time/payments; wizards for integrations. Features: Offline timers; Square offline tokens.
+
+- **Task 1: Scheduling/Time Screens (4 hours)**.
+  - **Feature Breakdown**: Schedule: Calendar control (Month view with day slots; drag from estimates list); filters (e.g., "Open Slots"). Time: Dashboard tabs (Active Timers: Clock buttons; Logs: Timesheet grid with GPS coords); auto-pause on idle.
+  - **HVAC-Specific**: Preset durations (e.g., "Diagnostic: 1hr"); tags (e.g., "Requires Gas Certification").
+  - **Integration Details**: Google Maps static links for routing (offline cached via app assets).
+  - **Backup Tie-In**: Schedule ICS export; time logs CSV.
+  - **AI Prompt**: "ScheduleScreen: WPF Calendar with drag-drop from estimate list, slot suggestions from availability. TimeTracking: Tabs for timers (Start/Stop with Geolocation.GetLocationAsync), timesheet grid. HVAC preset adds 'Duration Estimate' field."
+  - **Sub-Test**: Drag estimate to slot → Start timer → GPS stamps log.
+
+- **Task 2: Payments/Integrations Screens (4 hours)**.
+  - **Feature Breakdown**: Payments: Invoice list (filters: Pending/Recurring); detail view with Square embed (card entry, token gen for offline). Integrations: Stepper wizard (e.g., Step 1: API key paste; Step 2: OAuth redirect for Google; Step 3: Test call, e.g., create dummy event).
+  - **HVAC-Specific**: Preset invoice templates (e.g., "Include BTU Verification Fee").
+  - **Integration Details**: Square: SDK NuGet for Charge request (offline: Save token, process on sync). Google: Microsoft.Graph for event CRUD (bi-sync: Job create → Calendar add).
+  - **Backup Tie-In**: Payment exports with tokens redacted.
+  - **AI Prompt**: "PaymentsScreen: Invoice grid, detail with Square SDK embed (Charge flow, offline token save). Integrations wizard: Stepper for Google Calendar (GraphServiceClient auth, test Event creation). HVAC template adds line item for 'Warranty Check'."
+  - **Sub-Test**: Generate invoice → Mock Square charge → Create event in test Calendar.
+
+**Expanded Checkpoint**: Job from estimate → Schedule → Time log → Invoice pay. Wizard connects Google (test event appears). Offline token saves. Commit "v0.3-Operations".
+
+#### Phase 4: Insights, Customizability, and Polish (6-8 Hours, Expanded)
+Finalize with reports and no-code tools; HVAC reports on presets.
+
+- **Task 1: Reporting Screens (2-3 hours)**.
+  - **Feature Breakdown**: Dashboard: KPI cards (e.g., "Monthly Revenue: $4K," "Warranty Alerts: 3"); charts (Line for trends, Pie for trade breakdown). Report gen: Filter form (date/customer) → PDF/CSV output.
+  - **HVAC-Specific**: Preset KPIs (e.g., "Avg BTU per Job," "Fuel Type Revenue Split").
+  - **Integration Details**: LiveCharts2 for visuals; export via CsvHelper.
+  - **Backup Tie-In**: Report data JSON export.
+  - **AI Prompt**: "ReportingScreen MVVM: KPI cards (revenue calc from invoices), LineChart for job trends (filter by date/custom field like BTU). HVAC preset adds Pie for FuelType revenue. Export to PDF (iText) / CSV."
+  - **Sub-Test**: Filter HVAC jobs → Chart renders → Export PDF.
+
+- **Task 2: No-Code Custom Editor (2-3 hours)**.
+  - **Feature Breakdown**: Editor: Tabbed (Tables: ListView of schemas; Fields: Drag pane for types like Enum with options editor; Preview: Sample form render). Apply button runs migration; undo via rollback.
+  - **HVAC-Specific**: Defaults load presets; edit adds (e.g., "Refrigerant Log" sub-table).
+  - **Integration Details**: Reflection for dynamic binding (e.g., PropertyInfo for new fields).
+  - **Backup Tie-In**: Schema changes export as delta JSON.
+  - **AI Prompt**: "CustomSchemaEditor WPF: Tabs for table list, drag-drop field adder (Type: Text/Enum/Number, options editor for Enum). On apply, generate EF migration (AddColumn). Preview dynamic form with reflection binding (e.g., new 'SEER Rating' Slider)."
+  - **Sub-Test**: Add "Custom Field" → Migration runs → Appears in asset form.
+
+- **Task 3: Full Polish and Employee Stub (1-2 hours)**.
+  - **Feature Breakdown**: Dark mode (App.xaml resources); PWA stub for subs (MAUI BlazorHybrid: QR login page, read-only job views).
+  - **AI Prompt**: "Add dark/light theme toggle to WPF/MAUI (ResourceDictionary switch). Stub MobileEmployee PWA: Blazor page for QR auth, read-only job list with clock button (queues to sync)."
+  - **Sub-Test**: Theme changes; QR mocks sub login.
+
+**Expanded Checkpoint**: Custom field in report → Dark mode on mobile. Commit "v0.4-Polish".
+
+#### Phase 5: Android Extension and Comprehensive Testing (10-12 Hours, Expanded)
+Port and validate end-to-end.
+
+- **Task 1: MAUI Core Port (5-6 hours)**.
+  - **Feature Breakdown**: Shared ViewModels bind to MAUI pages (e.g., AssetPage with camera for photos); dynamic forms via CollectionView.
+  - **AI Prompt**: "Port CustomerScreen to MAUI: CollectionView for list, FlyoutPage for sites expansion. Dynamic binding for HVAC fields (e.g., Fuel Picker). Add MediaPicker for asset photos."
+  - **Sub-Test**: Run on emulator; add asset offline.
+
+- **Task 2: Mobile-Specific Enhancements (3 hours)**.
+  - **Feature Breakdown**: GPS for time stamps (Geolocation); barcode for serials.
+  - **AI Prompt**: "MAUI TimeTracking: Geolocation clock-in button, ZXing camera page for serial scans. Offline queue for deducts."
+  - **Sub-Test**: Scan → Log time → Queue sync.
+
+- **Task 3: Full-System Testing (2 hours)**.
+  - **Feature Breakdown**: Scenarios: Offline estimate on mobile → Sync to desktop → Invoice → Backup recovery.
+  - **AI Prompt**: "xUnit tests for end-to-end: Add HVAC asset (BTU validation), estimate with inventory deduct, schedule job, time log, Square mock pay, report KPI. Include offline sync queue test."
+  - **Sub-Test**: Run suite (95% coverage); Docker remote verifies.
+
+**Final Deployment**: Desktop MSIX publish; Android APK (VS Tools > Publish). Include Docker guide in README.
+
+This expanded plan arms you for AI-accelerated building—detailed prompts yield 80% code, VS handles the rest. Your HVAC estimator: Offline-ready, backup-strong, and personally yours. Phase 1 go?

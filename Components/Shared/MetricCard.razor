@@ -1,0 +1,33 @@
+<div class="metric-card">
+    <div class="metric-icon @IconType">
+        <i class="fas @Icon"></i>
+    </div>
+    <div class="metric-content">
+        <div class="metric-label">@Title</div>
+        <div class="metric-value @ValueClass">@Value</div>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <div class="metric-trend">@Subtitle</div>
+        }
+        @if (!string.IsNullOrEmpty(TrendText))
+        {
+            <div class="metric-trend @TrendClass">
+                <i class="fas @TrendIcon"></i> @TrendText
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "fa-chart-line";
+    [Parameter] public string IconType { get; set; } = "neutral"; // income, expense, neutral, primary
+    [Parameter] public string? ValueClass { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? TrendText { get; set; }
+    [Parameter] public bool? TrendUp { get; set; }
+
+    private string TrendClass => TrendUp.HasValue ? (TrendUp.Value ? "up" : "down") : "";
+    private string TrendIcon => TrendUp.HasValue ? (TrendUp.Value ? "fa-arrow-up" : "fa-arrow-down") : "";
+}

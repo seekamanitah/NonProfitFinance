@@ -1,0 +1,97 @@
+/* ============================================
+   Searchable Select Component Styles
+   ============================================ */
+
+.searchable-select-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-select {
+    position: relative;
+    outline: none;
+}
+
+.searchable-select-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.searchable-select-display:hover {
+    border-color: var(--color-primary);
+}
+
+.searchable-select-display i {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.searchable-select.open .searchable-select-display i {
+    transform: rotate(180deg);
+}
+
+.searchable-select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    max-height: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+.searchable-select-search {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.searchable-select-search:focus {
+    background: var(--bg-primary);
+}
+
+.searchable-select-options {
+    overflow-y: auto;
+    max-height: 250px;
+}
+
+.searchable-select-option {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.searchable-select-option:hover {
+    background: var(--bg-secondary);
+}
+
+.searchable-select-option.selected {
+    background: var(--color-primary);
+    color: white;
+    font-weight: 600;
+}
+
+.searchable-select-no-results {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}

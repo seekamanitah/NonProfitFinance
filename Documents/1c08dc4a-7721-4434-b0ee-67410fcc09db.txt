@@ -1,0 +1,259 @@
+# Fantasy Football TV Dashboard Specification
+
+**Project Name**  
+Fantasy Football Live Dashboard (TV Kiosk Mode)
+
+**Target Platform**  
+Large-screen TVs (55–85" 4K landscape) – passive viewing, minimal/no interaction  
+Future: fully mobile-responsive version
+
+**Core Purpose**  
+Display real-time fantasy football stats, calculated fantasy points, and rankings  
+Auto-refresh, auto-scroll, color-coded highlights, news ticker  
+Yahoo Fantasy default, extensible to Sleeper / ESPN / API-Football / SportsDataIO
+
+**Project Goal**  
+Passive large-screen dashboard with real-time data, custom scoring, wizard setup for non-technical users.  
+Developed in Visual Studio 2026 with .NET 8+.
+
+
+## 1. UI Layout (3840×2160 target)
+
+**Top Banner** (8–10% height)  
+- Background: dark gradient (#0f172a → #1e293b)  
+- Left: League name + logo (large, bold white text, 48–72px)  
+- Center: “Week X • YYYY Season” + live game clock / next slate countdown (red accent when <15 min)  
+- Right: Total league fantasy points this week (huge number, 96px, green)  
+- Bottom edge: thin horizontal scrolling news ticker (injuries, big plays, Yahoo headlines, 24px white on semi-transparent black bar, speed 8–12 sec full cycle)
+
+**Main Content Area** (82–84% height)  
+- 5 equal-width columns (20% each) with 8–12 px gutter  
+- All columns scroll independently if overflow (smooth, slow auto-scroll every 20–30 s when idle)  
+- Column header: position abbreviation (QB / RB / WR/TE / K/DST / OVERALL) – 48px bold, centered, team-color accent bar underneath  
+- Row height: 80–100 px per player entry  
+- Font: sans-serif (Inter / Roboto), 28–36 px player name, 20–24 px stats  
+- Background per cell: very dark (#0a0e17), hover/active subtle glow
+
+**Columns**  
+1. **QB** → Player | Team | Pass Yd | TD | INT | Rush Yd | FPts  
+   Color: green text for positive stat contribution, red for negative  
+2. **RB** → Player | Team | Rush Yd | TD | Rec | Rec Yd | FPts  
+3. **WR/TE** → Player | Team | Rec | Rec Yd | TD | Rush Yd | FPts  
+4. **K + DST** → Player | Team | FG | PAT | Miss | (DST: Sack/INT/PA) | FPts  
+5. **Overall Top Performers** (wider visual weight, 22–25% if needed) → Rank | Player | Pos | Team | Key stat line | FPts (largest text, 48–60 px)  
+   Top 15–20, descending FPts, background highlight intensity increases with rank
+
+**Bottom Control Strip** (6–8% height)  
+- Semi-transparent black bar (#00000080)  
+- Left: Current refresh countdown (“Next update in 42 s”)  
+- Center: Selected scoring mode badge (“Yahoo Default 0.5 PPR” / “Custom”) – clickable only in admin mode  
+- Right: Small icons (gear = settings hidden, refresh = manual trigger hidden)  
+- Optional: league standings mini-bar (top 3 teams + their points)
+
+**Visual Styling Rules**  
+- Primary accent: #10b981 (emerald green) for positive / leaders  
+- Negative: #ef4444 (red)  
+- Neutral stat: #94a3b8 (gray)  
+- Highlight hot players: yellow (#fbbf24) border or background pulse  
+- Row zebra: very subtle (#111827 vs #0f172a)  
+- All numbers right-aligned in cells  
+- Player headshots: 64×64 px circle left of name (fallback silhouette)  
+- Auto-cycle: every 45–60 s scroll each column to top if stopped
+
+**Responsive Rules** (MudBlazor breakpoints)  
+- lg+ (desktop/TV): 5 columns  
+- md (tablet): 3 columns (QB/RB | WR/TE | K/DST+Overall)  
+- sm/xs (mobile): single column, collapsible MudExpansionPanels per position
+
+**Admin / Setup Overlay** (rare interaction)  
+- Large centered modal, high-contrast white-on-dark  
+- Stepper wizard UI (progress dots)  
+- Minimum 48 px touch targets  
+- Large readable text (32–48 px)
+
+## 2. Scoring Rules (Yahoo Default 2025–2026)
+
+**Offense**  
+- Passing: 1 pt / 25 yds, 4 pts / TD, –1 pt / INT  
+- Rushing / Receiving: 1 pt / 10 yds, 6 pts / TD, 0.5 pt / reception (half-PPR common)  
+- 2-pt conversions: 2 pts  
+- Fumble lost: –2 pts
+
+**Kicking**  
+- FG 0–39 yds: 3 pts each  
+- FG 40–49 yds: 4 pts each  
+- FG 50+ yds: 5 pts each  
+- PAT: 1 pt
+
+**DST**  
+- Sack: 1 pt  
+- Interception: 2 pts  
+- Fumble Recovery: 2 pts  
+- Defensive TD: 6 pts  
+- Safety: 2 pts  
+- Blocked Kick: 2 pts  
+- Points Allowed tiers:  
+  0 = 10 pts  
+  1–6 = 7 pts  
+  7–13 = 4 pts  
+  14–20 = 1 pt  
+  21–27 = 0 pts  
+  28–34 = –1 pt  
+  35+ = –4 pts
+
+**IDP (common extension, not always default)**  
+- Solo Tackle: 1.5 pts  
+- Tackle Assist: 0.75 pts  
+- Sack: 4 pts  
+- Interception: 5 pts  
+- Forced Fumble: 3 pts  
+- Fumble Recovered: 4 pts  
+- Defensive TD: 6 pts  
+- Safety: 2 pts  
+- Pass Defended: 1.5 pts  
+- Blocked Kick: 3 pts  
+- Extra Point Returned: 2 pts
+
+All values are customizable in the app via ScoringConfig.
+
+
+## 3. Tech Stack
+
+- IDE: Visual Studio 2026  
+- Backend: ASP.NET Core 8+ Web API + SignalR  
+- Frontend: Blazor WebAssembly + MudBlazor  
+- Shared: Class library (models, calculators, config)  
+- Database: EF Core (SQL Server / SQLite) for configs/tokens  
+- Auth: ASP.NET Identity + JWT + roles (Admin / Viewer)  
+- Logging: Serilog (console/file/Seq)  
+- Polling: Cron.NET + Polly (backoff, circuit breaker)  
+- Testing: xUnit, bUnit, Playwright
+
+## 4. APIs & Integration
+
+**Yahoo (Default)**  
+- OAuth 1.0 (3-legged), XML only  
+- Register: https://developer.yahoo.com/apps  
+- Key endpoints:  
+  - /fantasy/v2/league/{key}/scoreboard  
+  - /fantasy/v2/league/{key}/players;sort=PTS  
+  - /fantasy/v2/team/{team_key}/roster;week=XX
+
+**Other APIs**  
+- Sleeper: No auth, /v1/user/{username}, /v1/league/{id}  
+  Docs: https://docs.sleeper.com/  
+- ESPN: espn-api wrapper, league_id + year  
+  GitHub: https://github.com/cwendt94/espn-api  
+- API-Football: API key (x-apisports-key), /players, /fixtures  
+  Docs: https://www.api-football.com/documentation-v3  
+- SportsDataIO: API key, projections/stats  
+  Docs: https://sportsdata.io/developers/api-documentation/nfl
+
+**Section 5 – Modular Scoring & Data Flow**
+
+```markdown
+## 5. Modular Scoring System
+
+```csharp
+public interface IScoringCalculator
+{
+    double Calculate(Player player, ScoringConfig config);
+}
+
+public class QbCalculator : IScoringCalculator { /* impl */ }
+public class RbCalculator : IScoringCalculator { /* impl */ }
+public class WrTeCalculator : IScoringCalculator { /* impl */ }
+public class KickerCalculator : IScoringCalculator { /* impl */ }
+public class DstCalculator : IScoringCalculator { /* impl */ }
+public class IdpCalculator : IScoringCalculator { /* impl */ }
+```
+
+Factory pattern:  
+```csharp
+IScoringCalculator GetCalculator(string position) { /* return appropriate impl */ }
+```
+
+**ScoringConfig** (extensible)  
+```csharp
+public class ScoringConfig
+{
+    public double PassYdsPerPt { get; set; } = 0.04;
+    public double PassTdPt { get; set; } = 4;
+    public double RushYdsPerPt { get; set; } = 0.1;
+    public double RecYdsPerPt { get; set; } = 0.1;
+    public double PprPt { get; set; } = 0.5;
+    // ... all other variables from formulas
+    public Dictionary<string, double> DstPaTiers { get; set; } = new()
+    {
+        { "0", 10 }, { "1-6", 7 }, { "7-13", 4 }, { "14-20", 1 },
+        { "21-27", 0 }, { "28-34", -1 }, { "35+", -4 }
+    };
+    // Custom stats via Dictionary<string, double> CustomValues
+}
+```
+
+## 6. Data Flow
+
+1. User completes setup wizard → config + tokens saved to DB  
+2. PollingService runs every 60 s (configurable)  
+   - Calls provider-specific ApiService.FetchData()  
+   - Applies IScoringCalculator per player/position  
+   - Broadcasts updated data via SignalR  
+3. Blazor components listen → update UI reactively  
+4. Rate-limit protection: Polly exponential backoff + cache + circuit breaker
+```
+
+## 7. Setup Wizard Flow (MudStepper)
+
+1. Select provider (Yahoo default)  
+2. Provider-specific input  
+   - Yahoo: "Login with Yahoo" → OAuth 1.0 redirect → callback → enter league ID  
+   - Sleeper: Enter username → fetch leagues → select dropdown  
+   - ESPN: Enter league ID + year  
+   - API-Football / SportsDataIO: Paste API key → test connection  
+3. Select league/season (auto-populated dropdowns)  
+4. Customize scoring? → open modal with sliders/inputs for all rules  
+5. Finish → save config/tokens to DB → redirect to dashboard
+
+**Error Handling**: User-friendly MudAlert messages, retry button
+
+## 8. Development Plan (6–8 Weeks)
+
+1. Shared models + formulas  
+2. DB + EF Core setup  
+3. API services (Yahoo OAuth first)  
+4. Polling + SignalR + point calculator  
+5. Blazor dashboard + columns  
+6. Setup wizard  
+7. Auth/roles + custom scoring modal  
+8. Logging, error handling, responsiveness  
+9. Tests + deployment scripts
+
+**Features Implemented**  
+- Error handling (global middleware + alerts)  
+- Token refresh/secure storage  
+- DB persistence  
+- Roles (Admin edit / Viewer read-only)  
+- Accessibility (ARIA, WCAG AA)  
+- Deployment (Azure, GitHub Actions/Docker)  
+- Integration tests (API, components, E2E)
+
+**Improvements Applied**  
+- Mobile-ready layout from start  
+- Optimized polling (backoff, cache)  
+- Modular/extensible formulas  
+- Comprehensive logging
+
+## Final Notes
+
+This document compiles all requirements, specifications, scoring rules, API details, architecture, code patterns, UI pixel-level guidance, development plans, and improvements discussed.
+
+- Single source of truth for development  
+- Ready for handover to developer or iterative use with Copilot  
+- All Node.js/React remnants removed; fully aligned to .NET 8+ / Blazor / MudBlazor stack  
+- Covers passive TV kiosk mode, mobile future-proofing, custom scoring, multi-provider support, security, logging, testing, deployment
+
+**Last Updated**  
+January 2026 – complete conversation synthesis
+
+**End of Specification**

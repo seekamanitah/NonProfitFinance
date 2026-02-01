@@ -1,0 +1,401 @@
+@using NonProfitFinance.Models
+@using NonProfitFinance.Services
+@inject IDocumentService DocumentService
+@inject ITextToSpeechService TextToSpeechService
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+@if (IsVisible)
+{
+    <div class="ocr-modal show" 
+         role="dialog" 
+         aria-modal="true" 
+         aria-labelledby="ocr-modal-title"
+         @onkeydown="HandleKeyDown">
+        <div class="modal-backdrop show" @onclick="Close" aria-hidden="true"></div>
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ocr-modal-title">
+                        <i class="fas fa-text-recognition"></i> OCR Text Extraction
+                    </h5>
+                    <button type="button" 
+                            class="btn-close" 
+                            @onclick="Close" 
+                            aria-label="Close"
+                            tabindex="0">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    @if (IsProcessing)
+                    {
+                        <div class="text-center py-4" role="status" aria-live="polite">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Processing...</span>
+                            </div>
+                            <p class="mt-3">Processing image with OCR... Please wait.</p>
+                            <button class="btn btn-secondary mt-3" @onclick="Close">
+                                Cancel
+                            </button>
+                        </div>
+                    }
+                    else if (OcrResult != null)
+                    {
+                        @if (OcrResult.Success)
+                        {
+                            <div class="alert alert-success" role="alert">
+                                <i class="fas fa-check-circle"></i> 
+                                Text extracted successfully (Confidence: @OcrResult.Confidence.ToString("F1")%)
+                            </div>
+
+                            @if (OcrResult.ReceiptData != null && OcrResult.ReceiptData.ReceiptConfidence > 50)
+                            {
+                                <div class="card mb-3">
+                                    <div class="card-header bg-info text-white">
+                                        <i class="fas fa-receipt"></i> Receipt Data Detected
+                                        <small class="float-end">Confidence: @OcrResult.ReceiptData.ReceiptConfidence.ToString("F1")%</small>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (!string.IsNullOrEmpty(OcrResult.ReceiptData.Merchant))
+                                        {
+                                            <p><strong>Merchant:</strong> @OcrResult.ReceiptData.Merchant</p>
+                                        }
+                                        @if (OcrResult.ReceiptData.Date.HasValue)
+                                        {
+                                            <p><strong>Date:</strong> @OcrResult.ReceiptData.Date.Value.ToString("MM/dd/yyyy")</p>
+                                        }
+                                        @if (OcrResult.ReceiptData.Total.HasValue)
+                                        {
+                                            <p><strong>Total:</strong> $@OcrResult.ReceiptData.Total.Value.ToString("N2")</p>
+                                        }
+                                        @if (OcrResult.ReceiptData.Items.Any())
+                                        {
+                                            <hr />
+                                            <h6>Line Items:</h6>
+                                            <ul class="list-unstyled">
+                                                @foreach (var item in OcrResult.ReceiptData.Items)
+                                                {
+                                                    <li>
+                                                        @item.Description
+                                                        @if (item.Amount.HasValue)
+                                                        {
+                                                            <span class="float-end">$@item.Amount.Value.ToString("N2")</span>
+                                                        }
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                        <button class="btn btn-sm btn-primary" 
+                                                @onclick="CreateTransactionFromReceipt"
+                                                tabindex="0">
+                                            <i class="fas fa-plus"></i> Create Transaction
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="form-group">
+                                <label for="extracted-text">Extracted Text:</label>
+                                <textarea id="extracted-text" 
+                                          class="form-control" 
+                                          rows="10" 
+                                          readonly 
+                                          aria-label="Extracted text from OCR">@OcrResult.ExtractedText</textarea>
+                            </div>
+
+                            <div class="mt-3">
+                                <button class="btn btn-secondary" 
+                                        @onclick="() => CopyToClipboard(OcrResult.ExtractedText)"
+                                        tabindex="0">
+                                    <i class="fas fa-copy"></i> Copy Text
+                                </button>
+                                <button class="btn btn-info" 
+                                        @onclick="() => SpeakText(OcrResult.ExtractedText)"
+                                        tabindex="0">
+                                    <i class="fas fa-volume-up"></i> Read Aloud
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                <i class="fas fa-exclamation-circle"></i> 
+                                @OcrResult.ErrorMessage
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted">Click "Process with OCR" to extract text from the image.</p>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" 
+                            @onclick="Close"
+                            tabindex="0">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int DocumentId { get; set; }
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<ReceiptData> OnReceiptDetected { get; set; }
+
+    private bool IsProcessing { get; set; }
+    private OcrResult? OcrResult { get; set; }
+    private DotNetObjectReference<OcrModal>? dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (IsVisible)
+        {
+            // Trap focus within modal
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("keyboardShortcuts.trapFocus", ".ocr-modal .modal-content");
+            }
+            catch
+            {
+                // JS interop may fail if script not loaded
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible && DocumentId > 0 && OcrResult == null)
+        {
+            await ProcessOcr();
+        }
+        else if (!IsVisible)
+        {
+            // Reset state when modal closes
+            OcrResult = null;
+            IsProcessing = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await Close();
+        }
+    }
+
+    private async Task ProcessOcr()
+    {
+        IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            OcrResult = await DocumentService.ProcessDocumentOcrAsync(DocumentId);
+            
+            if (OcrResult?.Success == true)
+            {
+                await TextToSpeechService.AnnounceSuccessAsync("Text extraction complete");
+            }
+            else if (OcrResult != null)
+            {
+                await TextToSpeechService.AnnounceErrorAsync("OCR processing failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            OcrResult = new OcrResult
+            {
+                Success = false,
+                ErrorMessage = $"Error: {ex.Message}"
+            };
+            await TextToSpeechService.AnnounceErrorAsync("OCR error occurred");
+        }
+        finally
+        {
+            IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Close()
+    {
+        OcrResult = null;
+        IsProcessing = false;
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task CreateTransactionFromReceipt()
+    {
+        if (OcrResult?.ReceiptData != null)
+        {
+            await OnReceiptDetected.InvokeAsync(OcrResult.ReceiptData);
+            await Close();
+        }
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            await TextToSpeechService.AnnounceSuccessAsync("Text copied to clipboard");
+        }
+        catch
+        {
+            // Clipboard API may not be available
+            await TextToSpeechService.AnnounceErrorAsync("Could not copy to clipboard");
+        }
+    }
+
+    private async Task SpeakText(string text)
+    {
+        await TextToSpeechService.SpeakAsync(text);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+    }
+}
+
+<style>
+    .ocr-modal {
+        display: none;
+    }
+
+    .ocr-modal.show {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2000;
+    }
+
+    .ocr-modal .modal-backdrop {
+        display: none;
+    }
+
+    .ocr-modal .modal-backdrop.show {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1999;
+    }
+
+    .ocr-modal .modal-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2001;
+        width: 90%;
+        max-width: 800px;
+        max-height: 90vh;
+        overflow: visible;
+    }
+
+    .ocr-modal .modal-content {
+        background-color: var(--bg-card);
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .ocr-modal .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: var(--bg-secondary);
+    }
+
+    .ocr-modal .modal-title {
+        color: var(--text-primary);
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .ocr-modal .btn-close {
+        background: transparent;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .ocr-modal .btn-close:hover,
+    .ocr-modal .btn-close:focus {
+        background-color: var(--bg-hover);
+        color: var(--text-primary);
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .ocr-modal .modal-body {
+        padding: 1.5rem;
+        color: var(--text-primary);
+    }
+
+    .ocr-modal .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        background-color: var(--bg-secondary);
+    }
+
+    /* Focus visible styles */
+    .ocr-modal button:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    /* Ensure modal is keyboard accessible */
+    .ocr-modal [tabindex="0"]:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    /* Screen reader only content */
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+    }
+</style>

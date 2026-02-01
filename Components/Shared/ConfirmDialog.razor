@@ -1,0 +1,117 @@
+@* Reusable confirmation dialog component *@
+
+@if (IsVisible)
+{
+    <div class="modal-backdrop" @onclick="OnCancel" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-desc">
+        <div class="modal" style="max-width: 400px;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title" id="confirm-dialog-title">
+                    <i class="fas @IconClass @IconColorClass" aria-hidden="true"></i>
+                    @Title
+                </h3>
+            </div>
+            <div class="modal-body" id="confirm-dialog-desc">
+                <p>@Message</p>
+                
+                @if (!string.IsNullOrEmpty(ItemName))
+                {
+                    <p class="text-muted" style="font-style: italic;">
+                        "@ItemName"
+                    </p>
+                }
+                
+                @if (ShowWarning)
+                {
+                    <div class="alert alert-warning" role="alert">
+                        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                        @WarningMessage
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="OnCancel" disabled="@IsProcessing">
+                    @CancelText
+                </button>
+                <button type="button" class="btn @ConfirmButtonClass" @onclick="OnConfirm" disabled="@IsProcessing" aria-busy="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span class="spinner" aria-label="Processing..."></span>
+                    }
+                    else
+                    {
+                        <i class="fas @ConfirmIcon" aria-hidden="true"></i>
+                    }
+                    @ConfirmText
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm Action";
+    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+    [Parameter] public string? ItemName { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public ConfirmationType Type { get; set; } = ConfirmationType.Warning;
+    [Parameter] public bool ShowWarning { get; set; } = false;
+    [Parameter] public string WarningMessage { get; set; } = "This action cannot be undone.";
+    [Parameter] public bool IsProcessing { get; set; } = false;
+    [Parameter] public EventCallback OnConfirmClicked { get; set; }
+    [Parameter] public EventCallback OnCancelClicked { get; set; }
+
+    private string IconClass => Type switch
+    {
+        ConfirmationType.Delete => "fa-trash-alt",
+        ConfirmationType.Warning => "fa-exclamation-triangle",
+        ConfirmationType.Info => "fa-info-circle",
+        ConfirmationType.Success => "fa-check-circle",
+        _ => "fa-question-circle"
+    };
+
+    private string IconColorClass => Type switch
+    {
+        ConfirmationType.Delete => "text-danger",
+        ConfirmationType.Warning => "text-warning",
+        ConfirmationType.Info => "text-info",
+        ConfirmationType.Success => "text-success",
+        _ => ""
+    };
+
+    private string ConfirmButtonClass => Type switch
+    {
+        ConfirmationType.Delete => "btn-danger",
+        ConfirmationType.Warning => "btn-warning",
+        _ => "btn-primary"
+    };
+
+    private string ConfirmIcon => Type switch
+    {
+        ConfirmationType.Delete => "fa-trash",
+        ConfirmationType.Warning => "fa-check",
+        _ => "fa-check"
+    };
+
+    private async Task OnConfirm()
+    {
+        await OnConfirmClicked.InvokeAsync();
+    }
+
+    private async Task OnCancel()
+    {
+        if (!IsProcessing)
+        {
+            await OnCancelClicked.InvokeAsync();
+        }
+    }
+
+    public enum ConfirmationType
+    {
+        Info,
+        Warning,
+        Delete,
+        Success
+    }
+}

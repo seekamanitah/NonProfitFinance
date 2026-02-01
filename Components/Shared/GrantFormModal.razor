@@ -1,0 +1,247 @@
+@inject IGrantService GrantService
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" style="max-width: 600px;" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit Grant" : "Add Grant")</h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Grant Name *</label>
+                    <InputText class="form-control" @bind-Value="model.Name" placeholder="Grant name" />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Grantor Name *</label>
+                        <InputText class="form-control" @bind-Value="model.GrantorName" 
+                                   placeholder="Organization name" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Grant Number</label>
+                        <InputText class="form-control" @bind-Value="model.GrantNumber" 
+                                   placeholder="Reference number" />
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount *</label>
+                        <InputNumber class="form-control" @bind-Value="model.Amount" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <InputSelect class="form-control" @bind-Value="model.Status">
+                            @foreach (var status in Enum.GetValues<GrantStatus>())
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Start Date *</label>
+                        <InputDate class="form-control" @bind-Value="model.StartDate" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">End Date</label>
+                        <InputDate class="form-control" @bind-Value="model.EndDate" />
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Restrictions</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Restrictions" 
+                                   rows="2" placeholder="Describe any fund restrictions..." />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Contact Person</label>
+                        <InputText class="form-control" @bind-Value="model.ContactPerson" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Contact Email</label>
+                        <InputText class="form-control" @bind-Value="model.ContactEmail" type="email" />
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Reporting Requirements</label>
+                    <InputTextArea class="form-control" @bind-Value="model.ReportingRequirements" 
+                                   rows="2" placeholder="Describe reporting schedule..." />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Next Report Due Date</label>
+                    <InputDate class="form-control" @bind-Value="model.NextReportDueDate" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Notes" 
+                                   rows="2" placeholder="Additional notes..." />
+                </div>
+                
+                @if (errorMessage != null)
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> @errorMessage
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    @(IsEdit ? "Update" : "Create") Grant
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public GrantDto? Grant { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private GrantFormModel model = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    private bool IsEdit => Grant != null;
+
+    protected override void OnInitialized()
+    {
+        if (Grant != null)
+        {
+            model = new GrantFormModel
+            {
+                Name = Grant.Name,
+                GrantorName = Grant.GrantorName,
+                Amount = Grant.Amount,
+                StartDate = Grant.StartDate,
+                EndDate = Grant.EndDate,
+                Status = Grant.Status,
+                Restrictions = Grant.Restrictions,
+                Notes = Grant.Notes,
+                GrantNumber = Grant.GrantNumber,
+                ContactPerson = Grant.ContactPerson,
+                ContactEmail = Grant.ContactEmail,
+                ReportingRequirements = Grant.ReportingRequirements,
+                NextReportDueDate = Grant.NextReportDueDate
+            };
+        }
+        else
+        {
+            model.StartDate = DateTime.Today;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.GrantorName))
+        {
+            errorMessage = "Name and Grantor are required.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await GrantService.UpdateAsync(Grant!.Id, new UpdateGrantRequest(
+                    model.Name!,
+                    model.GrantorName!,
+                    model.Amount,
+                    model.StartDate,
+                    model.EndDate,
+                    model.Status,
+                    model.Restrictions,
+                    model.Notes,
+                    model.GrantNumber,
+                    model.ContactPerson,
+                    model.ContactEmail,
+                    model.ReportingRequirements,
+                    model.NextReportDueDate
+                ));
+            }
+            else
+            {
+                await GrantService.CreateAsync(new CreateGrantRequest(
+                    model.Name!,
+                    model.GrantorName!,
+                    model.Amount,
+                    model.StartDate,
+                    model.EndDate,
+                    null,
+                    model.Status,
+                    model.Restrictions,
+                    model.Notes,
+                    model.GrantNumber,
+                    model.ContactPerson,
+                    model.ContactEmail,
+                    model.ReportingRequirements,
+                    model.NextReportDueDate
+                ));
+            }
+
+            await OnSave.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private class GrantFormModel
+    {
+        public string? Name { get; set; }
+        public string? GrantorName { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime StartDate { get; set; } = DateTime.Today;
+        public DateTime? EndDate { get; set; }
+        public GrantStatus Status { get; set; } = GrantStatus.Pending;
+        public string? Restrictions { get; set; }
+        public string? Notes { get; set; }
+        public string? GrantNumber { get; set; }
+        public string? ContactPerson { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ReportingRequirements { get; set; }
+        public DateTime? NextReportDueDate { get; set; }
+    }
+}

@@ -1,0 +1,476 @@
+@page "/transactions"
+@using System.Web
+@inject ITransactionService TransactionService
+@inject ICategoryService CategoryService
+@inject IFundService FundService
+@inject ITextToSpeechService TtsService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Transactions - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Transactions</h2>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="/transactions/recycle-bin" class="btn btn-outline" title="View deleted transactions">
+            <i class="fas fa-trash-restore"></i> Recycle Bin
+        </a>
+        <a href="/transactions/recurring" class="btn btn-outline">
+            <i class="fas fa-sync-alt"></i> Recurring
+        </a>
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <i class="fas fa-plus"></i> Add Transaction
+        </button>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <div class="filter-group">
+        <span class="filter-label">Date Range</span>
+        <div class="d-flex gap-2">
+            <input type="date" class="form-control" @bind="filter.StartDate" style="width: 140px;" />
+            <span>to</span>
+            <input type="date" class="form-control" @bind="filter.EndDate" style="width: 140px;" />
+        </div>
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Category</span>
+        <select class="form-control" @bind="filter.CategoryId" style="width: 180px;">
+            <option value="">All Categories</option>
+            @foreach (var cat in categories)
+            {
+                <option value="@cat.Id">@cat.Name</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Account</span>
+        <select class="form-control" @bind="filter.FundId" style="width: 160px;">
+            <option value="">All Accounts</option>
+            @foreach (var fund in funds)
+            {
+                <option value="@fund.Id">@fund.Name</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Type</span>
+        <select class="form-control" @bind="filter.Type" style="width: 120px;">
+            <option value="">All Types</option>
+            <option value="@TransactionType.Income">Income</option>
+            <option value="@TransactionType.Expense">Expense</option>
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Tags</span>
+        <input type="text" class="form-control" placeholder="e.g., emergency, grant"
+               @bind="filter.Tags" style="width: 150px;" />
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Search</span>
+        <input type="text" class="form-control" placeholder="Description, payee..." 
+               @bind="filter.SearchTerm" @bind:event="oninput" style="width: 180px;" />
+    </div>
+    
+    <div class="filter-group" style="align-self: flex-end;">
+        <button class="btn btn-primary" @onclick="ApplyFilters">
+            <i class="fas fa-search"></i> Search
+        </button>
+        <button class="btn btn-secondary" @onclick="ClearFilters">
+            <i class="fas fa-times"></i> Clear
+        </button>
+    </div>
+</div>
+
+<!-- Actions Bar -->
+<div class="d-flex justify-between align-center mb-3">
+    <div class="text-muted">
+        Showing @transactions.Count of @totalCount transactions
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-body" style="padding: 0; overflow-x: auto;">
+        @if (isLoading)
+        {
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        }
+        else
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30px;"></th>
+                        <th style="width: 100px;">Date</th>
+                        <th>Account</th>
+                        <th>Payee/Donor</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th class="text-right" style="width: 120px;">Amount</th>
+                        <th style="width: 80px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tx in transactions)
+                    {
+                        var hasSplits = tx.Splits?.Any() == true;
+                        var isExpanded = expandedTransactions.Contains(tx.Id);
+                        
+                        <tr>
+                            <td>
+                                @if (hasSplits)
+                                {
+                                    <button class="btn btn-sm btn-icon" @onclick="() => ToggleExpand(tx.Id)" 
+                                            style="padding: 0; width: 20px; height: 20px;">
+                                        <i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
+                                    </button>
+                                }
+                            </td>
+                            <td>@tx.Date.ToString("MMM dd, yyyy")</td>
+                            <td>@(tx.FundName ?? "—")</td>
+                            <td>@(tx.DonorName ?? tx.Payee ?? "—")</td>
+                            <td>
+                                <span class="badge @(tx.Type == TransactionType.Income ? "badge-income" : "badge-expense")">
+                                    @tx.CategoryName
+                                </span>
+                            </td>
+                            <td>
+                                @(tx.Description ?? "—")
+                                @if (tx.IsRecurring)
+                                {
+                                    <span class="badge badge-info ml-1"><i class="fas fa-sync-alt"></i></span>
+                                }
+                                @if (hasSplits)
+                                {
+                                    <span class="badge badge-warning ml-1" title="Split transaction">
+                                        <i class="fas fa-code-branch"></i> @tx.Splits!.Count splits
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-right amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
+                                @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C")
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline" @onclick="() => EditTransaction(tx)" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteTransaction(tx)" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        @* Split details row *@
+                        @if (hasSplits && isExpanded)
+                        {
+                            <tr class="split-details-row" style="background: var(--bg-secondary);">
+                                <td colspan="8" style="padding: 0.5rem 1rem;">
+                                    <div style="margin-left: 30px;">
+                                        <strong class="text-muted">Split Details:</strong>
+                                        <table style="width: 100%; margin-top: 0.5rem;">
+                                            @foreach (var split in tx.Splits!)
+                                            {
+                                                <tr style="border-bottom: 1px dashed var(--border-color);">
+                                                    <td style="padding: 0.25rem 0;">
+                                                        <span class="badge @(tx.Type == TransactionType.Income ? "badge-income" : "badge-expense")">
+                                                            @split.CategoryName
+                                                        </span>
+                                                    </td>
+                                                    <td style="padding: 0.25rem 0;">
+                                                        @(split.Description ?? "—")
+                                                    </td>
+                                                    <td class="text-right amount @(tx.Type == TransactionType.Income ? "income" : "expense")" 
+                                                        style="padding: 0.25rem 0; width: 120px;">
+                                                        @split.Amount.ToString("C")
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (!transactions.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted" style="padding: 2rem;">
+                                No transactions found
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Pagination -->
+@if (totalPages > 1)
+{
+    <div class="d-flex justify-between align-center mt-3">
+        <div class="text-muted">
+            Page @filter.Page of @totalPages
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline" @onclick="PreviousPage" disabled="@(filter.Page <= 1)">
+                <i class="fas fa-chevron-left"></i> Previous
+            </button>
+            <button class="btn btn-outline" @onclick="NextPage" disabled="@(filter.Page >= totalPages)">
+                Next <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Edit/Add Modal -->
+@if (showForm)
+{
+    <TransactionForm 
+        Transaction="selectedTransaction"
+        Categories="categories"
+        Funds="funds"
+        PreFillAmount="receiptData?.Amount"
+        PreFillDescription="receiptData?.Description"
+        PreFillDate="receiptData?.Date"
+        PreFillPayee="receiptData?.Payee"
+        OnSave="OnTransactionSaved"
+        OnCancel="CloseForm" />
+}
+
+<!-- Delete Confirmation Dialog -->
+<ConfirmDialog 
+    IsVisible="showDeleteConfirm"
+    Title="Delete Transaction"
+    Message="Are you sure you want to delete this transaction?"
+    ItemName="@transactionToDelete?.Description"
+    Type="ConfirmDialog.ConfirmationType.Delete"
+    ConfirmText="Delete"
+    ShowWarning="true"
+    WarningMessage="This action cannot be undone. Related fund balances will be recalculated."
+    IsProcessing="isDeleting"
+    OnConfirmClicked="ConfirmDelete"
+    OnCancelClicked="CancelDelete" />
+
+@code {
+private List<TransactionDto> transactions = new();
+private List<CategoryDto> categories = new();
+private List<FundDto> funds = new();
+private TransactionFilterModel filter = new();
+private TransactionDto? selectedTransaction;
+private TransactionDto? transactionToDelete;
+private HashSet<int> expandedTransactions = new();
+private bool isLoading = true;
+private bool showForm = false;
+private bool showDeleteConfirm = false;
+private bool isDeleting = false;
+private int totalCount = 0;
+private int totalPages = 1;
+
+// Receipt pre-fill data
+private ReceiptPreFillData? receiptData;
+
+protected override async Task OnInitializedAsync()
+{
+    filter.StartDate = DateTime.Today.AddMonths(-1);
+    filter.EndDate = DateTime.Today;
+        
+    categories = await CategoryService.GetAllAsync();
+    funds = await FundService.GetAllAsync();
+        
+    // Check if we're coming from a receipt OCR
+    CheckForReceiptPreFill();
+    
+    await LoadTransactions();
+}
+
+private void ToggleExpand(int transactionId)
+{
+    if (expandedTransactions.Contains(transactionId))
+        expandedTransactions.Remove(transactionId);
+    else
+        expandedTransactions.Add(transactionId);
+}
+
+private async Task LoadTransactions()
+{
+        isLoading = true;
+        
+        var request = new TransactionFilterRequest(
+            filter.StartDate,
+            filter.EndDate,
+            filter.CategoryId,
+            filter.FundId,
+            null,
+            null,
+            filter.Type,
+            filter.SearchTerm,
+            filter.Tags,
+            false,
+            filter.Page,
+            filter.PageSize
+        );
+        
+        var result = await TransactionService.GetAllAsync(request);
+        transactions = result.Items;
+        totalCount = result.TotalCount;
+        totalPages = result.TotalPages;
+        
+        isLoading = false;
+    }
+
+    private async Task ApplyFilters()
+    {
+        filter.Page = 1;
+        await LoadTransactions();
+    }
+
+    private async Task ClearFilters()
+    {
+        filter = new TransactionFilterModel
+        {
+            StartDate = DateTime.Today.AddMonths(-1),
+            EndDate = DateTime.Today
+        };
+        await LoadTransactions();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (filter.Page > 1)
+        {
+            filter.Page--;
+            await LoadTransactions();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (filter.Page < totalPages)
+        {
+            filter.Page++;
+            await LoadTransactions();
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        selectedTransaction = null;
+        showForm = true;
+        
+        // If we have receipt data, show form immediately
+        if (receiptData != null)
+        {
+            TtsService.AnnounceSuccessAsync($"Creating transaction from receipt");
+        }
+        
+        StateHasChanged();
+    }
+
+    private void CheckForReceiptPreFill()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        
+        if (query["fromReceipt"] == "true")
+        {
+            receiptData = new ReceiptPreFillData
+            {
+                Amount = decimal.TryParse(query["amount"], out var amt) ? amt : null,
+                Description = query["description"],
+                Date = DateTime.TryParse(query["date"], out var dt) ? dt : null,
+                Payee = query["payee"]
+            };
+            
+            // Auto-show the form with pre-filled data
+            ShowAddForm();
+        }
+    }
+    
+    private class ReceiptPreFillData
+    {
+        public decimal? Amount { get; set; }
+        public string? Description { get; set; }
+        public DateTime? Date { get; set; }
+        public string? Payee { get; set; }
+    }
+
+    private void EditTransaction(TransactionDto tx)
+    {
+        selectedTransaction = tx;
+        showForm = true;
+        StateHasChanged();
+    }
+
+    private void DeleteTransaction(TransactionDto tx)
+    {
+        transactionToDelete = tx;
+        showDeleteConfirm = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (transactionToDelete == null) return;
+        
+        isDeleting = true;
+        try
+        {
+            await TransactionService.DeleteAsync(transactionToDelete.Id);
+            await LoadTransactions();
+            showDeleteConfirm = false;
+            transactionToDelete = null;
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        transactionToDelete = null;
+    }
+
+    private async Task OnTransactionSaved()
+    {
+        showForm = false;
+        receiptData = null; // Clear receipt data after use
+        await LoadTransactions();
+        
+        // Announce with TTS
+        await TtsService.AnnounceSuccessAsync("Transaction saved successfully");
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+    }
+
+    private class TransactionFilterModel
+    {
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public int? CategoryId { get; set; }
+        public int? FundId { get; set; }
+        public TransactionType? Type { get; set; }
+        public string? SearchTerm { get; set; }
+        public string? Tags { get; set; }
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 25;
+    }
+}

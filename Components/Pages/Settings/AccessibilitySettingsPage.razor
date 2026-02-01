@@ -1,0 +1,296 @@
+@page "/accessibility-settings"
+@using NonProfitFinance.Services
+@inject ITextToSpeechService TextToSpeechService
+@inject IOcrService OcrService
+@inject IAccessibilityService AccessibilityService
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Accessibility Settings</PageTitle>
+
+<div class="container-fluid">
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1><i class="fas fa-universal-access"></i> Accessibility Settings</h1>
+            <p class="text-muted" style="margin: 0.25rem 0 0 0;">Configure OCR, Text-to-Speech, and UI scaling</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-volume-up"></i> Text-to-Speech
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="ttsEnabled" 
+                               checked="@isTtsEnabled"
+                               @onchange="OnTtsEnabledChanged" />
+                        <label class="form-check-label" for="ttsEnabled">
+                            Enable Text-to-Speech
+                        </label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="speechRate" class="form-label">
+                            Speech Rate: @speechRate.ToString("F1")x
+                        </label>
+                        <input type="range" class="form-range" id="speechRate" 
+                               min="0.5" max="2.0" step="0.1"
+                               value="@speechRate"
+                               @oninput="OnSpeechRateChanged" />
+                        <small class="text-muted">Adjust how fast the text is read aloud</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Test Text-to-Speech:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="testText" 
+                                   placeholder="Enter text to test..." />
+                            <button class="btn btn-primary" @onclick="TestTts" disabled="@(!isTtsEnabled)">
+                                <i class="fas fa-play"></i> Speak
+                            </button>
+                            <button class="btn btn-secondary" @onclick="StopTts" disabled="@(!isTtsEnabled)">
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>TTS Features:</strong>
+                        <ul class="mb-0">
+                            <li>Announces transactions when saved</li>
+                            <li>Reads validation errors aloud</li>
+                            <li>Announces report generation</li>
+                            <li>Supports OCR text reading</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-text-recognition"></i> OCR (Text Recognition)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p class="mb-2">
+                            <strong>Engine:</strong> PaddleOCR (High Accuracy AI)
+                        </p>
+                        <p class="mb-2">
+                            <strong>Status:</strong> 
+                            @if (OcrService.IsInitialized)
+                            {
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check"></i> Ready
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-hourglass-half"></i> Initializing...
+                                </span>
+                            }
+                        </p>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>PaddleOCR Features:</strong>
+                        <ul class="mb-0">
+                            <li>High accuracy text recognition</li>
+                            <li>Auto-downloads models on first use (~30MB)</li>
+                            <li>Supports rotated images</li>
+                            <li>Automatic receipt parsing</li>
+                            <li>No manual setup required</li>
+                        </ul>
+                    </div>
+
+                    @if (!OcrService.IsInitialized)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>First-Time Setup:</strong>
+                            <p class="mb-2">On first use, PaddleOCR will automatically download required models (~30MB). This may take 1-2 minutes depending on your internet speed.</p>
+                            <p class="mb-0 small">The models are saved locally and only need to be downloaded once.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>OCR is ready!</strong> You can now extract text from images in the Documents section.
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label"><strong>How to use OCR:</strong></label>
+                        <ol class="small">
+                            <li>Go to the Documents page</li>
+                            <li>Upload an image document (receipt, invoice, photo)</li>
+                            <li>Click the "Extract Text" button</li>
+                            <li>Review extracted text and receipt data</li>
+                            <li>Create transaction from receipt data (if detected)</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-search-plus"></i> UI Scaling
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="uiScale" class="form-label">
+                            Interface Scale: @((int)(uiScale * 100))%
+                        </label>
+                        <input type="range" class="form-range" id="uiScale" 
+                               min="80" max="150" step="10"
+                               value="@((int)(uiScale * 100))"
+                               @oninput="OnUiScaleChanged" />
+                        <small class="text-muted">Adjust the size of text and UI elements</small>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>UI Scaling:</strong>
+                        <ul class="mb-0">
+                            <li><strong>80%:</strong> Compact view (more content visible)</li>
+                            <li><strong>100%:</strong> Default size (recommended)</li>
+                            <li><strong>120%:</strong> Larger text (easier to read)</li>
+                            <li><strong>150%:</strong> Maximum size (best for accessibility)</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetUiScale(0.8f)">
+                            80%
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetUiScale(1.0f)">
+                            100%
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetUiScale(1.2f)">
+                            120%
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => SetUiScale(1.5f)">
+                            150%
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-keyboard"></i> Keyboard Shortcuts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Text-to-Speech:</h6>
+                            <ul class="small">
+                                <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> - Toggle TTS</li>
+                                <li><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd> - Stop speaking</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>OCR:</h6>
+                            <ul class="small">
+                                <li>Available in document viewer</li>
+                                <li>Click "Extract Text" on images</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string testText = "Hello! This is a test of the text-to-speech system.";
+    private bool isTtsEnabled = true;
+    private float speechRate = 1.0f;
+    private float uiScale = 1.0f;
+
+    protected override void OnInitialized()
+    {
+        // Load current settings from services
+        isTtsEnabled = TextToSpeechService.IsEnabled;
+        speechRate = TextToSpeechService.SpeechRate;
+        uiScale = AccessibilityService.UiScale;
+    }
+
+    private void OnTtsEnabledChanged(ChangeEventArgs e)
+    {
+        isTtsEnabled = e.Value?.ToString() == "true";
+        TextToSpeechService.IsEnabled = isTtsEnabled;
+        StateHasChanged();
+        
+        if (isTtsEnabled)
+        {
+            _ = TextToSpeechService.AnnounceSuccessAsync("Text-to-speech enabled");
+        }
+    }
+
+    private void OnSpeechRateChanged(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), out var rate))
+        {
+            speechRate = rate / 100f; // Convert from 50-200 to 0.5-2.0
+            TextToSpeechService.SpeechRate = speechRate;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnUiScaleChanged(ChangeEventArgs e)
+    {
+        if (float.TryParse(e.Value?.ToString(), out var scale))
+        {
+            uiScale = scale / 100f; // Convert from 80-150 to 0.8-1.5
+            AccessibilityService.UiScale = uiScale;
+            await AccessibilityService.SaveSettingsAsync();
+            await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetUiScale(float scale)
+    {
+        uiScale = scale;
+        AccessibilityService.UiScale = uiScale;
+        await AccessibilityService.SaveSettingsAsync();
+        await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
+        StateHasChanged();
+    }
+
+    private async Task TestTts()
+    {
+        await TextToSpeechService.SpeakAsync(testText);
+        StateHasChanged();
+    }
+
+    private async Task StopTts()
+    {
+        await TextToSpeechService.Stop();
+        StateHasChanged();
+    }
+}

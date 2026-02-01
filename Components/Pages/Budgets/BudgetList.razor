@@ -1,0 +1,254 @@
+@page "/budgets"
+@inject IBudgetService BudgetService
+@inject ICategoryService CategoryService
+@rendermode InteractiveServer
+
+<PageTitle>Budgets - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Budget vs Actual</h2>
+        <p class="text-muted">Track spending against budget targets</p>
+    </div>
+    <div class="d-flex gap-2">
+        <select class="form-control" @bind="selectedYear">
+            @for (int year = DateTime.Today.Year + 1; year >= DateTime.Today.Year - 3; year--)
+            {
+                <option value="@year">FY @year</option>
+            }
+        </select>
+        <button class="btn btn-outline" @onclick="LoadBudget">
+            <i class="fas fa-sync"></i> Refresh
+        </button>
+        <button class="btn btn-primary" @onclick="ShowCreateForm">
+            <i class="fas fa-plus"></i> Create Budget
+        </button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else if (budget != null)
+{
+    <!-- Summary Cards -->
+    <div class="metric-cards mb-3">
+        <div class="metric-card">
+            <div class="metric-icon primary">
+                <i class="fas fa-bullseye"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Total Budget</div>
+                <div class="metric-value">@budget.TotalBudget.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon expense">
+                <i class="fas fa-receipt"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Total Spent</div>
+                <div class="metric-value negative">@budget.TotalSpent.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon @(budget.Remaining >= 0 ? "income" : "expense")">
+                <i class="fas @(budget.Remaining >= 0 ? "fa-check-circle" : "fa-exclamation-circle")"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Remaining</div>
+                <div class="metric-value @(budget.Remaining >= 0 ? "positive" : "negative")">@budget.Remaining.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon neutral">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Used</div>
+                <div class="metric-value">@budget.PercentageUsed.ToString("N1")%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-between mb-2">
+                <strong>Overall Budget Progress</strong>
+                <span>@budget.TotalSpent.ToString("C0") / @budget.TotalBudget.ToString("C0")</span>
+            </div>
+            <div class="progress" style="height: 24px;">
+                <div class="progress-bar @GetProgressBarClass(budget.PercentageUsed)" 
+                     style="width: @Math.Min(budget.PercentageUsed, 100)%;">
+                    @budget.PercentageUsed.ToString("N0")%
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Line Items -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-list"></i> Budget by Category</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            @if (budget.LineItems.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-right">Budget</th>
+                            <th class="text-right">Actual</th>
+                            <th class="text-right">Variance</th>
+                            <th style="width: 200px;">Progress</th>
+                            <th class="text-right">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in budget.LineItems.OrderByDescending(l => l.PercentageUsed))
+                        {
+                            var isOverBudget = item.Variance < 0;
+                            <tr>
+                                <td>
+                                    <span class="tree-color" style="background: @(item.CategoryColor ?? "#6c757d");"></span>
+                                    @item.CategoryName
+                                </td>
+                                <td class="text-right">@item.BudgetAmount.ToString("C0")</td>
+                                <td class="text-right amount expense">@item.ActualAmount.ToString("C0")</td>
+                                <td class="text-right @(isOverBudget ? "text-danger" : "text-success")">
+                                    @(isOverBudget ? "-" : "+")@Math.Abs(item.Variance).ToString("C0")
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 16px;">
+                                        <div class="progress-bar @GetProgressBarClass(item.PercentageUsed)" 
+                                             style="width: @Math.Min(item.PercentageUsed, 100)%;">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-right">
+                                    <span class="badge @GetPercentageBadgeClass(item.PercentageUsed)">
+                                        @item.PercentageUsed.ToString("N0")%
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background: var(--bg-secondary);">
+                            <td>Total</td>
+                            <td class="text-right">@budget.TotalBudget.ToString("C0")</td>
+                            <td class="text-right amount expense">@budget.TotalSpent.ToString("C0")</td>
+                            <td class="text-right @(budget.Remaining >= 0 ? "text-success" : "text-danger")">
+                                @(budget.Remaining >= 0 ? "+" : "-")@Math.Abs(budget.Remaining).ToString("C0")
+                            </td>
+                            <td></td>
+                            <td class="text-right">@budget.PercentageUsed.ToString("N0")%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            }
+            else
+            {
+                <div class="text-center text-muted" style="padding: 2rem;">
+                    <i class="fas fa-tags" style="font-size: 2rem;"></i>
+                    <p class="mt-2">No budget limits set. Add budget limits to categories to see budget tracking.</p>
+                    <a href="/categories" class="btn btn-outline">
+                        <i class="fas fa-cog"></i> Manage Categories
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Info -->
+    <div class="alert alert-info mt-3">
+        <i class="fas fa-info-circle"></i>
+        <strong>Tip:</strong> Set budget limits on expense categories in the 
+        <a href="/categories">Category Manager</a> to enable budget tracking.
+    </div>
+}
+
+@if (showBudgetForm)
+{
+    <BudgetFormModal Budget="selectedBudget" IsEdit="isEdit" OnClose="CloseForm" OnSaved="OnBudgetSaved" />
+}
+
+@code {
+    private int selectedYear = DateTime.Today.Year;
+    private BudgetDto? budget;
+    private bool isLoading = true;
+    private bool showBudgetForm = false;
+    private BudgetDto? selectedBudget;
+    private bool isEdit = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBudget();
+    }
+
+    private async Task LoadBudget()
+    {
+        isLoading = true;
+        try
+        {
+            budget = await BudgetService.GetByYearAsync(selectedYear);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetProgressBarClass(decimal percentage)
+    {
+        if (percentage >= 100) return "danger";
+        if (percentage >= 80) return "warning";
+        return "";
+    }
+
+    private string GetPercentageBadgeClass(decimal percentage)
+    {
+        if (percentage >= 100) return "badge-danger";
+        if (percentage >= 80) return "badge-warning";
+        if (percentage >= 50) return "badge-info";
+        return "badge-success";
+    }
+
+    private void ShowCreateForm()
+    {
+        selectedBudget = null;
+        isEdit = false;
+        showBudgetForm = true;
+        StateHasChanged();
+    }
+
+    private void ShowEditForm(BudgetDto budgetToEdit)
+    {
+        selectedBudget = budgetToEdit;
+        isEdit = true;
+        showBudgetForm = true;
+        StateHasChanged();
+    }
+
+    private void CloseForm()
+    {
+        showBudgetForm = false;
+        selectedBudget = null;
+        StateHasChanged();
+    }
+
+    private async Task OnBudgetSaved()
+    {
+        showBudgetForm = false;
+        selectedBudget = null;
+        await LoadBudget();
+    }
+}

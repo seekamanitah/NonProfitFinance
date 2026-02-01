@@ -1,0 +1,112 @@
+@* Recursive tree item component for category display *@
+
+<div class="tree-item @(Category.Id == SelectedId ? "selected" : "") @(Category.IsArchived ? "text-muted" : "")"
+     style="padding-left: @(Level * 1.5)rem;"
+     @onclick="() => OnSelect.InvokeAsync(Category)"
+     @onclick:stopPropagation="true">
+    
+    @if (HasChildren)
+    {
+        <span class="tree-toggle" @onclick="ToggleExpand" @onclick:stopPropagation="true">
+            <i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
+        </span>
+    }
+    else
+    {
+        <span class="tree-toggle"></span>
+    }
+    
+    <span class="tree-color" style="background: @(Category.Color ?? "#6c757d");"></span>
+    
+    <span class="tree-name">
+        @Category.Name
+        @if (Category.IsArchived)
+        {
+            <span class="badge badge-warning" style="font-size: 0.65rem; margin-left: 0.5rem;">Archived</span>
+        }
+    </span>
+    
+    <div class="tree-actions" style="margin-left: auto;" @onclick:stopPropagation="true">
+        <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnAddChild.InvokeAsync(Category)" title="Add subcategory">
+            <i class="fas fa-plus"></i>
+        </button>
+        <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnEdit.InvokeAsync(Category)" title="Edit">
+            <i class="fas fa-edit"></i>
+        </button>
+        @if (!Category.IsArchived)
+        {
+            <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnArchive.InvokeAsync(Category)" title="Archive">
+                <i class="fas fa-archive"></i>
+            </button>
+        }
+    </div>
+</div>
+
+@if (isExpanded && HasChildren)
+{
+    <div class="tree-children">
+        @foreach (var child in Category.Children!)
+        {
+            <CategoryTreeItem 
+                Category="child"
+                Level="Level + 1"
+                SelectedId="SelectedId"
+                OnSelect="OnSelect"
+                OnEdit="OnEdit"
+                OnArchive="OnArchive"
+                OnAddChild="OnAddChild" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public CategoryDto Category { get; set; } = null!;
+    [Parameter] public int Level { get; set; } = 0;
+    [Parameter] public int? SelectedId { get; set; }
+    [Parameter] public EventCallback<CategoryDto> OnSelect { get; set; }
+    [Parameter] public EventCallback<CategoryDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<CategoryDto> OnArchive { get; set; }
+    [Parameter] public EventCallback<CategoryDto> OnAddChild { get; set; }
+
+    private bool isExpanded = true;
+    private bool HasChildren => Category.Children?.Any() == true;
+
+    private void ToggleExpand()
+    {
+        isExpanded = !isExpanded;
+    }
+}
+
+<style>
+    .tree-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.15s ease;
+    }
+    
+    .tree-item:hover {
+        background: var(--bg-primary);
+    }
+    
+    .tree-item:hover .tree-actions {
+        opacity: 1;
+    }
+    
+    .tree-item.selected {
+        background: rgba(196, 30, 58, 0.1);
+    }
+    
+    .tree-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+    
+    .tree-actions .btn {
+        padding: 0.25rem 0.5rem;
+    }
+</style>

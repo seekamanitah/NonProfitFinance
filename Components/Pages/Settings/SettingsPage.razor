@@ -1,0 +1,1086 @@
+@page "/settings"
+@inject IJSRuntime JS
+@inject IBackupService BackupService
+@inject IDemoDataService DemoDataService
+@inject IOrganizationService OrganizationService
+@rendermode InteractiveServer
+
+<PageTitle>Settings - NonProfit Finance</PageTitle>
+
+<h2 style="margin-bottom: 1.5rem;">Settings</h2>
+
+<div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));">
+    <!-- Organization Settings -->
+    <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-building"></i> Organization Information</h3>
+            <p class="text-muted" style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+                This information will appear on reports, forms, and documents
+            </p>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- Basic Information -->
+                <div class="col-md-6">
+                    <h5 style="margin-bottom: 1rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem;">
+                        <i class="fas fa-info-circle"></i> Basic Information
+                    </h5>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Organization Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="orgSettings.OrganizationName" 
+                               placeholder="e.g., City Fire Department" required />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">EIN (Tax ID) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="orgSettings.EIN" 
+                               placeholder="XX-XXXXXXX" maxlength="10" required />
+                        <small class="text-muted">Format: 12-3456789</small>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Incorporation Date</label>
+                            <input type="date" class="form-control" 
+                                   value="@orgSettings.IncorporationDate?.ToString("yyyy-MM-dd")"
+                                   @onchange="e => orgSettings.IncorporationDate = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : null" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">501(c)(3) Designation Date</label>
+                            <input type="date" class="form-control"
+                                   value="@orgSettings.NonProfitDesignationDate?.ToString("yyyy-MM-dd")"
+                                   @onchange="e => orgSettings.NonProfitDesignationDate = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : null" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Fiscal Year Start</label>
+                        <select class="form-control" @bind="orgSettings.FiscalYearStartMonth">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Mission Statement</label>
+                        <textarea class="form-control" @bind="orgSettings.MissionStatement" 
+                                  rows="3" placeholder="Brief description of your organization's mission and purpose"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Contact Information -->
+                <div class="col-md-6">
+                    <h5 style="margin-bottom: 1rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem;">
+                        <i class="fas fa-address-card"></i> Contact Information
+                    </h5>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Street Address</label>
+                        <input type="text" class="form-control" @bind="orgSettings.AddressLine1" 
+                               placeholder="123 Main Street" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Address Line 2 <span class="text-muted">(Optional)</span></label>
+                        <input type="text" class="form-control" @bind="orgSettings.AddressLine2" 
+                               placeholder="Suite 100" />
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" @bind="orgSettings.City" 
+                                   placeholder="Nashville" />
+                        </div>
+                        
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">State</label>
+                            <input type="text" class="form-control" @bind="orgSettings.State" 
+                                   placeholder="TN" maxlength="2" />
+                        </div>
+                        
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">ZIP Code</label>
+                            <input type="text" class="form-control" @bind="orgSettings.ZipCode" 
+                                   placeholder="37201" maxlength="10" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" @bind="orgSettings.PhoneNumber" 
+                                   placeholder="(615) 555-1234" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Fax <span class="text-muted">(Optional)</span></label>
+                            <input type="tel" class="form-control" @bind="orgSettings.FaxNumber" 
+                                   placeholder="(615) 555-1235" />
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" class="form-control" @bind="orgSettings.EmailAddress" 
+                               placeholder="info@organization.org" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Website <span class="text-muted">(Optional)</span></label>
+                        <input type="url" class="form-control" @bind="orgSettings.Website" 
+                               placeholder="https://www.organization.org" />
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Leadership Information -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5 style="margin-bottom: 1rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem;">
+                        <i class="fas fa-users"></i> Leadership
+                    </h5>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Board President / Chairman</label>
+                        <input type="text" class="form-control" @bind="orgSettings.BoardPresidentName" 
+                               placeholder="John Smith" />
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Executive Director / CEO</label>
+                        <input type="text" class="form-control" @bind="orgSettings.ExecutiveDirectorName" 
+                               placeholder="Jane Doe" />
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">Primary Contact Person</label>
+                        <input type="text" class="form-control" @bind="orgSettings.ContactPersonName" 
+                               placeholder="Contact Name" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Title</label>
+                        <input type="text" class="form-control" @bind="orgSettings.ContactPersonTitle" 
+                               placeholder="Finance Officer" />
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <button class="btn btn-primary" @onclick="SaveOrgSettings" disabled="@isSavingOrg">
+                    @if (isSavingOrg)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    Save Organization Settings
+                </button>
+                
+                @if (!string.IsNullOrEmpty(orgSaveMessage))
+                {
+                    <span class="ms-2 text-success">
+                        <i class="fas fa-check-circle"></i> @orgSaveMessage
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <!-- Appearance Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-palette"></i> Appearance</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Theme</label>
+                <div class="d-flex gap-3">
+                    <label class="d-flex align-center gap-2">
+                        <input type="radio" name="theme" value="light" checked="@(currentTheme == "light")" 
+                               @onclick="SetLightTheme" />
+                        <i class="fas fa-sun"></i> Light
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="radio" name="theme" value="dark" checked="@(currentTheme == "dark")" 
+                               @onclick="SetDarkTheme" />
+                        <i class="fas fa-moon"></i> Dark
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Date Format</label>
+                <select class="form-control" @bind="dateFormat">
+                    <option value="MM/dd/yyyy">MM/dd/yyyy (US)</option>
+                    <option value="dd/MM/yyyy">dd/MM/yyyy (EU)</option>
+                    <option value="yyyy-MM-dd">yyyy-MM-dd (ISO)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Currency</label>
+                <select class="form-control" @bind="currency">
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Compliance Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-clipboard-check"></i> Compliance</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="enableAuditAlerts" />
+                    Enable $1M revenue threshold alerts (Form 990)
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="enableFilingReminders" />
+                    Enable TN Secretary of State filing reminders
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="enableGrantReminders" />
+                    Enable grant expiration reminders
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Reminder Days Before Due</label>
+                <input type="number" class="form-control" @bind="reminderDays" min="1" max="90" style="width: 100px;" />
+            </div>
+            
+            <button class="btn btn-primary" @onclick="SaveComplianceSettings">
+                <i class="fas fa-save"></i> Save Compliance Settings
+            </button>
+        </div>
+    </div>
+    
+    <!-- Spell Check Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-spell-check"></i> Spell Check</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" checked="@spellCheckSettings.Enabled" 
+                           @onchange="ToggleSpellCheck" />
+                    <strong>Enable spell checking</strong>
+                </label>
+                <small class="text-muted">Check spelling in text inputs across the app</small>
+            </div>
+            
+            <div class="form-group mt-3">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="spellCheckSettings.UseBrowserSpellCheck" 
+                           disabled="@(!spellCheckSettings.Enabled)" />
+                    <strong>Use browser spell check</strong>
+                </label>
+                <small class="text-muted">Native browser spell checking (recommended)</small>
+            </div>
+            
+            <div class="form-group mt-3">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="spellCheckSettings.CheckAsYouType" 
+                           disabled="@(!spellCheckSettings.Enabled)" />
+                    <strong>Check as you type</strong>
+                </label>
+                <small class="text-muted">Check spelling while typing vs only on submit</small>
+            </div>
+            
+            <div class="form-group mt-3">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="spellCheckSettings.UnderlineErrors" 
+                           disabled="@(!spellCheckSettings.Enabled)" />
+                    <strong>Underline errors</strong>
+                </label>
+                <small class="text-muted">Show wavy underline on misspelled words</small>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle"></i>
+                <small>
+                    <strong>Custom Dictionary Includes:</strong> nonprofit, fundraising, grantor, 
+                    payee, reimbursement, AFG, FEMA, SAFER, SCBA, and more financial/emergency services terms.
+                    Right-click on words to add to your browser's dictionary.
+                </small>
+            </div>
+            
+            <div class="mt-3">
+                <button class="btn btn-primary" @onclick="SaveSpellCheckSettings">
+                    <i class="fas fa-save"></i> Save Spell Check Settings
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-bell"></i> Notifications</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="emailNotifications" />
+                    Email notifications
+                </label>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Notification Email</label>
+                <input type="email" class="form-control" @bind="notificationEmail" 
+                       placeholder="admin@organization.org" />
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="weeklyDigest" />
+                    Send weekly financial digest
+                </label>
+            </div>
+            
+            <button class="btn btn-primary" @onclick="SaveNotificationSettings">
+                <i class="fas fa-save"></i> Save Notification Settings
+            </button>
+        </div>
+    </div>
+    
+    <!-- Data Management & Backup -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-database"></i> Data Management & Backup</h3>
+        </div>
+        <div class="card-body">
+            <!-- Backup Actions -->
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button class="btn btn-primary" @onclick="CreateBackupNow" disabled="@isBackingUp">
+                    @if (isBackingUp)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-download"></i>
+                    }
+                    Backup Now
+                </button>
+                <a href="/import-export" class="btn btn-outline">
+                    <i class="fas fa-file-import"></i> Import/Export Data
+                </a>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(backupMessage))
+            {
+                <div class="alert @(backupSuccess ? "alert-success" : "alert-danger") mb-3">
+                    <i class="fas @(backupSuccess ? "fa-check-circle" : "fa-exclamation-circle")"></i>
+                    @backupMessage
+                </div>
+            }
+            
+            <!-- Automatic Backup Settings -->
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="backupSettings.AutoBackupEnabled" />
+                    <strong>Enable automatic scheduled backups</strong>
+                </label>
+            </div>
+            
+            @if (backupSettings.AutoBackupEnabled)
+            {
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Backup Schedule</label>
+                        <select class="form-control" @bind="backupSettings.Schedule">
+                            <option value="@BackupSchedule.Hourly">Hourly</option>
+                            <option value="@BackupSchedule.Daily">Daily</option>
+                            <option value="@BackupSchedule.Weekly">Weekly</option>
+                            <option value="@BackupSchedule.Monthly">Monthly</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Backup Time</label>
+                        <input type="time" class="form-control" 
+                               value="@backupSettings.BackupTime.ToString(@"hh\:mm")"
+                               @onchange="OnBackupTimeChange" />
+                    </div>
+                </div>
+            }
+            
+            <div class="form-group">
+                <label class="form-label">Backup Directory</label>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control" @bind="backupSettings.BackupDirectory" 
+                           placeholder="@BackupService.GetDefaultBackupDirectory()" />
+                    <button class="btn btn-outline" @onclick="ResetBackupDirectory" title="Reset to default">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+                <small class="text-muted">Leave empty to use default location</small>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Keep last N backups</label>
+                    <input type="number" class="form-control" @bind="backupSettings.RetentionCount" 
+                           min="0" max="100" style="width: 100px;" />
+                    <small class="text-muted">0 = unlimited</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Delete backups older than (days)</label>
+                    <input type="number" class="form-control" @bind="backupSettings.RetentionDays" 
+                           min="0" max="365" style="width: 100px;" />
+                    <small class="text-muted">0 = never</small>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="d-flex align-center gap-2">
+                    <input type="checkbox" @bind="backupSettings.CompressBackups" />
+                    Compress backups (saves disk space)
+                </label>
+            </div>
+            
+            <button class="btn btn-primary" @onclick="SaveBackupSettings">
+                <i class="fas fa-save"></i> Save Backup Settings
+            </button>
+            
+            @if (backupSettings.LastAutoBackup.HasValue)
+            {
+                <p class="text-muted mt-2" style="font-size: 0.85rem;">
+                    <i class="fas fa-clock"></i> Last automatic backup: @backupSettings.LastAutoBackup.Value.ToString("MMM d, yyyy h:mm tt")
+                </p>
+            }
+        </div>
+    </div>
+    
+    <!-- Existing Backups -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-history"></i> Backup History</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            @if (isLoadingBackups)
+            {
+                <div class="loading" style="padding: 2rem;">
+                    <div class="spinner"></div>
+                </div>
+            }
+            else if (existingBackups.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Backup File</th>
+                            <th>Date</th>
+                            <th>Size</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var backup in existingBackups.Take(10))
+                        {
+                            <tr>
+                                <td>
+                                    <i class="fas fa-file-archive text-muted"></i>
+                                    <span style="font-family: monospace; font-size: 0.85rem;">@backup.FileName</span>
+                                </td>
+                                <td>@backup.CreatedAt.ToString("MMM d, yyyy h:mm tt")</td>
+                                <td>@FormatFileSize(backup.SizeBytes)</td>
+                                <td>
+                                    @if (backup.IsAutomatic)
+                                    {
+                                        <span class="badge badge-info">Auto</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge">Manual</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline" @onclick="() => DownloadBackup(backup)" title="Download">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline text-warning" @onclick="() => RestoreBackup(backup)" title="Restore">
+                                            <i class="fas fa-undo"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteBackup(backup)" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center text-muted" style="padding: 2rem;">
+                    <i class="fas fa-archive" style="font-size: 2rem; opacity: 0.3;"></i>
+                    <p class="mt-2">No backups found. Create your first backup above.</p>
+                </div>
+            }
+        </div>
+    </div>
+    
+    <!-- Demo Data -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-flask"></i> Demo Data</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                Generate realistic demo data to explore all features of the application. 
+                Demo data includes donors, grants, funds, and 12 months of transactions.
+            </p>
+            
+            @if (hasDemoData)
+            {
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Demo data is currently loaded.</strong> 
+                    All demo transactions, donors, grants, and funds are marked and can be cleared.
+                </div>
+                
+                <button class="btn btn-warning" @onclick="ClearDemoData" disabled="@isDemoProcessing">
+                    @if (isDemoProcessing)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-eraser"></i>
+                    }
+                    Clear Demo Data
+                </button>
+            }
+            else
+            {
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>No demo data loaded.</strong> 
+                    Click below to generate sample data for testing.
+                </div>
+                
+                <button class="btn btn-primary" @onclick="LoadDemoData" disabled="@isDemoProcessing">
+                    @if (isDemoProcessing)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-database"></i>
+                    }
+                    Load Demo Data
+                </button>
+            }
+            
+            @if (!string.IsNullOrEmpty(demoMessage))
+            {
+                <div class="alert @(demoSuccess ? "alert-success" : "alert-danger") mt-3">
+                    <i class="fas @(demoSuccess ? "fa-check-circle" : "fa-exclamation-circle")"></i>
+                    @demoMessage
+                </div>
+            }
+            
+            <hr style="margin: 1.5rem 0;" />
+            
+            <h5>Demo Data Includes:</h5>
+            <ul class="text-muted" style="list-style: disc; margin-left: 1.5rem;">
+                <li><strong>10 Donors:</strong> Individuals, corporations, foundations, government</li>
+                <li><strong>5 Grants:</strong> FEMA, state, local with various statuses</li>
+                <li><strong>5 Funds:</strong> Operating, restricted, training, maintenance, emergency</li>
+                <li><strong>~150+ Transactions:</strong> 12 months of income/expenses with realistic patterns</li>
+                <li>Recurring transactions (utilities, insurance)</li>
+                <li>Grant disbursements and donor contributions</li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Danger Zone -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title text-danger"><i class="fas fa-exclamation-triangle"></i> Danger Zone</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning mb-3">
+                <strong>Warning:</strong> These actions cannot be undone. Make sure you have a backup first.
+            </div>
+            
+            <button class="btn btn-danger" @onclick="ShowResetConfirm">
+                <i class="fas fa-trash-alt"></i> Reset All Data
+            </button>
+        </div>
+    </div>
+    
+    <!-- About -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-info-circle"></i> About</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>NonProfit Finance</strong></p>
+            <p class="text-muted">Version 1.0.0</p>
+            <p class="text-muted">Financial management for 501(c)(3) nonprofits</p>
+            
+            <hr />
+            
+            <p class="text-muted" style="font-size: 0.85rem;">
+                Built with .NET 10, Blazor, and Entity Framework Core.
+                Designed for fire departments and similar nonprofit organizations.
+            </p>
+        </div>
+    </div>
+</div>
+
+@if (showSaveMessage)
+{
+    <div class="alert alert-success" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
+        <i class="fas fa-check-circle"></i> Settings saved successfully!
+    </div>
+}
+
+<!-- Reset Database Confirmation Dialog -->
+<ConfirmDialog 
+    IsVisible="showResetDialog"
+    Title="Reset Database"
+    Message="Are you ABSOLUTELY sure you want to delete ALL data? This will permanently delete all transactions, donors, grants, categories, and documents."
+    ItemName="Entire Database"
+    Type="ConfirmDialog.ConfirmationType.Delete"
+    ConfirmText="DELETE EVERYTHING"
+    ShowWarning="true"
+    WarningMessage="THIS ACTION CANNOT BE UNDONE! All your data will be lost forever. Make sure you have a backup first!"
+    IsProcessing="isResetting"
+    OnConfirmClicked="ConfirmReset"
+    OnCancelClicked="CancelReset" />
+
+@code {
+[Inject] private ISpellCheckService? SpellCheckService { get; set; }
+    
+// Organization
+private OrganizationSettings orgSettings = new();
+private bool isSavingOrg = false;
+private string? orgSaveMessage;
+    
+// Appearance
+private string currentTheme = "light";
+private string dateFormat = "MM/dd/yyyy";
+private string currency = "USD";
+    
+// Spell Check
+private SpellCheckSettings spellCheckSettings = new();
+    
+// Compliance
+private bool enableAuditAlerts = true;
+private bool enableFilingReminders = true;
+private bool enableGrantReminders = true;
+private int reminderDays = 30;
+    
+// Notifications
+private bool emailNotifications = false;
+private string notificationEmail = "";
+private bool weeklyDigest = false;
+    
+// Backup
+private BackupSettings backupSettings = new();
+private List<BackupInfo> existingBackups = new();
+private bool isBackingUp = false;
+private bool isLoadingBackups = true;
+private string? backupMessage;
+private bool backupSuccess;
+    
+// Demo Data
+private bool hasDemoData = false;
+private bool isDemoProcessing = false;
+private string? demoMessage;
+private bool demoSuccess;
+    
+// UI state
+private bool showSaveMessage = false;
+private bool showResetDialog = false;
+private bool isResetting = false;
+
+protected override async Task OnInitializedAsync()
+{
+    // Load organization settings
+    orgSettings = await OrganizationService.GetSettingsAsync();
+    
+    // Load backup settings
+    backupSettings = BackupService.GetSettings();
+        
+    // Load spell check settings
+    if (SpellCheckService != null)
+    {
+        spellCheckSettings = SpellCheckService.GetSettings();
+    }
+        
+    await LoadBackups();
+    hasDemoData = await DemoDataService.HasDemoDataAsync();
+}
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadBackups()
+    {
+        isLoadingBackups = true;
+        existingBackups = await BackupService.GetBackupsAsync();
+        isLoadingBackups = false;
+    }
+
+    private async Task CreateBackupNow()
+    {
+        isBackingUp = true;
+        backupMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await BackupService.CreateBackupAsync();
+            backupSuccess = result.Success;
+            
+            if (result.Success)
+            {
+                backupMessage = $"Backup created successfully: {Path.GetFileName(result.FilePath)} ({FormatFileSize(result.FileSizeBytes)})";
+                await LoadBackups();
+            }
+            else
+            {
+                backupMessage = $"Backup failed: {result.Error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            backupSuccess = false;
+            backupMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isBackingUp = false;
+        }
+    }
+
+    private async Task SaveBackupSettings()
+    {
+        await BackupService.SaveSettingsAsync(backupSettings);
+        await ShowSaveConfirmation();
+    }
+
+    private void OnBackupTimeChange(ChangeEventArgs e)
+    {
+        if (TimeSpan.TryParse(e.Value?.ToString(), out var time))
+        {
+            backupSettings.BackupTime = time;
+        }
+    }
+
+    private void ResetBackupDirectory()
+    {
+        backupSettings.BackupDirectory = BackupService.GetDefaultBackupDirectory();
+    }
+
+    private async Task DownloadBackup(BackupInfo backup)
+    {
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(backup.FullPath);
+            var base64 = Convert.ToBase64String(bytes);
+            var contentType = backup.FileName.EndsWith(".gz") 
+                ? "application/gzip" 
+                : "application/octet-stream";
+            await JS.InvokeVoidAsync("downloadFile", backup.FileName, contentType, base64);
+        }
+        catch (Exception ex)
+        {
+            backupSuccess = false;
+            backupMessage = $"Download failed: {ex.Message}";
+        }
+    }
+
+    private async Task RestoreBackup(BackupInfo backup)
+    {
+        // Create a backup before restoring
+        backupMessage = "Creating safety backup before restore...";
+        StateHasChanged();
+        
+        var result = await BackupService.RestoreFromBackupAsync(backup.FullPath);
+        backupSuccess = result.Success;
+        
+        if (result.Success)
+        {
+            backupMessage = "Database restored successfully! Please refresh the application.";
+        }
+        else
+        {
+            backupMessage = $"Restore failed: {result.Error}";
+        }
+    }
+
+    private async Task DeleteBackup(BackupInfo backup)
+    {
+        var success = await BackupService.DeleteBackupAsync(backup.FullPath);
+        if (success)
+        {
+            await LoadBackups();
+            backupSuccess = true;
+            backupMessage = "Backup deleted.";
+        }
+        else
+        {
+            backupSuccess = false;
+            backupMessage = "Failed to delete backup.";
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private async Task SetTheme(string theme)
+    {
+        currentTheme = theme;
+        await JS.InvokeVoidAsync("themeManager.setTheme", theme);
+        StateHasChanged();
+    }
+
+    private async Task SetLightTheme() => await SetTheme("light");
+    private async Task SetDarkTheme() => await SetTheme("dark");
+
+    private async Task SaveOrgSettings()
+    {
+        isSavingOrg = true;
+        orgSaveMessage = null;
+        StateHasChanged();
+        
+        try
+        {
+            await OrganizationService.SaveSettingsAsync(orgSettings);
+            orgSaveMessage = "Settings saved successfully!";
+            
+            // Show message for 3 seconds
+            await Task.Delay(3000);
+            orgSaveMessage = null;
+        }
+        catch (Exception ex)
+        {
+            orgSaveMessage = $"Error saving: {ex.Message}";
+        }
+        finally
+        {
+            isSavingOrg = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveComplianceSettings()
+    {
+        await ShowSaveConfirmation();
+    }
+
+    private async Task SaveNotificationSettings()
+    {
+        await ShowSaveConfirmation();
+    }
+
+    private async Task ShowSaveConfirmation()
+    {
+        showSaveMessage = true;
+        StateHasChanged();
+        await Task.Delay(3000);
+        showSaveMessage = false;
+        StateHasChanged();
+    }
+
+    private void ShowResetConfirm()
+    {
+        showResetDialog = true;
+    }
+
+    private void CancelReset()
+    {
+        showResetDialog = false;
+    }
+
+    private async Task ConfirmReset()
+    {
+        isResetting = true;
+        try
+        {
+            // Create emergency backup before reset
+            backupMessage = "Creating emergency backup before reset...";
+            StateHasChanged();
+            
+            var backupResult = await BackupService.CreateBackupAsync();
+            
+            if (!backupResult.Success)
+            {
+                backupSuccess = false;
+                backupMessage = "Failed to create backup. Reset cancelled for safety.";
+                showResetDialog = false;
+                return;
+            }
+
+            // Delete the database file
+            var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "NonProfitFinance.db");
+            if (File.Exists(dbPath))
+            {
+                File.Delete(dbPath);
+            }
+
+            backupSuccess = true;
+            backupMessage = $"Database reset complete! Emergency backup saved to: {backupResult.FilePath}. Please restart the application.";
+            showResetDialog = false;
+        }
+        catch (Exception ex)
+        {
+            backupSuccess = false;
+            backupMessage = $"Reset failed: {ex.Message}";
+            showResetDialog = false;
+        }
+        finally
+        {
+            isResetting = false;
+        }
+    }
+
+    private async Task LoadDemoData()
+    {
+        isDemoProcessing = true;
+        demoMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await DemoDataService.SeedDemoDataAsync();
+            demoSuccess = result.Success;
+            
+            if (result.Success)
+            {
+                demoMessage = $"Demo data loaded! Created {result.TransactionsCreated} transactions, {result.DonorsCreated} donors, {result.GrantsCreated} grants, {result.FundsCreated} funds.";
+                hasDemoData = true;
+            }
+            else
+            {
+                demoMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            demoSuccess = false;
+            demoMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isDemoProcessing = false;
+        }
+    }
+
+    private async Task ClearDemoData()
+    {
+        isDemoProcessing = true;
+        demoMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await DemoDataService.ClearDemoDataAsync();
+            demoSuccess = result.Success;
+            
+            if (result.Success)
+            {
+                demoMessage = $"Demo data cleared! Removed {result.TransactionsCreated} transactions, {result.DonorsCreated} donors, {result.GrantsCreated} grants, {result.FundsCreated} funds.";
+                hasDemoData = false;
+            }
+            else
+            {
+                demoMessage = result.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            demoSuccess = false;
+            demoMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isDemoProcessing = false;
+        }
+    }
+    
+    // Spell Check Methods
+    private async Task ToggleSpellCheck(ChangeEventArgs e)
+    {
+        if (SpellCheckService != null)
+        {
+            bool enabled = (bool)(e.Value ?? false);
+            await SpellCheckService.SetEnabledAsync(enabled);
+        }
+    }
+    
+    private async Task SaveSpellCheckSettings()
+    {
+        if (SpellCheckService != null)
+        {
+            await SpellCheckService.SaveSettingsAsync(spellCheckSettings);
+            await SpellCheckService.SetEnabledAsync(spellCheckSettings.Enabled);
+            
+            showSaveMessage = true;
+            await Task.Delay(2000);
+            showSaveMessage = false;
+            StateHasChanged();
+        }
+    }
+}
+

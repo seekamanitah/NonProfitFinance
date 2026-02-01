@@ -1,0 +1,277 @@
+@page "/compliance"
+@inject IComplianceService ComplianceService
+@rendermode InteractiveServer
+
+<PageTitle>Compliance - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3">
+    <div>
+        <h2 style="margin: 0;">Compliance & Deadlines</h2>
+        <p class="text-muted">Track filing deadlines and compliance requirements</p>
+    </div>
+    <a href="/compliance/form990" class="btn btn-outline">
+        <i class="fas fa-file-alt"></i> Form 990 Worksheet
+    </a>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">
+        <div class="spinner"></div>
+    </div>
+}
+else
+{
+    <!-- Audit Threshold Alert -->
+    @if (auditStatus != null)
+    {
+        <div class="alert @(auditStatus.HasExceeded ? "alert-danger" : auditStatus.IsApproaching ? "alert-warning" : "alert-info") mb-3">
+            <div class="d-flex justify-between align-center">
+                <div>
+                    <i class="fas @(auditStatus.HasExceeded ? "fa-exclamation-circle" : auditStatus.IsApproaching ? "fa-exclamation-triangle" : "fa-info-circle")"></i>
+                    <strong>$1M Audit Threshold</strong>
+                    <span class="ml-2">@auditStatus.Message</span>
+                </div>
+                <div>
+                    <strong>@auditStatus.CurrentYtdRevenue.ToString("C0")</strong>
+                    <span class="text-muted">/ @auditStatus.AuditThreshold.ToString("C0")</span>
+                </div>
+            </div>
+            <div class="progress mt-2" style="height: 8px;">
+                <div class="progress-bar @(auditStatus.HasExceeded ? "danger" : auditStatus.IsApproaching ? "warning" : "")" 
+                     style="width: @Math.Min(auditStatus.PercentageOfThreshold, 100)%;"></div>
+            </div>
+        </div>
+    }
+
+    <!-- Summary Cards -->
+    <div class="metric-cards mb-3">
+        <div class="metric-card">
+            <div class="metric-icon expense">
+                <i class="fas fa-exclamation-circle"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Critical (&lt; 7 days)</div>
+                <div class="metric-value negative">@reminders.Count(r => r.Priority == ReminderPriority.Critical)</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon neutral">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">High Priority</div>
+                <div class="metric-value">@reminders.Count(r => r.Priority == ReminderPriority.High)</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon primary">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Upcoming (90 days)</div>
+                <div class="metric-value">@reminders.Count</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon income">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Completed YTD</div>
+                <div class="metric-value positive">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deadlines List -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-calendar-check"></i> Upcoming Deadlines</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            @if (reminders.Any())
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Deadline</th>
+                            <th>Type</th>
+                            <th>Due Date</th>
+                            <th>Days Left</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var reminder in reminders)
+                        {
+                            <tr>
+                                <td>
+                                    <i class="fas @GetPriorityIcon(reminder.Priority) @GetPriorityColor(reminder.Priority)"></i>
+                                </td>
+                                <td>
+                                    <strong>@reminder.Title</strong>
+                                    <br />
+                                    <small class="text-muted">@reminder.Description</small>
+                                </td>
+                                <td>
+                                    <span class="badge @GetTypeBadgeClass(reminder.Type)">@reminder.Type</span>
+                                </td>
+                                <td>@reminder.DueDate.ToString("MMM dd, yyyy")</td>
+                                <td>
+                                    <span class="badge @GetDaysBadgeClass(reminder.DaysUntilDue)">
+                                        @if (reminder.DaysUntilDue < 0)
+                                        {
+                                            <text>@Math.Abs(reminder.DaysUntilDue) days overdue</text>
+                                        }
+                                        else if (reminder.DaysUntilDue == 0)
+                                        {
+                                            <text>Due today!</text>
+                                        }
+                                        else
+                                        {
+                                            <text>@reminder.DaysUntilDue days</text>
+                                        }
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        @if (!string.IsNullOrEmpty(reminder.ActionUrl))
+                                        {
+                                            @if (reminder.ActionUrl.StartsWith("http"))
+                                            {
+                                                <a href="@reminder.ActionUrl" class="btn btn-sm btn-outline" target="_blank" title="Open">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <a href="@reminder.ActionUrl" class="btn btn-sm btn-outline" title="View">
+                                                    <i class="fas fa-arrow-right"></i>
+                                                </a>
+                                            }
+                                        }
+                                        <button class="btn btn-sm btn-outline" @onclick="() => DismissReminder(reminder)" title="Dismiss">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="text-center text-muted" style="padding: 2rem;">
+                    <i class="fas fa-check-circle" style="font-size: 2rem; color: var(--color-success);"></i>
+                    <p class="mt-2">No upcoming deadlines in the next 90 days.</p>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="charts-grid mt-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-link"></i> TN State Resources</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="https://tnbear.tn.gov/" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-building"></i> TN Business Search
+                    </a>
+                    <a href="https://sos.tn.gov/charitable-solicitations" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-hand-holding-heart"></i> Charitable Solicitations
+                    </a>
+                    <a href="https://www.tn.gov/revenue.html" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-money-bill-wave"></i> TN Dept of Revenue
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-link"></i> IRS Resources</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="https://www.irs.gov/charities-non-profits" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-file-alt"></i> IRS Charities & Nonprofits
+                    </a>
+                    <a href="https://www.irs.gov/forms-pubs/about-form-990" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-file-invoice"></i> Form 990 Info
+                    </a>
+                    <a href="https://www.irs.gov/charities-non-profits/annual-electronic-filing-requirement-for-small-exempt-organizations-form-990-n-e-postcard" class="btn btn-outline" target="_blank">
+                        <i class="fas fa-envelope"></i> Form 990-N (e-Postcard)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ComplianceReminderDto> reminders = new();
+    private AuditThresholdStatusDto? auditStatus;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            reminders = await ComplianceService.GetUpcomingRemindersAsync(90);
+            auditStatus = await ComplianceService.CheckAuditThresholdAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DismissReminder(ComplianceReminderDto reminder)
+    {
+        await ComplianceService.DismissReminderAsync(reminder.Id);
+        reminders.Remove(reminder);
+    }
+
+    private string GetPriorityIcon(ReminderPriority priority) => priority switch
+    {
+        ReminderPriority.Critical => "fa-exclamation-circle",
+        ReminderPriority.High => "fa-exclamation-triangle",
+        ReminderPriority.Medium => "fa-clock",
+        _ => "fa-info-circle"
+    };
+
+    private string GetPriorityColor(ReminderPriority priority) => priority switch
+    {
+        ReminderPriority.Critical => "text-danger",
+        ReminderPriority.High => "text-warning",
+        ReminderPriority.Medium => "text-info",
+        _ => "text-muted"
+    };
+
+    private string GetTypeBadgeClass(ComplianceType type) => type switch
+    {
+        ComplianceType.TNSecretaryOfState => "badge-info",
+        ComplianceType.Form990 => "badge-warning",
+        ComplianceType.GrantReport => "badge-success",
+        _ => ""
+    };
+
+    private string GetDaysBadgeClass(int days)
+    {
+        if (days < 0) return "badge-danger";
+        if (days == 0) return "badge-danger";
+        if (days <= 7) return "badge-danger";
+        if (days <= 30) return "badge-warning";
+        return "badge-info";
+    }
+}

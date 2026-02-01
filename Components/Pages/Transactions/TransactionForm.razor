@@ -1,0 +1,638 @@
+@inject ITransactionService TransactionService
+@inject IDonorService DonorService
+@inject IGrantService GrantService
+@inject IAutoCategorizationService AutoCategorizationService
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" style="max-width: 600px;" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit Transaction" : "Add Transaction")</h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="modal-body">
+                <!-- Transaction Type -->
+                <div class="tabs mb-3">
+                    <div class="tab @(model.Type == TransactionType.Income ? "active" : "")"
+                         @onclick="() => SetType(TransactionType.Income)">
+                        <i class="fas fa-arrow-down text-success"></i> Income
+                    </div>
+                    <div class="tab @(model.Type == TransactionType.Expense ? "active" : "")"
+                         @onclick="() => SetType(TransactionType.Expense)">
+                        <i class="fas fa-arrow-up text-danger"></i> Expense
+                    </div>
+                    <div class="tab @(model.Type == TransactionType.Transfer ? "active" : "")"
+                         @onclick="() => SetType(TransactionType.Transfer)">
+                        <i class="fas fa-exchange-alt"></i> Transfer
+                    </div>
+                </div>
+                
+                <!-- Amount and Date -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Amount *</label>
+                        <div class="d-flex align-center">
+                            <span class="text-muted" style="margin-right: 0.5rem;">$</span>
+                            <InputNumber class="form-control" @bind-Value="model.Amount" 
+                                         min="0" step="0.01" />
+                        </div>
+                        <ValidationMessage For="@(() => model.Amount)" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Date *</label>
+                        <InputDate class="form-control" @bind-Value="model.Date" />
+                        <ValidationMessage For="@(() => model.Date)" />
+                    </div>
+                </div>
+                
+                <!-- Category and Account(s) -->
+                @if (model.Type == TransactionType.Transfer)
+                {
+                    <!-- Transfer: Show From and To Accounts -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">From Account *</label>
+                            <SearchableSelect TItem="FundDto" TValue="int?"
+                                            Items="Funds"
+                                            @bind-SelectedValue="model.FundId"
+                                            ValueSelector="@(f => (int?)f.Id)"
+                                            TextSelector="@(f => f.Name)"
+                                            Placeholder="Select source account..."
+                                            NullOptionText="Select account..." />
+                            <ValidationMessage For="@(() => model.FundId)" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">To Account *</label>
+                            <SearchableSelect TItem="FundDto" TValue="int?"
+                                            Items="Funds"
+                                            @bind-SelectedValue="model.ToFundId"
+                                            ValueSelector="@(f => (int?)f.Id)"
+                                            TextSelector="@(f => f.Name)"
+                                            Placeholder="Select destination account..."
+                                            NullOptionText="Select account..." />
+                            <ValidationMessage For="@(() => model.ToFundId)" />
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info" style="margin-bottom: 1rem;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Transfer Note:</strong> This will create two linked transactions: 
+                        one withdrawal from the source account and one deposit to the destination account.
+                    </div>
+                }
+                else
+                {
+                    <!-- Income/Expense: Show Category and Single Account -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Category *</label>
+                            <SearchableSelect TItem="CategoryDto" TValue="int"
+                                            Items="FilteredCategories"
+                                            @bind-SelectedValue="model.CategoryId"
+                                            ValueSelector="@(c => c.Id)"
+                                            TextSelector="@(c => c.Name)"
+                                            Placeholder="Select category..."
+                                            NullOptionText="Select category..." />
+                            <ValidationMessage For="@(() => model.CategoryId)" />
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Account</label>
+                            <SearchableSelect TItem="FundDto" TValue="int?"
+                                            Items="Funds"
+                                            @bind-SelectedValue="model.FundId"
+                                            ValueSelector="@(f => (int?)f.Id)"
+                                            TextSelector="@(f => f.Name)"
+                                            Placeholder="No account"
+                                            NullOptionText="No account" />
+                        </div>
+                    </div>
+                }
+                
+                <!-- Description -->
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <InputText class="form-control" @bind-Value="model.Description" 
+                               placeholder="Enter description..." />
+                </div>
+                
+                <!-- Payee with Auto-complete -->
+                <div class="form-group" style="position: relative;">
+                    <label class="form-label">Payee</label>
+                    <input type="text" class="form-control" 
+                           value="@model.Payee"
+                           @oninput="OnPayeeInput"
+                           @onfocus="() => showPayeeSuggestions = payeeSuggestions.Any()"
+                           @onblur="OnPayeeBlur"
+                           placeholder="Start typing to see suggestions..." />
+                    
+                    @if (showPayeeSuggestions && payeeSuggestions.Any())
+                    {
+                        <div class="autocomplete-dropdown">
+                            @foreach (var suggestion in payeeSuggestions)
+                            {
+                                <div class="autocomplete-item" @onmousedown="() => SelectPayee(suggestion)">
+                                    <div class="d-flex justify-between">
+                                        <strong>@suggestion.Payee</strong>
+                                        <small class="text-muted">@suggestion.UsageCount uses</small>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(suggestion.LastCategoryName))
+                                    {
+                                        <small class="text-muted">Last category: @suggestion.LastCategoryName</small>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                
+                <!-- Donor (for Income) -->
+                @if (model.Type == TransactionType.Income)
+                {
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Donor</label>
+                            <InputSelect class="form-control" @bind-Value="model.DonorId">
+                                <option value="">No donor</option>
+                                @foreach (var donor in donors)
+                                {
+                                    <option value="@donor.Id">@donor.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Grant</label>
+                            <InputSelect class="form-control" @bind-Value="model.GrantId">
+                                <option value="">No grant</option>
+                                @foreach (var grant in grants)
+                                {
+                                    <option value="@grant.Id">@grant.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                }
+                
+                <!-- Grant (for Expenses) -->
+                @if (model.Type == TransactionType.Expense)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Grant (if expense is grant-funded)</label>
+                        <InputSelect class="form-control" @bind-Value="model.GrantId">
+                            <option value="">No grant / General funds</option>
+                            @foreach (var grant in grants)
+                            {
+                                <option value="@grant.Id">@grant.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
+                
+                <!-- Reference and Tags -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Reference #</label>
+                        <InputText class="form-control" @bind-Value="model.ReferenceNumber" 
+                                   placeholder="Check #, Invoice #, etc." />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Tags</label>
+                        <InputText class="form-control" @bind-Value="model.Tags" 
+                                   placeholder="Comma-separated tags" />
+                    </div>
+                </div>
+                
+                <!-- Account Type -->
+                <div class="form-group">
+                    <label class="form-label">Account Type</label>
+                    <InputSelect class="form-control" @bind-Value="model.FundType">
+                        <option value="@FundType.Unrestricted">Unrestricted</option>
+                        <option value="@FundType.Restricted">Restricted</option>
+                        <option value="@FundType.TemporarilyRestricted">Temporarily Restricted</option>
+                        <option value="@FundType.PermanentlyRestricted">Permanently Restricted</option>
+                    </InputSelect>
+                </div>
+                
+                <!-- Split Transaction Toggle -->
+                <div class="form-group">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="isSplitTransaction" />
+                        <strong>Split this transaction across multiple categories</strong>
+                    </label>
+                </div>
+                
+                <!-- Split Items -->
+                @if (isSplitTransaction)
+                {
+                    <div class="card mb-3" style="background: var(--bg-secondary);">
+                        <div class="card-body">
+                            <div class="d-flex justify-between align-center mb-2">
+                                <h4 style="margin: 0;">Split Details</h4>
+                                <button type="button" class="btn btn-sm btn-outline" @onclick="AddSplit">
+                                    <i class="fas fa-plus"></i> Add Split
+                                </button>
+                            </div>
+                            
+                            @for (int i = 0; i < splits.Count; i++)
+                            {
+                                var index = i;
+                                <div class="d-flex gap-2 align-center mb-2" style="padding: 0.5rem; background: var(--bg-primary); border-radius: 4px;">
+                                    <div style="flex: 2;">
+                                        <select class="form-control" @bind="splits[index].CategoryId">
+                                            <option value="0">Select category...</option>
+                                            @foreach (var cat in FilteredCategories)
+                                            {
+                                                <option value="@cat.Id">@cat.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <input type="number" class="form-control" step="0.01" 
+                                               @bind="splits[index].Amount" placeholder="Amount" />
+                                    </div>
+                                    <div style="flex: 2;">
+                                        <input type="text" class="form-control" 
+                                               @bind="splits[index].Description" placeholder="Description" />
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline text-danger" 
+                                            @onclick="() => RemoveSplit(index)" disabled="@(splits.Count <= 2)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            }
+                            
+                            <div class="d-flex justify-between mt-2">
+                                <span class="text-muted">Total: @splits.Sum(s => s.Amount).ToString("C")</span>
+                                @if (Math.Abs(splits.Sum(s => s.Amount) - model.Amount) > 0.01m)
+                                {
+                                    <span class="text-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Difference: @((model.Amount - splits.Sum(s => s.Amount)).ToString("C"))
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="text-success">
+                                        <i class="fas fa-check"></i> Balanced
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+                
+                @if (errorMessage != null)
+                {
+                    <div class="alert alert-danger" role="alert" aria-live="assertive" aria-atomic="true">
+                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i> @errorMessage
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    @(IsEdit ? "Update" : "Save") Transaction
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+[Parameter] public TransactionDto? Transaction { get; set; }
+[Parameter] public List<CategoryDto> Categories { get; set; } = new();
+[Parameter] public List<FundDto> Funds { get; set; } = new();
+[Parameter] public EventCallback OnSave { get; set; }
+[Parameter] public EventCallback OnCancel { get; set; }
+[Parameter] public decimal? PreFillAmount { get; set; }
+[Parameter] public string? PreFillDescription { get; set; }
+[Parameter] public DateTime? PreFillDate { get; set; }
+[Parameter] public string? PreFillPayee { get; set; }
+
+private TransactionFormModel model = new();
+private List<DonorDto> donors = new();
+private List<GrantDto> grants = new();
+private List<SplitItem> splits = new();
+private List<PayeeSuggestion> payeeSuggestions = new();
+private bool isSaving = false;
+private bool isSplitTransaction = false;
+private bool showPayeeSuggestions = false;
+private string? errorMessage;
+private System.Timers.Timer? debounceTimer;
+
+private bool IsEdit => Transaction != null;
+    
+    private IEnumerable<CategoryDto> FilteredCategories => Categories
+        .Where(c => c.Type == (model.Type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense));
+
+    protected override async Task OnInitializedAsync()
+    {
+        donors = await DonorService.GetAllAsync();
+        grants = await GrantService.GetAllAsync(GrantStatus.Active);
+        
+        if (Transaction != null)
+        {
+            model = new TransactionFormModel
+            {
+                Date = Transaction.Date,
+                Amount = Transaction.Amount,
+                Description = Transaction.Description,
+                Type = Transaction.Type,
+                CategoryId = Transaction.CategoryId,
+                FundType = Transaction.FundType,
+                FundId = Transaction.FundId,
+                DonorId = Transaction.DonorId,
+                GrantId = Transaction.GrantId,
+                Payee = Transaction.Payee,
+                Tags = Transaction.Tags,
+                ReferenceNumber = Transaction.ReferenceNumber
+            };
+        }
+        else
+        {
+            model.Date = DateTime.Today;
+            
+            // Apply pre-fill data from receipt OCR
+            if (PreFillAmount.HasValue)
+                model.Amount = PreFillAmount.Value;
+            
+            if (!string.IsNullOrEmpty(PreFillDescription))
+                model.Description = PreFillDescription;
+            
+            if (PreFillDate.HasValue)
+                model.Date = PreFillDate.Value;
+            
+            if (!string.IsNullOrEmpty(PreFillPayee))
+            {
+                model.Payee = PreFillPayee;
+                
+                // Try to auto-suggest category based on payee
+                var suggestedCategoryId = await AutoCategorizationService.SuggestCategoryAsync(
+                    model.Payee, 
+                    model.Description, 
+                    model.Amount
+                );
+                
+                if (suggestedCategoryId.HasValue)
+                {
+                    model.CategoryId = suggestedCategoryId.Value;
+                }
+            }
+        }
+    }
+
+    private void SetType(TransactionType type)
+    {
+        model.Type = type;
+        model.CategoryId = 0; // Reset category when type changes
+    }
+
+    private async Task OnPayeeInput(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+        model.Payee = value;
+        
+        // Debounce the search
+        debounceTimer?.Stop();
+        debounceTimer?.Dispose();
+        
+        if (value.Length >= 2)
+        {
+            debounceTimer = new System.Timers.Timer(300);
+            debounceTimer.Elapsed += async (sender, args) =>
+            {
+                debounceTimer?.Stop();
+                await InvokeAsync(async () =>
+                {
+                    payeeSuggestions = await TransactionService.GetPayeeSuggestionsAsync(value);
+                    showPayeeSuggestions = payeeSuggestions.Any();
+                    
+                    // Auto-suggest category based on payee and amount
+                    if (!IsEdit && model.CategoryId == 0)
+                    {
+                        var suggestedCategoryId = await AutoCategorizationService.SuggestCategoryAsync(
+                            model.Payee, 
+                            model.Description, 
+                            model.Amount
+                        );
+                        
+                        if (suggestedCategoryId.HasValue)
+                        {
+                            model.CategoryId = suggestedCategoryId.Value;
+                        }
+                    }
+                    
+                    StateHasChanged();
+                });
+            };
+            debounceTimer.Start();
+        }
+        else
+        {
+            payeeSuggestions.Clear();
+            showPayeeSuggestions = false;
+        }
+    }
+
+    private void SelectPayee(PayeeSuggestion suggestion)
+    {
+        model.Payee = suggestion.Payee;
+        showPayeeSuggestions = false;
+        
+        // Optionally auto-select the category they last used
+        if (suggestion.LastCategoryId.HasValue && model.CategoryId == 0)
+        {
+            var matchingCategory = Categories.FirstOrDefault(c => c.Id == suggestion.LastCategoryId.Value);
+            if (matchingCategory != null && matchingCategory.Type == (model.Type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense))
+            {
+                model.CategoryId = suggestion.LastCategoryId.Value;
+            }
+        }
+    }
+
+    private async Task OnPayeeBlur()
+    {
+        // Delay hiding to allow click to register
+        await Task.Delay(200);
+        showPayeeSuggestions = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        // Validate transfer
+        if (model.Type == TransactionType.Transfer)
+        {
+            if (!model.FundId.HasValue || !model.ToFundId.HasValue)
+            {
+                errorMessage = "Both source and destination accounts are required for transfers.";
+                return;
+            }
+            
+            if (model.FundId == model.ToFundId)
+            {
+                errorMessage = "Cannot transfer to the same account.";
+                return;
+            }
+        }
+        // Validate split transaction
+        else if (isSplitTransaction)
+        {
+            if (splits.Any(s => s.CategoryId == 0))
+            {
+                errorMessage = "Please select a category for all splits.";
+                return;
+            }
+            
+            if (Math.Abs(splits.Sum(s => s.Amount) - model.Amount) > 0.01m)
+            {
+                errorMessage = "Split amounts must equal the total transaction amount.";
+                return;
+            }
+        }
+        else if (model.CategoryId == 0)
+        {
+            errorMessage = "Please select a category.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            // Build splits list for API
+            List<CreateTransactionSplitRequest>? splitRequests = null;
+            if (isSplitTransaction && splits.Any())
+            {
+                splitRequests = splits.Select(s => new CreateTransactionSplitRequest(
+                    s.CategoryId,
+                    s.Amount,
+                    s.Description
+                )).ToList();
+            }
+
+            if (IsEdit)
+            {
+                await TransactionService.UpdateAsync(Transaction!.Id, new UpdateTransactionRequest(
+                    model.Date,
+                    model.Amount,
+                    model.Description,
+                    model.Type,
+                    isSplitTransaction ? splits.First().CategoryId : model.CategoryId,
+                    model.FundType,
+                    model.FundId,
+                    model.ToFundId,
+                    model.DonorId,
+                    model.GrantId,
+                    model.Payee,
+                    model.Tags,
+                    model.ReferenceNumber,
+                    null, // PONumber
+                    false, // IsReconciled
+                    splitRequests
+                ));
+            }
+            else
+            {
+                await TransactionService.CreateAsync(new CreateTransactionRequest(
+                    model.Date,
+                    model.Amount,
+                    model.Description,
+                    model.Type,
+                    model.Type == TransactionType.Transfer ? 0 : (isSplitTransaction ? splits.First().CategoryId : model.CategoryId),
+                    model.FundType,
+                    model.FundId,
+                    model.ToFundId,
+                    model.DonorId,
+                    model.GrantId,
+                    model.Payee,
+                    model.Tags,
+                    model.ReferenceNumber,
+                    null, // PONumber
+                    false, // IsRecurring
+                    null, // RecurrencePattern
+                    splitRequests
+                ));
+            }
+
+            await OnSave.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private class TransactionFormModel
+    {
+        public DateTime Date { get; set; } = DateTime.Today;
+        public decimal Amount { get; set; }
+        public string? Description { get; set; }
+        public TransactionType Type { get; set; } = TransactionType.Expense;
+        public int CategoryId { get; set; }
+        public FundType FundType { get; set; } = FundType.Unrestricted;
+        public int? FundId { get; set; }
+        public int? ToFundId { get; set; }
+        public int? DonorId { get; set; }
+        public int? GrantId { get; set; }
+        public string? Payee { get; set; }
+        public string? Tags { get; set; }
+        public string? ReferenceNumber { get; set; }
+    }
+
+    private class SplitItem
+    {
+        public int CategoryId { get; set; }
+        public decimal Amount { get; set; }
+        public string? Description { get; set; }
+    }
+
+    private void AddSplit()
+    {
+        splits.Add(new SplitItem());
+    }
+
+    private void RemoveSplit(int index)
+    {
+        if (splits.Count > 2)
+        {
+            splits.RemoveAt(index);
+        }
+    }
+
+    private void InitializeSplits()
+    {
+        if (splits.Count == 0)
+        {
+            splits.Add(new SplitItem { Amount = model.Amount / 2 });
+            splits.Add(new SplitItem { Amount = model.Amount / 2 });
+        }
+    }
+}

@@ -1,0 +1,193 @@
+@inject IDonorService DonorService
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">@(IsEdit ? "Edit Donor" : "Add Donor")</h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <EditForm Model="model" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <InputText class="form-control" @bind-Value="model.Name" placeholder="Donor name" />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-control" @bind-Value="model.Type">
+                            @foreach (var type in Enum.GetValues<DonorType>())
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <div class="d-flex gap-3 mt-2">
+                            <label class="d-flex align-center gap-2">
+                                <InputCheckbox @bind-Value="model.IsActive" /> Active
+                            </label>
+                            <label class="d-flex align-center gap-2">
+                                <InputCheckbox @bind-Value="model.IsAnonymous" /> Anonymous
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="model.Email" 
+                                   type="email" placeholder="email@example.com" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="model.Phone" 
+                                   placeholder="(555) 123-4567" />
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Address" 
+                                   rows="2" placeholder="Street, City, State, ZIP" />
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <InputTextArea class="form-control" @bind-Value="model.Notes" 
+                                   rows="3" placeholder="Additional notes..." />
+                </div>
+                
+                @if (errorMessage != null)
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> @errorMessage
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    @(IsEdit ? "Update" : "Create") Donor
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public DonorDto? Donor { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private DonorFormModel model = new();
+    private bool isSaving = false;
+    private string? errorMessage;
+
+    private bool IsEdit => Donor != null;
+
+    protected override void OnInitialized()
+    {
+        if (Donor != null)
+        {
+            model = new DonorFormModel
+            {
+                Name = Donor.Name,
+                Type = Donor.Type,
+                Email = Donor.Email,
+                Phone = Donor.Phone,
+                Address = Donor.Address,
+                Notes = Donor.Notes,
+                IsAnonymous = Donor.IsAnonymous,
+                IsActive = Donor.IsActive
+            };
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            errorMessage = "Name is required.";
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            if (IsEdit)
+            {
+                await DonorService.UpdateAsync(Donor!.Id, new UpdateDonorRequest(
+                    model.Name!,
+                    model.Type,
+                    model.Email,
+                    model.Phone,
+                    model.Address,
+                    model.Notes,
+                    model.IsAnonymous,
+                    model.IsActive
+                ));
+            }
+            else
+            {
+                await DonorService.CreateAsync(new CreateDonorRequest(
+                    model.Name!,
+                    model.Type,
+                    model.Email,
+                    model.Phone,
+                    model.Address,
+                    model.Notes,
+                    model.IsAnonymous
+                ));
+            }
+
+            await OnSave.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private class DonorFormModel
+    {
+        public string? Name { get; set; }
+        public DonorType Type { get; set; } = DonorType.Individual;
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? Notes { get; set; }
+        public bool IsAnonymous { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}
