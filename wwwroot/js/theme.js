@@ -1,5 +1,5 @@
 // Theme Manager for Dark/Light Mode
-window.themeManager = {
+const themeManager = {
     currentTheme: 'light',
 
     init: function() {
@@ -42,8 +42,6 @@ window.themeManager = {
 };
 
 // Initialize on page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => themeManager.init());
-} else {
+document.addEventListener('DOMContentLoaded', function() {
     themeManager.init();
-}
+});
