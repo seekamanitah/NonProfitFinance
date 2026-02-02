@@ -16,9 +16,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING:-Data Source=/app/data/NonProfitFinance.db}
     volumes:
-      - nonprofit-data:/app/data
-      - nonprofit-backups:/app/backups
-      - nonprofit-documents:/app/documents
+      - nonprofit-data:media/AppDatabases/data
+      - nonprofit-backups:media/AppDatabases/backups
+      - nonprofit-documents:media/AppDatabases/documents
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
