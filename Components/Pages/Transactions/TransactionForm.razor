@@ -20,15 +20,15 @@
                 <div class="tabs mb-3">
                     <div class="tab @(model.Type == TransactionType.Income ? "active" : "")"
                          @onclick="() => SetType(TransactionType.Income)">
-                        <i class="fas fa-arrow-down text-success"></i> Income
+                        Income
                     </div>
                     <div class="tab @(model.Type == TransactionType.Expense ? "active" : "")"
                          @onclick="() => SetType(TransactionType.Expense)">
-                        <i class="fas fa-arrow-up text-danger"></i> Expense
+                        Expense
                     </div>
                     <div class="tab @(model.Type == TransactionType.Transfer ? "active" : "")"
                          @onclick="() => SetType(TransactionType.Transfer)">
-                        <i class="fas fa-exchange-alt"></i> Transfer
+                        Transfer
                     </div>
                 </div>
                 
@@ -52,14 +52,12 @@
                         @if (model.Date > DateTime.Today)
                         {
                             <small class="text-danger" role="alert">
-                                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                 Future dates are not allowed for transactions
                             </small>
                         }
                         else if (model.Date < DateTime.Today.AddYears(-10))
                         {
                             <small class="text-warning">
-                                <i class="fas fa-info-circle" aria-hidden="true"></i>
                                 This date is more than 10 years ago
                             </small>
                         }
@@ -98,7 +96,6 @@
                     </div>
 
                     <div class="alert alert-info" style="margin-bottom: 1rem;">
-                        <i class="fas fa-info-circle"></i>
                         <strong>Transfer Note:</strong> This will create two linked transactions: 
                         one withdrawal from the source account and one deposit to the destination account.
                     </div>
@@ -263,7 +260,7 @@
                             <div class="d-flex justify-between align-center mb-2">
                                 <h4 style="margin: 0;">Split Details</h4>
                                 <button type="button" class="btn btn-sm btn-outline" @onclick="AddSplit">
-                                    <i class="fas fa-plus"></i> Add Split
+                                    Add Split
                                 </button>
                             </div>
                             
@@ -294,7 +291,7 @@
                                     <button type="button" class="btn btn-sm btn-outline text-danger" 
                                             @onclick="() => RemoveSplit(index)" disabled="@(splits.Count <= 2)"
                                             aria-label="Remove split">
-                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                        ×
                                     </button>
                                 </div>
                             }
@@ -311,7 +308,6 @@
                                 @if (!IsSplitBalanced)
                                 {
                                     <span class="text-danger" role="alert" aria-live="polite">
-                                        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                         <strong>Difference: @SplitDifference.ToString("C")</strong>
                                         - Splits must equal transaction amount
                                     </span>
@@ -319,7 +315,6 @@
                                 else
                                 {
                                     <span class="text-success" role="status">
-                                        <i class="fas fa-check-circle" aria-hidden="true"></i>
                                         <strong>Balanced</strong>
                                     </span>
                                 }
@@ -331,7 +326,7 @@
                 @if (errorMessage != null)
                 {
                     <div class="alert alert-danger" role="alert" aria-live="assertive" aria-atomic="true">
-                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i> @errorMessage
+                        @errorMessage
                     </div>
                 }
             </div>
@@ -342,10 +337,6 @@
                     @if (isSaving)
                     {
                         <span class="spinner"></span>
-                    }
-                    else
-                    {
-                        <i class="fas fa-save"></i>
                     }
                     @(IsEdit ? "Update" : "Save") Transaction
                 </button>
