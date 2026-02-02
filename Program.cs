@@ -6,11 +6,17 @@ using NonProfitFinance.Middleware;
 using NonProfitFinance.Models;
 using NonProfitFinance.Services;
 using QuestPDF.Infrastructure;
+using System.Globalization;
 
 // Configure QuestPDF License (Community - free for organizations with less than $1M revenue)
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Set culture to US English to ensure $ currency symbol everywhere
+var cultureInfo = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 // Add database context with SQLite
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

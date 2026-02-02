@@ -45,3 +45,7 @@ const themeManager = {
 document.addEventListener('DOMContentLoaded', function() {
     themeManager.init();
 });
+
+const accessibilityHelpers = {
+    loadUiScale: function() { /* ... */ }  // ❌ Empty stub!
+};
