@@ -67,6 +67,11 @@
                 
                 <div class="form-row">
                     <div class="form-group">
+                        <label class="form-label">Type Column (optional)</label>
+                        <input type="number" class="form-control" @bind="typeColumn" min="0" placeholder="e.g., 3" />
+                        <small class="text-muted">Column with Income/Expense/Transfer</small>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Category Column (optional)</label>
                         <input type="number" class="form-control" @bind="categoryColumn" min="0" />
                     </div>
@@ -266,7 +271,8 @@ private bool hasHeaderRow = true;
 private int dateColumn = 0;
 private int amountColumn = 1;
 private int descriptionColumn = 2;
-private int? categoryColumn;
+private int? typeColumn = 3; // Default to column 3 (Type in exported CSV)
+private int? categoryColumn = 4; // Default to column 4 (Category in exported CSV)
 private string dateFormat = "yyyy-MM-dd";
 private bool isProcessing = false;
     
@@ -309,7 +315,7 @@ private async Task PreviewImport()
 
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, null, null, null, null,
+                categoryColumn, null, null, null, typeColumn,
                 null, null, hasHeaderRow, dateFormat);
 
             previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
@@ -334,7 +340,7 @@ private async Task PreviewImport()
 
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, null, null, null, null,
+                categoryColumn, null, null, null, typeColumn,
                 null, null, hasHeaderRow, dateFormat);
 
             importResult = await ImportExportService.ImportTransactionsFromCsvAsync(memoryStream, mapping);

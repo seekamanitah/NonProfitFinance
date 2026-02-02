@@ -28,8 +28,16 @@
     {
         if (firstRender)
         {
-            currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
-            StateHasChanged();
+            try
+            {
+                currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.getTheme()");
+                StateHasChanged();
+            }
+            catch
+            {
+                // Fallback if theme manager not loaded yet
+                currentTheme = "light";
+            }
         }
     }
 
@@ -45,9 +53,18 @@
 
     private async Task ToggleTheme()
     {
-        currentTheme = currentTheme == "light" ? "dark" : "light";
-        await JS.InvokeVoidAsync("themeManager.setTheme", currentTheme);
-        StateHasChanged();
+        try
+        {
+            currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.toggle()");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Theme toggle error: {ex.Message}");
+            // Fallback: toggle locally
+            currentTheme = currentTheme == "light" ? "dark" : "light";
+            StateHasChanged();
+        }
     }
 
     private async Task OnTransactionSaved()
