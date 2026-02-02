@@ -5,17 +5,16 @@ services:
     image: nonprofit-finance:latest
     container_name: nonprofit-finance
     ports:
-      - "7171:8080"
+      - "${PORT:-7171}:8080"
+    env_file:
+      - .env
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Data Source=/app/data/NonProfitFinance.db
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING:-Data Source=/app/data/NonProfitFinance.db}
     volumes:
-      # Persist database
       - nonprofit-data:/app/data
-      # Persist backups
       - nonprofit-backups:/app/backups
-      # Persist uploaded documents
       - nonprofit-documents:/app/documents
     restart: unless-stopped
     healthcheck:
@@ -24,6 +23,10 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    networks:
+      - nonprofit-network
+    depends_on:
+      - nonprofit-finance
 
 volumes:
   nonprofit-data:
@@ -32,3 +35,7 @@ volumes:
     driver: local
   nonprofit-documents:
     driver: local
+
+networks:
+  nonprofit-network:
+    driver: bridge

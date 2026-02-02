@@ -361,3 +361,37 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ================================================================
+# Environment Variables & Secrets (NEVER commit)
+# ================================================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+.env.test.local
+.env.development.local
+
+# ================================================================
+# Database Files
+# ================================================================
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ================================================================
+# Docker Build Artifacts
+# ================================================================
+nonprofit-finance.tar
+docker-compose.override.yml
+
+# ================================================================
+# Backup & Log Files
+# ================================================================
+/backups/
+/logs/
+/Documents/
+*.log
+*.log.*
