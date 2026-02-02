@@ -267,17 +267,40 @@ public class ImportExportService : IImportExportService
                         }
                         else
                         {
-                            // Create new category
-                            var newCategory = new Category
+                            try
                             {
-                                Name = categoryName,
-                                Type = type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense
-                            };
-                            _context.Categories.Add(newCategory);
-                            await _context.SaveChangesAsync();
-                            categoryId = newCategory.Id;
-                            existingCategories[categoryName.ToLower()] = categoryId;
-                            createdCategories.Add(categoryName);
+                                // Create new category
+                                var newCategory = new Category
+                                {
+                                    Name = categoryName,
+                                    Type = type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense
+                                };
+                                _context.Categories.Add(newCategory);
+                                await _context.SaveChangesAsync();
+                                categoryId = newCategory.Id;
+                                existingCategories[categoryName.ToLower()] = categoryId;
+                                createdCategories.Add(categoryName);
+                            }
+                            catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("UNIQUE constraint") == true)
+                            {
+                                // Category already exists (race condition or case sensitivity issue)
+                                // Try to find it again
+                                var existingCategory = await _context.Categories
+                                    .FirstOrDefaultAsync(c => c.Name.ToLower() == categoryName.ToLower());
+                                if (existingCategory != null)
+                                {
+                                    categoryId = existingCategory.Id;
+                                    existingCategories[categoryName.ToLower()] = categoryId;
+                                    _logger.LogWarning("Row {Row}: Category '{Name}' already exists (concurrent/case mismatch), using existing ID {Id}", 
+                                        rowNumber, categoryName, categoryId);
+                                }
+                                else
+                                {
+                                    // Use default category if we still can't find it
+                                    _logger.LogError("Row {Row}: Could not resolve category '{Name}', using default", rowNumber, categoryName);
+                                    errors.Add(new ImportError(rowNumber, "Category", $"Could not create or find category '{categoryName}'", line));
+                                }
+                            }
                         }
                     }
                 }
@@ -295,21 +318,37 @@ public class ImportExportService : IImportExportService
                         }
                         else
                         {
-                            // Create new fund with default settings
-                            var newFund = new Fund
+                            try
                             {
-                                Name = fundName,
-                                Type = FundType.Unrestricted, // Default to unrestricted
-                                StartingBalance = 0,
-                                Balance = 0,
-                                IsActive = true,
-                                Description = $"Auto-created during import on {DateTime.UtcNow:yyyy-MM-dd}"
-                            };
-                            _context.Funds.Add(newFund);
-                            await _context.SaveChangesAsync();
-                            fundId = newFund.Id;
-                            existingFunds[fundName.ToLower()] = fundId.Value;
-                            _logger.LogInformation("Created new fund '{FundName}' with ID {FundId} during import", fundName, fundId);
+                                // Create new fund with default settings
+                                var newFund = new Fund
+                                {
+                                    Name = fundName,
+                                    Type = FundType.Unrestricted, // Default to unrestricted
+                                    StartingBalance = 0,
+                                    Balance = 0,
+                                    IsActive = true,
+                                    Description = $"Auto-created during import on {DateTime.UtcNow:yyyy-MM-dd}"
+                                };
+                                _context.Funds.Add(newFund);
+                                await _context.SaveChangesAsync();
+                                fundId = newFund.Id;
+                                existingFunds[fundName.ToLower()] = fundId.Value;
+                                _logger.LogInformation("Created new fund '{FundName}' with ID {FundId} during import", fundName, fundId);
+                            }
+                            catch (DbUpdateException ex) when (ex.InnerException?.Message?.Contains("UNIQUE constraint") == true)
+                            {
+                                // Fund already exists (race condition or case sensitivity issue)
+                                var existingFund = await _context.Funds
+                                    .FirstOrDefaultAsync(f => f.Name.ToLower() == fundName.ToLower());
+                                if (existingFund != null)
+                                {
+                                    fundId = existingFund.Id;
+                                    existingFunds[fundName.ToLower()] = fundId.Value;
+                                    _logger.LogWarning("Row {Row}: Fund '{Name}' already exists, using existing ID {Id}", 
+                                        rowNumber, fundName, fundId);
+                                }
+                            }
                         }
                     }
                 }

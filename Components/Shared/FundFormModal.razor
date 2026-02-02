@@ -65,11 +65,22 @@
                     <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label">Starting Balance</label>
-                            <div style="display: flex; align-items: stretch;">
-                                <span style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
-                                <InputNumber TValue="decimal?" class="form-control" @bind-Value="model.StartingBalance" 
-                                             style="border-radius: 0 6px 6px 0; flex: 1;"
-                                             placeholder="0.00" step="0.01" disabled="@IsEdit" />
+                            <div class="input-group" style="display: flex; align-items: stretch;">
+                                <span class="input-group-text" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
+                                @if (IsEdit)
+                                {
+                                    <input type="number" class="form-control" value="@model.StartingBalance" 
+                                           style="border-radius: 0 6px 6px 0; flex: 1;"
+                                           placeholder="0.00" step="0.01" disabled />
+                                }
+                                else
+                                {
+                                    <input type="number" class="form-control" 
+                                           value="@model.StartingBalance"
+                                           @onchange="@(e => model.StartingBalance = decimal.TryParse(e.Value?.ToString(), out var v) ? v : 0)"
+                                           style="border-radius: 0 6px 6px 0; flex: 1;"
+                                           placeholder="0.00" step="0.01" />
+                                }
                             </div>
                             @if (IsEdit)
                             {

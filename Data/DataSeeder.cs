@@ -472,31 +472,41 @@ public static class DataSeeder
             {
                 Name = "General Operating Fund",
                 Type = FundType.Unrestricted,
-                Description = "Main operating fund for general organizational expenses"
+                Description = "Main operating fund for general organizational expenses",
+                CreatedAt = DateTime.UtcNow,
+                RowVersion = 1
             },
             new Fund
             {
                 Name = "Equipment Fund",
                 Type = FundType.Restricted,
-                Description = "Restricted fund for equipment purchases and maintenance"
+                Description = "Restricted fund for equipment purchases and maintenance",
+                CreatedAt = DateTime.UtcNow,
+                RowVersion = 1
             },
             new Fund
             {
                 Name = "Training Fund",
                 Type = FundType.Restricted,
-                Description = "Restricted fund for training and professional development"
+                Description = "Restricted fund for training and professional development",
+                CreatedAt = DateTime.UtcNow,
+                RowVersion = 1
             },
             new Fund
             {
                 Name = "Emergency Reserve",
                 Type = FundType.Unrestricted,
-                Description = "Reserve fund for unexpected expenses and emergencies"
+                Description = "Reserve fund for unexpected expenses and emergencies",
+                CreatedAt = DateTime.UtcNow,
+                RowVersion = 1
             },
             new Fund
             {
                 Name = "Building Fund",
                 Type = FundType.Restricted,
-                Description = "Restricted fund for building improvements and capital projects"
+                Description = "Restricted fund for building improvements and capital projects",
+                CreatedAt = DateTime.UtcNow,
+                RowVersion = 1
             }
         };
     }

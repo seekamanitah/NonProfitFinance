@@ -1,6 +1,7 @@
 @page "/error"
 @page "/error/{statusCode:int}"
 @using System.Diagnostics
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>@GetPageTitle() - NonProfit Finance</PageTitle>
 
@@ -98,18 +99,31 @@
 </style>
 
 @code {
-    [Parameter]
-    public int? StatusCode { get; set; }
+[Parameter]
+public int? StatusCode { get; set; }
 
-    [CascadingParameter]
-    public HttpContext? HttpContext { get; set; }
+[CascadingParameter]
+public HttpContext? HttpContext { get; set; }
     
-    public string? RequestId { get; set; }
+public string? RequestId { get; set; }
     
-    protected override void OnInitialized()
+protected override void OnInitialized()
+{
+    RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+        
+    // Set the correct response status code to avoid infinite loop
+    var httpContext = HttpContextAccessor?.HttpContext;
+    if (httpContext != null && StatusCode.HasValue)
     {
-        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+        // Clear the response status - we're handling it
+        httpContext.Response.StatusCode = StatusCode.Value;
+        // Mark the response as started so no more redirects happen
+        if (!httpContext.Response.HasStarted)
+        {
+            // This page is intentionally handling the error
+        }
     }
+}
 
     private string GetPageTitle() => StatusCode switch
     {

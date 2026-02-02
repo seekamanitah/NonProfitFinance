@@ -27,13 +27,13 @@
 </div>
 
 <!-- Filter Bar -->
-<div class="filter-bar">
+<div class="filter-bar @(isFiltering ? "filtering" : "")">
     <div class="filter-group">
         <span class="filter-label">Date Range</span>
         <div class="d-flex gap-2">
-            <input type="date" class="form-control" @bind="filter.StartDate" style="width: 140px;" />
+            <input type="date" class="form-control" @bind="filter.StartDate" @bind:after="OnDateChanged" style="width: 140px;" />
             <span>to</span>
-            <input type="date" class="form-control" @bind="filter.EndDate" style="width: 140px;" />
+            <input type="date" class="form-control" @bind="filter.EndDate" @bind:after="OnDateChanged" style="width: 140px;" />
         </div>
     </div>
     
@@ -72,7 +72,7 @@
     <div class="filter-group">
         <span class="filter-label">Tags</span>
         <input type="text" class="form-control" placeholder="e.g., emergency, grant"
-               @bind="filter.Tags" style="width: 150px;" />
+               @bind="filter.Tags" @bind:event="oninput" @bind:after="OnTagsChanged" style="width: 150px;" />
     </div>
     
     <div class="filter-group">
@@ -83,12 +83,13 @@
     </div>
     
     <div class="filter-group" style="align-self: flex-end;">
-        <button class="btn btn-primary" @onclick="ApplyFilters">
-            <i class="fas fa-search"></i> Search
-        </button>
-        <button class="btn btn-secondary" @onclick="ClearFilters">
+        <button class="btn btn-secondary" @onclick="ClearFilters" disabled="@isFiltering">
             <i class="fas fa-times"></i> Clear
         </button>
+        @if (isFiltering)
+        {
+            <span class="spinner" style="width: 16px; height: 16px; margin-left: 8px;"></span>
+        }
     </div>
 </div>
 
@@ -285,6 +286,7 @@ private TransactionDto? selectedTransaction;
 private TransactionDto? transactionToDelete;
 private HashSet<int> expandedTransactions = new();
 private bool isLoading = true;
+private bool isFiltering = false;
 private bool showForm = false;
 private bool showDeleteConfirm = false;
 private bool isDeleting = false;
@@ -361,7 +363,10 @@ private async Task LoadTransactions()
     private async Task ApplyFilters()
     {
         filter.Page = 1;
+        isFiltering = true;
+        StateHasChanged();
         await LoadTransactions();
+        isFiltering = false;
     }
 
     private async Task OnCategoryChanged(ChangeEventArgs e)
@@ -387,6 +392,46 @@ private async Task LoadTransactions()
             filter.Type = type;
         }
         await ApplyFilters();
+    }
+
+    // Debounced date change handler
+    private void OnDateChanged()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        
+        _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            _debounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                await ApplyFilters();
+                StateHasChanged();
+            });
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    // Debounced tags change handler
+    private void OnTagsChanged()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        
+        _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            _debounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                await ApplyFilters();
+                StateHasChanged();
+            });
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
     }
 
     // MED-09 fix: Debounced search handler

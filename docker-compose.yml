@@ -2,6 +2,9 @@ version: '3.8'
 
 services:
   nonprofit-finance:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: nonprofit-finance:latest
     container_name: nonprofit-finance
     ports:
@@ -37,3 +40,4 @@ volumes:
 networks:
   nonprofit-network:
     driver: bridge
+

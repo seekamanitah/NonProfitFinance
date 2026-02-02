@@ -133,7 +133,16 @@ else
 }
 
 // Global exception handler for all environments
-app.UseStatusCodePagesWithReExecute("/error/{0}");
+// Use /error without the status code in the path to avoid loop issues
+app.UseStatusCodePages(context =>
+{
+    var statusCode = context.HttpContext.Response.StatusCode;
+    if (statusCode >= 400 && statusCode < 600)
+    {
+        context.HttpContext.Response.Redirect($"/error/{statusCode}");
+    }
+    return Task.CompletedTask;
+});
 
 // Security headers (CSP, X-Frame-Options, etc.)
 app.UseSecurityHeaders();
@@ -166,8 +175,106 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     
-    // Apply pending migrations
-    context.Database.Migrate();
+    // For fresh databases, delete if corrupted schema is detected
+    var dbPath = context.Database.GetDbConnection().DataSource;
+    
+    // Check if database file exists
+    bool needsRecreate = false;
+    if (File.Exists(dbPath))
+    {
+        try
+        {
+            // Open connection and check schema
+            await context.Database.OpenConnectionAsync();
+            
+            // Check if Funds table has RowVersion column using PRAGMA
+            var connection = context.Database.GetDbConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "PRAGMA table_info(Funds)";
+            
+            bool hasRowVersion = false;
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var columnName = reader.GetString(1); // Column name is at index 1
+                    if (columnName.Equals("RowVersion", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasRowVersion = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If Funds table exists but doesn't have RowVersion, need to recreate
+            if (!hasRowVersion)
+            {
+                // Check if Funds table exists at all
+                cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Funds'";
+                var tableExists = await cmd.ExecuteScalarAsync() != null;
+                
+                if (tableExists)
+                {
+                    needsRecreate = true;
+                    Console.WriteLine("Database schema outdated (missing RowVersion column). Recreating database...");
+                }
+            }
+            
+            await context.Database.CloseConnectionAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking database schema: {ex.Message}");
+            needsRecreate = true;
+        }
+    }
+    
+    if (needsRecreate)
+    {
+        context.Database.EnsureDeleted();
+        Console.WriteLine("Old database deleted. Creating new database with correct schema...");
+    }
+    
+    // Ensure database is created with fresh schema
+    context.Database.EnsureCreated();
+    
+    // Add missing RowVersion columns to existing tables (for databases created before this column was added)
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Funds ADD COLUMN RowVersion INTEGER NOT NULL DEFAULT 0;");
+    }
+    catch { /* Column already exists */ }
+    
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Grants ADD COLUMN RowVersion INTEGER NOT NULL DEFAULT 0;");
+    }
+    catch { /* Column already exists */ }
+    
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Transactions ADD COLUMN RowVersion INTEGER NOT NULL DEFAULT 0;");
+    }
+    catch { /* Column already exists */ }
+    
+    // Add missing Fund columns
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Funds ADD COLUMN StartingBalance REAL NOT NULL DEFAULT 0;");
+    }
+    catch { /* Column already exists */ }
+    
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Funds ADD COLUMN TargetBalance REAL;");
+    }
+    catch { /* Column already exists */ }
+    
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE Funds ADD COLUMN RestrictionExpiryDate TEXT;");
+    }
+    catch { /* Column already exists */ }
     
     // Ensure core financial tables exist (manual workaround for migration issues)
     
@@ -207,10 +314,14 @@ using (var scope = app.Services.CreateScope())
                 Name TEXT NOT NULL,
                 Type INTEGER NOT NULL,
                 Description TEXT,
+                StartingBalance REAL NOT NULL DEFAULT 0,
                 Balance REAL NOT NULL DEFAULT 0,
+                TargetBalance REAL,
                 IsActive INTEGER NOT NULL DEFAULT 1,
+                RestrictionExpiryDate TEXT,
                 CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT
+                UpdatedAt TEXT,
+                RowVersion INTEGER NOT NULL DEFAULT 0
             );
         ");
     }
@@ -264,7 +375,8 @@ using (var scope = app.Services.CreateScope())
                 Restrictions TEXT,
                 Notes TEXT,
                 CreatedAt TEXT NOT NULL,
-                UpdatedAt TEXT
+                UpdatedAt TEXT,
+                RowVersion INTEGER NOT NULL DEFAULT 0
             );
         ");
         
@@ -297,6 +409,7 @@ using (var scope = app.Services.CreateScope())
                 PONumber TEXT,
                 CreatedAt TEXT NOT NULL,
                 UpdatedAt TEXT,
+                RowVersion INTEGER NOT NULL DEFAULT 0,
                 CONSTRAINT FK_Transactions_Categories_CategoryId FOREIGN KEY (CategoryId) REFERENCES Categories (Id) ON DELETE RESTRICT,
                 CONSTRAINT FK_Transactions_Funds_FundId FOREIGN KEY (FundId) REFERENCES Funds (Id) ON DELETE SET NULL,
                 CONSTRAINT FK_Transactions_Donors_DonorId FOREIGN KEY (DonorId) REFERENCES Donors (Id) ON DELETE SET NULL,

@@ -133,13 +133,28 @@ private void HandleKeyDown(KeyboardEventArgs e)
 {
     handleKeyDownPreventDefault = false;
     
-    if (!showResults || !results.Any())
+    // Handle Escape globally
+    if (e.Key == "Escape")
     {
-        if (e.Key == "Escape")
+        ClearSearch();
+        handleKeyDownPreventDefault = true;
+        return;
+    }
+    
+    // If results aren't shown but we have a query, show results on arrow down
+    if ((!showResults || !results.Any()) && !string.IsNullOrWhiteSpace(searchQuery))
+    {
+        if (e.Key == "ArrowDown")
         {
-            ClearSearch();
+            showResults = true;
+            _ = PerformSearch();
             handleKeyDownPreventDefault = true;
         }
+        return;
+    }
+    
+    if (!showResults || !results.Any())
+    {
         return;
     }
     
@@ -166,11 +181,6 @@ private void HandleKeyDown(KeyboardEventArgs e)
             {
                 NavigateToResult(results.First());
             }
-            handleKeyDownPreventDefault = true;
-            break;
-            
-        case "Escape":
-            ClearSearch();
             handleKeyDownPreventDefault = true;
             break;
             

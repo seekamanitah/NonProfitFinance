@@ -125,9 +125,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(t => new { t.Date, t.Type }); // Composite for reports
             entity.HasIndex(t => new { t.FundId, t.Date }); // Fund balance queries
             
-            // Concurrency token for optimistic locking
+            // Concurrency token for optimistic locking - use simple version counter for SQLite
+            // Don't use IsRowVersion() as SQLite doesn't support automatic row versioning
             entity.Property(t => t.RowVersion)
-                .IsRowVersion()
+                .HasDefaultValue(0u)
                 .IsConcurrencyToken();
             
             // Soft delete query filter - excludes deleted records by default
@@ -164,9 +165,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             // Unique constraint on Fund.Name - MED-02 fix
             entity.HasIndex(f => f.Name).IsUnique();
             
-            // Concurrency token for optimistic locking (SQLite uses xmin equivalent)
+            // Concurrency token for optimistic locking - use simple version counter for SQLite
+            // Don't use IsRowVersion() as SQLite doesn't support automatic row versioning
             entity.Property(f => f.RowVersion)
-                .IsRowVersion()
+                .HasDefaultValue(0u)
                 .IsConcurrencyToken();
         });
 
@@ -197,6 +199,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(g => g.Amount).HasPrecision(18, 2);
             entity.Property(g => g.Restrictions).HasMaxLength(1000);
             entity.Property(g => g.Notes).HasMaxLength(1000);
+            
+            // Concurrency token for optimistic locking - use simple version counter for SQLite
+            entity.Property(g => g.RowVersion)
+                .HasDefaultValue(0u)
+                .IsConcurrencyToken();
             
             // Performance indexes
             entity.HasIndex(g => g.Status);
