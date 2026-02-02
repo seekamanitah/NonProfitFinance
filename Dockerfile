@@ -2,27 +2,29 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project file and restore dependencies
-COPY ["NonProfitFinance.csproj", "./"]
-RUN dotnet restore
-
-# Copy everything else and build
+# Copy all project files
 COPY . .
-RUN dotnet build -c Release -o /app/build
+
+# Restore dependencies
+RUN dotnet restore NonProfitFinance.csproj
+
+# Build the project
+RUN dotnet build NonProfitFinance.csproj -c Release -o /app/build
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish NonProfitFinance.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Install dependencies for OCR (Tesseract)
+# Install dependencies for OCR (Tesseract) and curl for health checks
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     libtesseract-dev \
     libleptonica-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy published app
