@@ -1,5 +1,7 @@
 @page "/categories"
+@using System.Web
 @inject ICategoryService CategoryService
+@inject NavigationManager Navigation
 @rendermode InteractiveServer
 
 <PageTitle>Categories - NonProfit Finance</PageTitle>
@@ -151,7 +153,29 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Check for search parameter from global search
+        var uri = new Uri(Navigation.Uri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        var searchParam = query["search"];
+        
         await LoadCategories();
+        
+        // If coming from search, find and select the matching category
+        if (!string.IsNullOrEmpty(searchParam))
+        {
+            var matchingCategory = allCategories.FirstOrDefault(c => 
+                c.Name.Contains(searchParam, StringComparison.OrdinalIgnoreCase));
+            if (matchingCategory != null)
+            {
+                // Switch to the correct tab if needed
+                if (matchingCategory.Type != activeTab)
+                {
+                    activeTab = matchingCategory.Type;
+                    await LoadCategories();
+                }
+                selectedCategory = matchingCategory;
+            }
+        }
     }
 
     private async Task LoadCategories()

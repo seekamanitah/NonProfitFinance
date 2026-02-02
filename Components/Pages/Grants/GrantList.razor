@@ -1,7 +1,9 @@
 @page "/grants"
+@using System.Web
 @inject IGrantService GrantService
 @inject IDocumentService DocumentService
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @rendermode InteractiveServer
 
 <PageTitle>Grants - NonProfit Finance</PageTitle>
@@ -155,7 +157,7 @@ else
                     </div>
                     <div class="form-group">
                         <label class="form-label">Grant Number</label>
-                        <p>@(selectedGrant.GrantNumber ?? "—")</p>
+                        <p>@(selectedGrant.GrantNumber ?? "â€”")</p>
                     </div>
                 </div>
                 
@@ -192,7 +194,7 @@ else
                     </div>
                     <div class="form-group">
                         <label class="form-label">Next Report Due</label>
-                        <p>@(selectedGrant.NextReportDueDate?.ToString("MMMM dd, yyyy") ?? "—")</p>
+                        <p>@(selectedGrant.NextReportDueDate?.ToString("MMMM dd, yyyy") ?? "â€”")</p>
                     </div>
                 </div>
                 
@@ -215,11 +217,11 @@ else
                 <div class="form-row mb-3">
                     <div class="form-group">
                         <label class="form-label">Contact Person</label>
-                        <p>@(selectedGrant.ContactPerson ?? "—")</p>
+                        <p>@(selectedGrant.ContactPerson ?? "â€”")</p>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Contact Email</label>
-                        <p>@(selectedGrant.ContactEmail ?? "—")</p>
+                        <p>@(selectedGrant.ContactEmail ?? "â€”")</p>
                     </div>
                 </div>
                 
@@ -240,7 +242,7 @@ else
                             {
                                 <tr>
                                     <td>@tx.Date.ToString("MMM dd, yyyy")</td>
-                                    <td>@(tx.Description ?? "—")</td>
+                                    <td>@(tx.Description ?? "â€”")</td>
                                     <td>@tx.CategoryName</td>
                                     <td class="text-right amount expense">@tx.Amount.ToString("C")</td>
                                 </tr>
@@ -347,6 +349,15 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Check for search parameter from global search
+        var uri = new Uri(Navigation.Uri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        var searchParam = query["search"];
+        if (!string.IsNullOrEmpty(searchParam))
+        {
+            searchTerm = searchParam;
+        }
+        
         await LoadGrants();
         expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
         upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);

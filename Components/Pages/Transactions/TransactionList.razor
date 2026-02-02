@@ -140,7 +140,16 @@
                                 }
                             </td>
                             <td>@tx.Date.ToString("MMM dd, yyyy")</td>
-                            <td>@(tx.FundName ?? "—")</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(tx.FundName))
+                                {
+                                    <span class="badge badge-info">@tx.FundName</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
                             <td>@(tx.DonorName ?? tx.Payee ?? "—")</td>
                             <td>
                                 <span class="badge @(tx.Type == TransactionType.Income ? "badge-income" : "badge-expense")">
@@ -296,6 +305,17 @@ protected override async Task OnInitializedAsync()
         
     categories = await CategoryService.GetAllAsync();
     funds = await FundService.GetAllAsync();
+    
+    // Check for search parameter from global search
+    var uri = new Uri(Navigation.Uri);
+    var query = HttpUtility.ParseQueryString(uri.Query);
+    var searchParam = query["search"];
+    if (!string.IsNullOrEmpty(searchParam))
+    {
+        filter.SearchTerm = searchParam;
+        // Expand date range to last year when coming from search
+        filter.StartDate = DateTime.Today.AddYears(-1);
+    }
         
     // Check if we're coming from a receipt OCR
     CheckForReceiptPreFill();

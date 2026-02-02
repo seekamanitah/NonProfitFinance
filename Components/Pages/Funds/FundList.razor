@@ -180,9 +180,13 @@ private async Task LoadFunds()
 private async Task RecalculateBalances()
 {
     isRecalculating = true;
+    StateHasChanged(); // Show recalculating state
+    
     await FundService.RecalculateAllBalancesAsync();
     await LoadFunds();
+    
     isRecalculating = false;
+    StateHasChanged(); // Update UI after recalculation
 }
 
     private void ShowAddForm()

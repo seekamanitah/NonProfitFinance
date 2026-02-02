@@ -30,6 +30,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ReportPreset> ReportPresets => Set<ReportPreset>();
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLineItem> BudgetLineItems => Set<BudgetLineItem>();
+    public DbSet<ImportPreset> ImportPresets => Set<ImportPreset>();
 
     // ==================== Inventory Module ====================
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();

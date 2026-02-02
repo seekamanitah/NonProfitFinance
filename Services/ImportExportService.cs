@@ -282,14 +282,35 @@ public class ImportExportService : IImportExportService
                     }
                 }
 
-                // Handle fund
+                // Handle fund - auto-create if doesn't exist
                 int? fundId = null;
                 if (mapping.FundColumn.HasValue && mapping.FundColumn.Value < columns.Length)
                 {
                     var fundName = columns[mapping.FundColumn.Value].Trim();
-                    if (!string.IsNullOrEmpty(fundName) && existingFunds.TryGetValue(fundName.ToLower(), out var fId))
+                    if (!string.IsNullOrEmpty(fundName))
                     {
-                        fundId = fId;
+                        if (existingFunds.TryGetValue(fundName.ToLower(), out var fId))
+                        {
+                            fundId = fId;
+                        }
+                        else
+                        {
+                            // Create new fund with default settings
+                            var newFund = new Fund
+                            {
+                                Name = fundName,
+                                Type = FundType.Unrestricted, // Default to unrestricted
+                                StartingBalance = 0,
+                                Balance = 0,
+                                IsActive = true,
+                                Description = $"Auto-created during import on {DateTime.UtcNow:yyyy-MM-dd}"
+                            };
+                            _context.Funds.Add(newFund);
+                            await _context.SaveChangesAsync();
+                            fundId = newFund.Id;
+                            existingFunds[fundName.ToLower()] = fundId.Value;
+                            _logger.LogInformation("Created new fund '{FundName}' with ID {FundId} during import", fundName, fundId);
+                        }
                     }
                 }
 
@@ -361,6 +382,13 @@ public class ImportExportService : IImportExportService
                 CreatedCategories = createdCategories
             }
         );
+
+        // Recalculate fund balances after import
+        if (importedRows > 0)
+        {
+            await _fundService.RecalculateAllBalancesAsync();
+            _logger.LogInformation("Fund balances recalculated after import");
+        }
 
         _logger.LogInformation(
             "CSV Import completed: {ImportedRows} imported, {SkippedRows} skipped, {ErrorCount} errors",
@@ -450,6 +478,78 @@ public class ImportExportService : IImportExportService
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    public byte[] GenerateSkippedRowsCsv(ImportResult result, ImportMappingConfig mapping)
+    {
+        var sb = new StringBuilder();
+        
+        // Generate header row based on column mapping
+        var headers = new List<string>();
+        for (int i = 0; i <= Math.Max(mapping.DateColumn, Math.Max(mapping.AmountColumn, mapping.DescriptionColumn)); i++)
+        {
+            if (i == mapping.DateColumn) headers.Add("Date");
+            else if (i == mapping.AmountColumn) headers.Add("Amount");
+            else if (i == mapping.DescriptionColumn) headers.Add("Description");
+            else if (mapping.TypeColumn.HasValue && i == mapping.TypeColumn.Value) headers.Add("Type");
+            else if (mapping.CategoryColumn.HasValue && i == mapping.CategoryColumn.Value) headers.Add("Category");
+            else if (mapping.FundColumn.HasValue && i == mapping.FundColumn.Value) headers.Add("Fund");
+            else if (mapping.DonorColumn.HasValue && i == mapping.DonorColumn.Value) headers.Add("Donor");
+            else if (mapping.PayeeColumn.HasValue && i == mapping.PayeeColumn.Value) headers.Add("Payee");
+            else if (mapping.TagsColumn.HasValue && i == mapping.TagsColumn.Value) headers.Add("Tags");
+            else headers.Add($"Column{i}");
+        }
+        
+        // Add error info columns
+        headers.Add("ERROR_REASON");
+        headers.Add("FIX_INSTRUCTIONS");
+        
+        sb.AppendLine(string.Join(",", headers));
+
+        // Add rows with errors
+        foreach (var error in result.Errors)
+        {
+            if (!string.IsNullOrEmpty(error.OriginalData))
+            {
+                // Append original data + error reason + fix instructions
+                var fixInstructions = GetFixInstructions(error.Column, error.Message);
+                sb.AppendLine($"{error.OriginalData},{EscapeCsv(error.Message)},{EscapeCsv(fixInstructions)}");
+            }
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    public byte[] GenerateErrorRowsCsv(ImportResult result, ImportMappingConfig mapping)
+    {
+        var sb = new StringBuilder();
+        
+        // Simple error summary format for manual review
+        sb.AppendLine("Row,Column,Error,Original Row Data,How to Fix");
+
+        foreach (var error in result.Errors)
+        {
+            var fixInstructions = GetFixInstructions(error.Column, error.Message);
+            sb.AppendLine($"{error.RowNumber},{EscapeCsv(error.Column)},{EscapeCsv(error.Message)},{EscapeCsv(error.OriginalData)},{EscapeCsv(fixInstructions)}");
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    private static string GetFixInstructions(string column, string errorMessage)
+    {
+        return column.ToLower() switch
+        {
+            "date" when errorMessage.Contains("Invalid date format") => 
+                "Use format: yyyy-MM-dd (e.g., 2024-01-15) or MM/dd/yyyy (e.g., 01/15/2024)",
+            "amount" when errorMessage.Contains("Invalid amount format") => 
+                "Remove currency symbols and use numbers only (e.g., 500.00). Use parentheses for expenses: (500.00)",
+            "category" when errorMessage.Contains("not found") => 
+                "Check spelling or create this category first before importing",
+            "fund" or "account" when errorMessage.Contains("not found") => 
+                "Check spelling or create this fund/account first before importing",
+            _ => "Review the error message and correct the data in this column"
+        };
     }
 
     public async Task<byte[]> ExportTransactionsToCsvAsync(TransactionFilterRequest filter)

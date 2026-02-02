@@ -232,7 +232,7 @@ private async Task PerformSearch()
                 Type = "Transaction",
                 Title = tx.Description ?? "Transaction",
                 Subtitle = $"{tx.Date:MMM d, yyyy} • {tx.Amount:C} • {tx.CategoryName}",
-                Url = $"/transactions?id={tx.Id}"
+                Url = $"/transactions?search={Uri.EscapeDataString(tx.Description ?? tx.Id.ToString())}"
             });
         }
 
@@ -245,7 +245,7 @@ private async Task PerformSearch()
                 Type = "Donor",
                 Title = donor.Name,
                 Subtitle = $"{donor.Type} • {donor.TotalContributions:C} contributed",
-                Url = $"/donors?id={donor.Id}"
+                Url = $"/donors?search={Uri.EscapeDataString(donor.Name)}"
             });
         }
 
@@ -261,7 +261,7 @@ private async Task PerformSearch()
                 Type = "Grant",
                 Title = grant.Name,
                 Subtitle = $"{grant.GrantorName} • {grant.Amount:C} • {grant.Status}",
-                Url = $"/grants?id={grant.Id}"
+                Url = $"/grants?search={Uri.EscapeDataString(grant.Name)}"
             });
         }
 
@@ -274,7 +274,7 @@ private async Task PerformSearch()
                 Type = "Category",
                 Title = cat.Name,
                 Subtitle = $"{cat.Type} category",
-                Url = $"/categories?id={cat.Id}"
+                Url = $"/categories?search={Uri.EscapeDataString(cat.Name)}"
             });
         }
 

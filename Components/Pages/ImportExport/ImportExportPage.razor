@@ -1,5 +1,6 @@
 @page "/import-export"
 @inject IImportExportService ImportExportService
+@inject IImportPresetService ImportPresetService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -27,6 +28,34 @@
                 <div class="tab @(importTab == "donors" ? "active" : "")" 
                      @onclick="SetDonorsTab">
                     Donors
+                </div>
+            </div>
+            
+            <!-- Preset Selection -->
+            <div class="form-row mb-3" style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px;">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label"><i class="fas fa-bookmark"></i> Load Preset</label>
+                    <select class="form-control" @onchange="OnPresetSelected">
+                        <option value="">-- Select a saved preset --</option>
+                        @foreach (var preset in savedPresets)
+                        {
+                            <option value="@preset.Id">
+                                @preset.Name @(preset.IsDefault ? "⭐" : "") 
+                                @(!string.IsNullOrEmpty(preset.Description) ? $"({preset.Description})" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                    <button class="btn btn-outline btn-sm" @onclick="ShowSavePresetModal" title="Save current settings as preset">
+                        <i class="fas fa-save"></i> Save Preset
+                    </button>
+                    @if (selectedPresetId.HasValue)
+                    {
+                        <button class="btn btn-outline btn-sm text-danger" @onclick="DeleteSelectedPreset" title="Delete selected preset">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    }
                 </div>
             </div>
             
@@ -74,6 +103,25 @@
                     <div class="form-group">
                         <label class="form-label">Category Column (optional)</label>
                         <input type="number" class="form-control" @bind="categoryColumn" min="0" />
+                        <small class="text-muted">Name of category</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Account Column (optional)</label>
+                        <input type="number" class="form-control" @bind="fundColumn" min="0" />
+                        <small class="text-muted">Name of fund/account</small>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Donor Column (optional)</label>
+                        <input type="number" class="form-control" @bind="donorColumn" min="0" />
+                        <small class="text-muted">Donor name for income transactions</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Payee Column (optional)</label>
+                        <input type="number" class="form-control" @bind="payeeColumn" min="0" />
+                        <small class="text-muted">Who received/paid the money</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Date Format</label>
@@ -107,29 +155,39 @@
             @* Progress Bar *@
             @if (isProcessing && importProgress != null)
             {
-                <div class="mt-3">
+                <div class="mt-3" style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 2px solid var(--primary-color);">
                     <div class="d-flex justify-between mb-1">
-                        <span class="text-muted">
-                            Processing row @importProgress.CurrentRow of @importProgress.TotalRows
+                        <span class="text-muted" style="font-weight: 600;">
+                            <i class="fas fa-spinner fa-spin"></i> Processing row @importProgress.CurrentRow of @importProgress.TotalRows
                         </span>
-                        <span class="text-muted">@GetProgressPercentage()%</span>
+                        <span class="text-muted" style="font-weight: 600; font-size: 1.1rem;">@GetProgressPercentage()%</span>
                     </div>
-                    <div class="progress" style="height: 20px;">
+                    <div class="progress" style="height: 24px; border: 1px solid var(--border-color); border-radius: 8px;">
                         <div class="progress-bar" 
                              role="progressbar" 
-                             style="width: @GetProgressPercentage()%; background-color: var(--primary-color);"
+                             style="width: @GetProgressPercentage()%; background: linear-gradient(90deg, var(--primary-color), var(--color-primary-light)); transition: width 0.3s ease;"
                              aria-valuenow="@GetProgressPercentage()" 
                              aria-valuemin="0" 
                              aria-valuemax="100">
+                            <span style="padding-left: 0.5rem; color: white; font-weight: 600; line-height: 24px;">
+                                @if (GetProgressPercentage() > 15)
+                                {
+                                    <text>@GetProgressPercentage()%</text>
+                                }
+                            </span>
                         </div>
                     </div>
-                    <div class="d-flex gap-3 mt-2 text-sm">
-                        <span class="text-success"><i class="fas fa-check"></i> Imported: @importProgress.ImportedCount</span>
-                        <span class="text-warning"><i class="fas fa-forward"></i> Skipped: @importProgress.SkippedCount</span>
+                    <div class="d-flex gap-3 mt-2" style="font-size: 0.9rem;">
+                        <span class="text-success" style="font-weight: 600;">
+                            <i class="fas fa-check-circle"></i> Imported: @importProgress.ImportedCount
+                        </span>
+                        <span class="text-warning" style="font-weight: 600;">
+                            <i class="fas fa-exclamation-triangle"></i> Skipped: @importProgress.SkippedCount
+                        </span>
                     </div>
                     @if (!string.IsNullOrEmpty(importProgress.CurrentDescription))
                     {
-                        <small class="text-muted d-block mt-1">
+                        <small class="text-muted d-block mt-2" style="font-style: italic;">
                             <i class="fas fa-file-alt"></i> @importProgress.CurrentDescription
                         </small>
                     }
@@ -150,9 +208,19 @@
                     </ul>
                     @if (importResult.Errors.Any())
                     {
-                        <button class="btn btn-sm btn-outline mt-2" @onclick="DownloadErrorReport">
-                            <i class="fas fa-download"></i> Download Error Report
-                        </button>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-sm btn-primary" @onclick="DownloadSkippedRows">
+                                <i class="fas fa-file-excel"></i> Download Skipped Rows (For Correction)
+                            </button>
+                            <button class="btn btn-sm btn-outline" @onclick="DownloadErrorSummary">
+                                <i class="fas fa-list"></i> Download Error Summary
+                            </button>
+                        </div>
+                        <small class="text-muted d-block mt-2">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Skipped Rows:</strong> Contains original data with error notes - fix and re-import.<br />
+                            <strong>Error Summary:</strong> Detailed error report for review.
+                        </small>
                     }
                 </div>
             }
@@ -302,6 +370,62 @@
     </div>
 </div>
 
+@* Save Preset Modal *@
+@if (showSavePresetModal)
+{
+    <div class="modal-backdrop" @onclick="CloseSavePresetModal">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-bookmark"></i> Save Import Preset</h3>
+                <button class="modal-close" @onclick="CloseSavePresetModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Preset Name *</label>
+                    <input type="text" class="form-control" @bind="newPresetName" 
+                           placeholder="e.g., QuickBooks Export, Bank of America CSV" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description (optional)</label>
+                    <input type="text" class="form-control" @bind="newPresetDescription" 
+                           placeholder="e.g., Monthly export from QuickBooks Online" />
+                </div>
+                <div class="form-group">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="newPresetIsDefault" />
+                        Set as default preset
+                    </label>
+                    <small class="text-muted">Default preset loads automatically when opening this page</small>
+                </div>
+                
+                <div class="alert alert-info mt-3" style="font-size: 0.85rem;">
+                    <strong>Settings to be saved:</strong>
+                    <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
+                        <li>Date Column: @dateColumn</li>
+                        <li>Amount Column: @amountColumn</li>
+                        <li>Description Column: @descriptionColumn</li>
+                        @if (typeColumn.HasValue) { <li>Type Column: @typeColumn</li> }
+                        @if (categoryColumn.HasValue) { <li>Category Column: @categoryColumn</li> }
+                        @if (fundColumn.HasValue) { <li>Account Column: @fundColumn</li> }
+                        @if (donorColumn.HasValue) { <li>Donor Column: @donorColumn</li> }
+                        @if (payeeColumn.HasValue) { <li>Payee Column: @payeeColumn</li> }
+                        <li>Has Header Row: @(hasHeaderRow ? "Yes" : "No")</li>
+                        <li>Date Format: @dateFormat</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseSavePresetModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SavePreset" disabled="@string.IsNullOrWhiteSpace(newPresetName)">
+                    <i class="fas fa-save"></i> Save Preset
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
 private string importTab = "transactions";
 private IBrowserFile? selectedFile;
@@ -311,9 +435,20 @@ private int amountColumn = 1;
 private int descriptionColumn = 2;
 private int? typeColumn = 3; // Default to column 3 (Type in exported CSV)
 private int? categoryColumn = 4; // Default to column 4 (Category in exported CSV)
+private int? fundColumn = 5; // Default to column 5 (Fund/Account in exported CSV)
+private int? donorColumn = null; // Donor column (optional)
+private int? payeeColumn = null; // Payee column (optional)
 private string dateFormat = "yyyy-MM-dd";
 private bool isProcessing = false;
 private ImportProgress? importProgress;
+
+// Preset management
+private List<ImportPreset> savedPresets = new();
+private int? selectedPresetId = null;
+private bool showSavePresetModal = false;
+private string newPresetName = "";
+private string newPresetDescription = "";
+private bool newPresetIsDefault = false;
     
 private DateTime exportStartDate = DateTime.Today.AddMonths(-1);
 private DateTime exportEndDate = DateTime.Today;
@@ -329,6 +464,13 @@ private bool CanExportExcel => exportTransactions || exportCategories || exportD
     
 private ImportResult? importResult;
 private ImportPreviewResult? previewResult;
+private ImportMappingConfig? lastMappingConfig; // Store for error report generation
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadPresetsAsync();
+    await LoadDefaultPresetAsync();
+}
 
 private void SetTransactionsTab() => importTab = "transactions";
 private void SetDonorsTab() => importTab = "donors";
@@ -357,8 +499,8 @@ private async Task PreviewImport()
 
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, null, null, null, typeColumn,
-                null, null, hasHeaderRow, dateFormat);
+                categoryColumn, fundColumn, donorColumn, null, typeColumn,
+                payeeColumn, null, hasHeaderRow, dateFormat);
 
             previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
         }
@@ -387,15 +529,18 @@ private async Task PreviewImport()
 
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, null, null, null, typeColumn,
-                null, null, hasHeaderRow, dateFormat);
+                categoryColumn, fundColumn, donorColumn, null, typeColumn,
+                payeeColumn, null, hasHeaderRow, dateFormat);
+
+            // Store mapping for error report generation
+            lastMappingConfig = mapping;
 
             // Create progress reporter that updates UI
             var progress = new Progress<ImportProgress>(async p =>
             {
                 importProgress = p;
-                // Only update UI every 10 rows to avoid overwhelming
-                if (p.CurrentRow % 10 == 0 || p.CurrentRow == p.TotalRows)
+                // Update UI every 5 rows or at completion for better visibility
+                if (p.CurrentRow % 5 == 0 || p.CurrentRow == p.TotalRows || p.CurrentRow == 1)
                 {
                     await InvokeAsync(StateHasChanged);
                 }
@@ -429,6 +574,22 @@ private async Task PreviewImport()
     {
         if (importProgress == null || importProgress.TotalRows == 0) return 0;
         return (int)((double)importProgress.CurrentRow / importProgress.TotalRows * 100);
+    }
+
+    private async Task DownloadSkippedRows()
+    {
+        if (importResult == null || !importResult.Errors.Any() || lastMappingConfig == null) return;
+        
+        var csv = ImportExportService.GenerateSkippedRowsCsv(importResult, lastMappingConfig);
+        await DownloadFile(csv, $"skipped_rows_to_fix_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
+    }
+
+    private async Task DownloadErrorSummary()
+    {
+        if (importResult == null || !importResult.Errors.Any() || lastMappingConfig == null) return;
+        
+        var csv = ImportExportService.GenerateErrorRowsCsv(importResult, lastMappingConfig);
+        await DownloadFile(csv, $"error_summary_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
     }
 
     private async Task DownloadErrorReport()
@@ -482,5 +643,107 @@ private async Task PreviewImport()
     {
         var base64 = Convert.ToBase64String(content);
         await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+    }
+
+    // ========== Preset Management ==========
+
+    private async Task LoadPresetsAsync()
+    {
+        savedPresets = await ImportPresetService.GetAllAsync(importTab);
+    }
+
+    private async Task LoadDefaultPresetAsync()
+    {
+        var defaultPreset = await ImportPresetService.GetDefaultAsync(importTab);
+        if (defaultPreset != null)
+        {
+            ApplyPreset(defaultPreset);
+            selectedPresetId = defaultPreset.Id;
+        }
+    }
+
+    private async Task OnPresetSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var presetId))
+        {
+            var preset = await ImportPresetService.GetByIdAsync(presetId);
+            if (preset != null)
+            {
+                ApplyPreset(preset);
+                selectedPresetId = presetId;
+                await ImportPresetService.UpdateLastUsedAsync(presetId);
+            }
+        }
+        else
+        {
+            selectedPresetId = null;
+        }
+    }
+
+    private void ApplyPreset(ImportPreset preset)
+    {
+        dateColumn = preset.DateColumn;
+        amountColumn = preset.AmountColumn;
+        descriptionColumn = preset.DescriptionColumn;
+        typeColumn = preset.TypeColumn;
+        categoryColumn = preset.CategoryColumn;
+        fundColumn = preset.FundColumn;
+        donorColumn = preset.DonorColumn;
+        payeeColumn = preset.PayeeColumn;
+        hasHeaderRow = preset.HasHeaderRow;
+        dateFormat = preset.DateFormat;
+        StateHasChanged();
+    }
+
+    private void ShowSavePresetModal()
+    {
+        newPresetName = "";
+        newPresetDescription = "";
+        newPresetIsDefault = false;
+        showSavePresetModal = true;
+    }
+
+    private void CloseSavePresetModal()
+    {
+        showSavePresetModal = false;
+    }
+
+    private async Task SavePreset()
+    {
+        if (string.IsNullOrWhiteSpace(newPresetName)) return;
+
+        var preset = new ImportPreset
+        {
+            Name = newPresetName.Trim(),
+            Description = string.IsNullOrWhiteSpace(newPresetDescription) ? null : newPresetDescription.Trim(),
+            ImportType = importTab,
+            DateColumn = dateColumn,
+            AmountColumn = amountColumn,
+            DescriptionColumn = descriptionColumn,
+            TypeColumn = typeColumn,
+            CategoryColumn = categoryColumn,
+            FundColumn = fundColumn,
+            DonorColumn = donorColumn,
+            PayeeColumn = payeeColumn,
+            HasHeaderRow = hasHeaderRow,
+            DateFormat = dateFormat,
+            IsDefault = newPresetIsDefault
+        };
+
+        await ImportPresetService.CreateAsync(preset);
+        await LoadPresetsAsync();
+        CloseSavePresetModal();
+        
+        // Show success message (optional - could add a toast)
+        StateHasChanged();
+    }
+
+    private async Task DeleteSelectedPreset()
+    {
+        if (!selectedPresetId.HasValue) return;
+
+        await ImportPresetService.DeleteAsync(selectedPresetId.Value);
+        selectedPresetId = null;
+        await LoadPresetsAsync();
     }
 }

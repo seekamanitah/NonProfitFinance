@@ -11,6 +11,8 @@ public interface IImportExportService
     
     // Error Report
     byte[] GenerateErrorReportCsv(ImportResult result);
+    byte[] GenerateSkippedRowsCsv(ImportResult result, ImportMappingConfig mapping);
+    byte[] GenerateErrorRowsCsv(ImportResult result, ImportMappingConfig mapping);
     
     // Export CSV
     Task<byte[]> ExportTransactionsToCsvAsync(TransactionFilterRequest filter);

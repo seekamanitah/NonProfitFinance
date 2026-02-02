@@ -1,6 +1,7 @@
 // Theme Manager for Dark/Light Mode
 const themeManager = {
     currentTheme: 'light',
+    initialized: false,
 
     init: function() {
         // Check saved theme or system preference
@@ -14,6 +15,8 @@ const themeManager = {
             }
         }
         this.applyTheme(this.currentTheme);
+        this.initialized = true;
+        return this.currentTheme;
     },
 
     getTheme: function() {
@@ -24,6 +27,7 @@ const themeManager = {
         this.currentTheme = theme;
         localStorage.setItem('theme', theme);
         this.applyTheme(theme);
+        return theme;
     },
 
     applyTheme: function(theme) {

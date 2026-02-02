@@ -533,7 +533,15 @@ namespace NonProfitFinance.Migrations
 
                     b.HasIndex("GrantId");
 
+                    b.HasIndex("IsArchived");
+
+                    b.HasIndex("OriginalFileName");
+
                     b.HasIndex("TransactionId");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("UploadedAt");
 
                     b.ToTable("Documents");
                 });
@@ -592,6 +600,8 @@ namespace NonProfitFinance.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email");
+
                     b.HasIndex("IsActive");
 
                     b.HasIndex("Name");
@@ -647,6 +657,9 @@ namespace NonProfitFinance.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Funds");
                 });
@@ -725,6 +738,74 @@ namespace NonProfitFinance.Migrations
                     b.HasIndex("Status");
 
                     b.ToTable("Grants");
+                });
+
+            modelBuilder.Entity("NonProfitFinance.Models.ImportPreset", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AmountColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CategoryColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DateColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DateFormat")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DescriptionColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DonorColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("FundColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("GrantColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("HasHeaderRow")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ImportType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PayeeColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TagsColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TypeColumn")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImportPresets");
                 });
 
             modelBuilder.Entity("NonProfitFinance.Models.Inventory.InventoryCategory", b =>
@@ -2002,13 +2083,21 @@ namespace NonProfitFinance.Migrations
 
                     b.HasIndex("IsDeleted");
 
+                    b.HasIndex("PONumber");
+
+                    b.HasIndex("Payee");
+
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("ReferenceNumber");
 
                     b.HasIndex("ToFundId");
 
                     b.HasIndex("Type");
 
                     b.HasIndex("Date", "Type");
+
+                    b.HasIndex("FundId", "Date");
 
                     b.ToTable("Transactions");
                 });

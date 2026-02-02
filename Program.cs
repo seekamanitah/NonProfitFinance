@@ -69,6 +69,7 @@ builder.Services.AddScoped<IGrantService, GrantService>();
 builder.Services.AddScoped<IFundService, FundService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IImportExportService, ImportExportService>();
+builder.Services.AddScoped<IImportPresetService, ImportPresetService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 builder.Services.AddScoped<IForm990Service, Form990Service>();

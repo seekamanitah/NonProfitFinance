@@ -785,8 +785,15 @@ protected override async Task OnInitializedAsync()
     {
         if (firstRender)
         {
-            currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
-            StateHasChanged();
+            try
+            {
+                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+                StateHasChanged();
+            }
+            catch
+            {
+                // Theme manager not available
+            }
         }
     }
 

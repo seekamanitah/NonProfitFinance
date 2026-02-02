@@ -30,13 +30,12 @@
         {
             try
             {
-                currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.getTheme()");
+                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
                 StateHasChanged();
             }
             catch
             {
-                // Fallback if theme manager not loaded yet
-                currentTheme = "light";
+                // Theme manager not loaded yet
             }
         }
     }
@@ -55,15 +54,12 @@
     {
         try
         {
-            currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.toggle()");
+            currentTheme = await JS.InvokeAsync<string>("themeManager.toggle");
             StateHasChanged();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Theme toggle error: {ex.Message}");
-            // Fallback: toggle locally
-            currentTheme = currentTheme == "light" ? "dark" : "light";
-            StateHasChanged();
         }
     }
 

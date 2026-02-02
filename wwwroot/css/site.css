@@ -124,14 +124,17 @@
     --bg-tooltip: #2a2a2a;
 }
 
-/* Light Mode (Reset if needed) */
-[data-theme="light"], :root {
-    --bg-primary: var(--color-gray-100);
-    --bg-secondary: var(--color-white);
-    --bg-card: var(--color-white);
-    --text-primary: var(--color-gray-900);
-    --text-secondary: var(--color-gray-600);
-    --border-color: var(--color-gray-300);
+/* Light Mode (explicit override when data-theme="light" is set) */
+[data-theme="light"] {
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #f1f3f5;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+    --border-light: #e9ecef;
 }
 
 /* ============================================

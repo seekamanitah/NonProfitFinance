@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <title>NonProfit Finance - Financial Management</title>
+    
+    <!-- Critical: Apply theme BEFORE any content renders to prevent flash -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) {
+                // localStorage not available
+            }
+        })();
+    </script>
+    
     <link rel="stylesheet" href="css/site.css" />
     <link rel="stylesheet" href="css/dark-mode.css" />
     <link rel="stylesheet" href="css/theme-fix.css" />
