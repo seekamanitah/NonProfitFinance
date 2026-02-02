@@ -32,7 +32,6 @@ public class PdfExportService : IPdfExportService
 
     public async Task<byte[]> GenerateFinancialReportAsync(ReportRequest request)
     {
-        var metrics = await _reportService.GetDashboardMetricsAsync();
         var filter = new ReportFilterRequest(request.StartDate, request.EndDate);
         var summary = await _reportService.GetIncomeExpenseSummaryAsync(filter);
         var trends = await _reportService.GetTrendDataAsync(request.StartDate, request.EndDate);
@@ -53,8 +52,8 @@ public class PdfExportService : IPdfExportService
                 {
                     column.Spacing(20);
 
-                    // Summary Section
-                    column.Item().Element(c => ComposeSummarySection(c, metrics, theme));
+                    // Summary Section - Use summary data, not metrics
+                    column.Item().Element(c => ComposeSummarySection(c, summary, theme));
 
                     // Income Section
                     column.Item().Element(c => ComposeCategorySection(c, "Income by Category", 
@@ -139,13 +138,13 @@ public class PdfExportService : IPdfExportService
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                             .Padding(4).Text(tx.Date.ToString("MM/dd/yyyy"));
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
-                            .Padding(4).Text(tx.Description ?? "—");
+                            .Padding(4).Text(tx.Description ?? "â€”");
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
-                            .Padding(4).Text(tx.CategoryName ?? "—");
+                            .Padding(4).Text(tx.CategoryName ?? "â€”");
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
-                            .Padding(4).Text(tx.FundName ?? "—");
+                            .Padding(4).Text(tx.FundName ?? "â€”");
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
-                            .Padding(4).Text(tx.Payee ?? tx.DonorName ?? "—");
+                            .Padding(4).Text(tx.Payee ?? tx.DonorName ?? "â€”");
                         table.Cell().Background(bgColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                             .Padding(4).Text($"{(tx.Type == Models.TransactionType.Income ? "+" : "-")}{tx.Amount:C}")
                             .FontColor(amountColor).AlignRight();
@@ -225,7 +224,7 @@ public class PdfExportService : IPdfExportService
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
                             .Text(donor.Name);
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
-                            .Text(donor.Email ?? "—");
+                            .Text(donor.Email ?? "â€”");
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
                             .Text(donor.Type.ToString());
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4)
@@ -312,7 +311,7 @@ public class PdfExportService : IPdfExportService
                         table.Cell().Background(statusColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                             .Padding(4).Text($"{grant.RemainingBalance:C}").AlignRight();
                         table.Cell().Background(statusColor).BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
-                            .Padding(4).Text(grant.EndDate?.ToString("MM/dd/yyyy") ?? "—");
+                            .Padding(4).Text(grant.EndDate?.ToString("MM/dd/yyyy") ?? "â€”");
                     }
 
                     // Totals
@@ -430,7 +429,7 @@ public class PdfExportService : IPdfExportService
         });
     }
 
-    private void ComposeSummarySection(IContainer container, DashboardMetricsDto metrics, ThemeColors theme)
+    private void ComposeSummarySection(IContainer container, IncomeExpenseSummaryDto summary, ThemeColors theme)
     {
         container.Column(column =>
         {
@@ -440,7 +439,7 @@ public class PdfExportService : IPdfExportService
                 row.RelativeItem().Background(Colors.Green.Lighten5).Padding(15).Column(col =>
                 {
                     col.Item().Text("Total Income").FontSize(10).FontColor(Colors.Grey.Darken1);
-                    col.Item().Text($"{metrics.MonthlyIncome:C}").FontSize(18).Bold().FontColor(Colors.Green.Darken2);
+                    col.Item().Text($"{summary.TotalIncome:C}").FontSize(18).Bold().FontColor(Colors.Green.Darken2);
                 });
                 
                 row.ConstantItem(10);
@@ -448,7 +447,7 @@ public class PdfExportService : IPdfExportService
                 row.RelativeItem().Background(Colors.Red.Lighten5).Padding(15).Column(col =>
                 {
                     col.Item().Text("Total Expenses").FontSize(10).FontColor(Colors.Grey.Darken1);
-                    col.Item().Text($"{metrics.MonthlyExpenses:C}").FontSize(18).Bold().FontColor(Colors.Red.Darken2);
+                    col.Item().Text($"{summary.TotalExpenses:C}").FontSize(18).Bold().FontColor(Colors.Red.Darken2);
                 });
                 
                 row.ConstantItem(10);
@@ -456,9 +455,8 @@ public class PdfExportService : IPdfExportService
                 row.RelativeItem().Background(Colors.Blue.Lighten5).Padding(15).Column(col =>
                 {
                     col.Item().Text("Net").FontSize(10).FontColor(Colors.Grey.Darken1);
-                    var net = metrics.MonthlyIncome - metrics.MonthlyExpenses;
-                    col.Item().Text($"{net:C}").FontSize(18).Bold()
-                        .FontColor(net >= 0 ? Colors.Green.Darken2 : Colors.Red.Darken2);
+                    col.Item().Text($"{summary.NetIncome:C}").FontSize(18).Bold()
+                        .FontColor(summary.NetIncome >= 0 ? Colors.Green.Darken2 : Colors.Red.Darken2);
                 });
             });
         });
