@@ -25,6 +25,9 @@
     <div class="main-content">
         <div class="main-header" role="banner">
             <GlobalSearch />
+            <button class="btn btn-icon" @onclick="ToggleTheme" title="Toggle Theme" aria-label="Toggle dark/light theme">
+                <i class="fas @(currentTheme == "dark" ? "fa-sun" : "fa-moon")" aria-hidden="true"></i>
+            </button>
             <button class="btn btn-icon" @onclick="ShowKeyboardHelp" title="Keyboard Shortcuts (Shift+?)" aria-label="Show keyboard shortcuts">
                 <i class="fas fa-keyboard" aria-hidden="true"></i>
             </button>
@@ -43,6 +46,7 @@
 @code {
 private bool sidebarCollapsed = false;
 private bool showKeyboardHelp = false;
+private string currentTheme = "light";
 
 protected override void OnInitialized()
 {
@@ -61,6 +65,10 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             try
             {
+                // Load current theme
+                currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.getTheme()");
+                StateHasChanged();
+                
                 // Initialize keyboard shortcuts
                 await KeyboardShortcuts.InitializeAsync();
                 
@@ -108,6 +116,22 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
     private void CloseKeyboardHelp()
     {
         showKeyboardHelp = false;
+    }
+
+    private async Task ToggleTheme()
+    {
+        try
+        {
+            currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.toggle()");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Theme toggle error: {ex.Message}");
+            // Fallback: toggle locally
+            currentTheme = currentTheme == "light" ? "dark" : "light";
+            StateHasChanged();
+        }
     }
 
     public void SetPageTitle(string title)
