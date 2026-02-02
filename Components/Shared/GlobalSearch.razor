@@ -1,3 +1,4 @@
+@rendermode InteractiveServer
 @inject ITransactionService TransactionService
 @inject IDonorService DonorService
 @inject IGrantService GrantService
@@ -6,47 +7,60 @@
 
 <div class="global-search">
 <div class="search-input-wrapper">
-    <i class="fas fa-search search-icon"></i>
+    <i class="fas fa-search search-icon" aria-hidden="true"></i>
     <input type="text" 
            class="search-input" 
-           placeholder="Search transactions, donors, grants... (Press Enter to open first result)" 
+           placeholder="Search... (â†‘â†“ to navigate, Enter to select)" 
            @bind="searchQuery"
            @bind:event="oninput"
            @onfocus="OnFocus"
            @onblur="OnBlur"
            @onkeydown="HandleKeyDown"
-           @onkeydown:preventDefault="@(handleKeyDownPreventDefault)" />
+           @onkeydown:preventDefault="@(handleKeyDownPreventDefault)"
+           role="combobox"
+           aria-expanded="@(showResults && results.Any())"
+           aria-controls="search-results-list"
+           aria-activedescendant="@(selectedIndex >= 0 ? $"search-result-{selectedIndex}" : "")"
+           aria-label="Search transactions, donors, grants" />
     @if (!string.IsNullOrEmpty(searchQuery))
     {
-        <button class="search-clear" @onclick="ClearSearch" @onclick:stopPropagation="true" title="Clear search (ESC)">
-            <i class="fas fa-times"></i>
+        <button class="search-clear" @onclick="ClearSearch" @onclick:stopPropagation="true" 
+                title="Clear search (ESC)" aria-label="Clear search">
+            <i class="fas fa-times" aria-hidden="true"></i>
         </button>
     }
     @if (!string.IsNullOrEmpty(searchQuery) && results.Any())
     {
-        <button class="search-button" @onclick="() => NavigateToResult(results.First())" title="Go to first result (Enter)">
-            <i class="fas fa-arrow-right"></i>
+        <button class="search-button" @onclick="() => NavigateToResult(results.First())" 
+                title="Go to first result (Enter)" aria-label="Go to first result">
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
         </button>
     }
 </div>
 
 @if (showResults && results.Any())
 {
-    <div class="search-results">
+    <div class="search-results" id="search-results-list" role="listbox">
         <div class="search-results-header">
             <small class="text-muted">
-                <i class="fas fa-info-circle"></i> 
-                Press <kbd>Enter</kbd> to open first result or click any item
+                <i class="fas fa-info-circle" aria-hidden="true"></i> 
+                <kbd>â†‘</kbd><kbd>â†“</kbd> navigate, <kbd>Enter</kbd> select, <kbd>Esc</kbd> close
             </small>
         </div>
-        @foreach (var result in results.Take(10))
+        @for (int i = 0; i < Math.Min(results.Count, 10); i++)
         {
-            <div class="search-result-item" 
+            var index = i;
+            var result = results[i];
+            <div class="search-result-item @(selectedIndex == index ? "selected" : "")" 
+                 id="search-result-@index"
                  @onclick="() => NavigateToResult(result)"
                  @onclick:stopPropagation="true"
-                 tabindex="0">
+                 @onmouseenter="() => selectedIndex = index"
+                 role="option"
+                 aria-selected="@(selectedIndex == index)"
+                 tabindex="-1">
                 <div class="result-icon">
-                    <i class="fas @GetResultIcon(result.Type)"></i>
+                    <i class="fas @GetResultIcon(result.Type)" aria-hidden="true"></i>
                 </div>
                 <div class="result-content">
                     <div class="result-title">@result.Title</div>
@@ -54,14 +68,14 @@
                 </div>
                 <div class="result-meta">
                     <span class="result-type-badge">@result.Type</span>
-                    <i class="fas fa-arrow-right result-arrow"></i>
+                    <i class="fas fa-arrow-right result-arrow" aria-hidden="true"></i>
                 </div>
             </div>
         }
         @if (results.Count > 10)
         {
             <div class="search-result-footer">
-                <small><i class="fas fa-layer-group"></i> Showing 10 of @results.Count results</small>
+                <small><i class="fas fa-layer-group" aria-hidden="true"></i> Showing 10 of @results.Count results</small>
             </div>
         }
     </div>
@@ -70,7 +84,7 @@
     {
         <div class="search-results">
             <div class="search-no-results">
-                <i class="fas fa-search"></i>
+                <i class="fas fa-search" aria-hidden="true"></i>
                 <p>No results found for "@searchQuery"</p>
             </div>
         </div>
@@ -85,6 +99,7 @@ private string searchQuery
     set
     {
         _searchQuery = value;
+        selectedIndex = -1; // Reset selection when query changes
         _ = PerformSearch(); // Trigger search when value changes
     }
 }
@@ -92,6 +107,7 @@ private List<SearchResult> results = new();
 private bool showResults = false;
 private System.Timers.Timer? debounceTimer;
 private bool handleKeyDownPreventDefault = false;
+private int selectedIndex = -1; // -1 means no selection
 
 private async Task OnFocus()
 {
@@ -108,8 +124,61 @@ private void OnBlur()
     Task.Delay(300).ContinueWith(_ => InvokeAsync(() =>
     {
         showResults = false;
+        selectedIndex = -1;
         StateHasChanged();
     }));
+}
+
+private void HandleKeyDown(KeyboardEventArgs e)
+{
+    handleKeyDownPreventDefault = false;
+    
+    if (!showResults || !results.Any())
+    {
+        if (e.Key == "Escape")
+        {
+            ClearSearch();
+            handleKeyDownPreventDefault = true;
+        }
+        return;
+    }
+    
+    var maxIndex = Math.Min(results.Count, 10) - 1;
+    
+    switch (e.Key)
+    {
+        case "ArrowDown":
+            selectedIndex = selectedIndex < maxIndex ? selectedIndex + 1 : 0;
+            handleKeyDownPreventDefault = true;
+            break;
+            
+        case "ArrowUp":
+            selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : maxIndex;
+            handleKeyDownPreventDefault = true;
+            break;
+            
+        case "Enter":
+            if (selectedIndex >= 0 && selectedIndex < results.Count)
+            {
+                NavigateToResult(results[selectedIndex]);
+            }
+            else if (results.Any())
+            {
+                NavigateToResult(results.First());
+            }
+            handleKeyDownPreventDefault = true;
+            break;
+            
+        case "Escape":
+            ClearSearch();
+            handleKeyDownPreventDefault = true;
+            break;
+            
+        case "Tab":
+            showResults = false;
+            selectedIndex = -1;
+            break;
+    }
 }
 
 private async Task PerformSearch()
@@ -162,7 +231,7 @@ private async Task PerformSearch()
             {
                 Type = "Transaction",
                 Title = tx.Description ?? "Transaction",
-                Subtitle = $"{tx.Date:MMM d, yyyy} • {tx.Amount:C} • {tx.CategoryName}",
+                Subtitle = $"{tx.Date:MMM d, yyyy} â€¢ {tx.Amount:C} â€¢ {tx.CategoryName}",
                 Url = $"/transactions?id={tx.Id}"
             });
         }
@@ -175,7 +244,7 @@ private async Task PerformSearch()
             {
                 Type = "Donor",
                 Title = donor.Name,
-                Subtitle = $"{donor.Type} • {donor.TotalContributions:C} contributed",
+                Subtitle = $"{donor.Type} â€¢ {donor.TotalContributions:C} contributed",
                 Url = $"/donors?id={donor.Id}"
             });
         }
@@ -191,7 +260,7 @@ private async Task PerformSearch()
             {
                 Type = "Grant",
                 Title = grant.Name,
-                Subtitle = $"{grant.GrantorName} • {grant.Amount:C} • {grant.Status}",
+                Subtitle = $"{grant.GrantorName} â€¢ {grant.Amount:C} â€¢ {grant.Status}",
                 Url = $"/grants?id={grant.Id}"
             });
         }
@@ -217,22 +286,8 @@ private async Task PerformSearch()
         searchQuery = "";
         results.Clear();
         showResults = false;
+        selectedIndex = -1;
         StateHasChanged();
-    }
-
-    private void HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            ClearSearch();
-        }
-        else if (e.Key == "Enter")
-        {
-            if (results.Any())
-            {
-                NavigateToResult(results.First());
-            }
-        }
     }
 
     private void NavigateToResult(SearchResult result)

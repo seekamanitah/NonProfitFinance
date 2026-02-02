@@ -3,7 +3,7 @@
 @if (IsVisible)
 {
     <div class="modal-backdrop" @onclick="OnCancel" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-desc">
-        <div class="modal" style="max-width: 400px;" @onclick:stopPropagation="true">
+        <div class="modal" style="max-width: 450px;" @onclick:stopPropagation="true">
             <div class="modal-header">
                 <h3 class="modal-title" id="confirm-dialog-title">
                     <i class="fas @IconClass @IconColorClass" aria-hidden="true"></i>
@@ -11,18 +11,29 @@
                 </h3>
             </div>
             <div class="modal-body" id="confirm-dialog-desc">
-                <p>@Message</p>
+                <p style="margin-bottom: 1rem;">@Message</p>
                 
                 @if (!string.IsNullOrEmpty(ItemName))
                 {
-                    <p class="text-muted" style="font-style: italic;">
-                        "@ItemName"
-                    </p>
+                    <div class="confirm-item-display" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border-left: 4px solid @GetBorderColor();">
+                        <small class="text-muted" style="display: block; margin-bottom: 0.25rem;">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i> You are about to @GetActionVerb():
+                        </small>
+                        <strong style="font-size: 1.1rem; color: var(--text-primary); word-break: break-word;">
+                            @ItemName
+                        </strong>
+                        @if (!string.IsNullOrEmpty(ItemDetails))
+                        {
+                            <div class="text-muted" style="font-size: 0.85rem; margin-top: 0.5rem;">
+                                @ItemDetails
+                            </div>
+                        }
+                    </div>
                 }
                 
                 @if (ShowWarning)
                 {
-                    <div class="alert alert-warning" role="alert">
+                    <div class="alert alert-warning" role="alert" style="margin-bottom: 0;">
                         <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                         @WarningMessage
                     </div>
@@ -49,54 +60,71 @@
 }
 
 @code {
-    [Parameter] public bool IsVisible { get; set; }
-    [Parameter] public string Title { get; set; } = "Confirm Action";
-    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
-    [Parameter] public string? ItemName { get; set; }
-    [Parameter] public string ConfirmText { get; set; } = "Confirm";
-    [Parameter] public string CancelText { get; set; } = "Cancel";
-    [Parameter] public ConfirmationType Type { get; set; } = ConfirmationType.Warning;
-    [Parameter] public bool ShowWarning { get; set; } = false;
-    [Parameter] public string WarningMessage { get; set; } = "This action cannot be undone.";
-    [Parameter] public bool IsProcessing { get; set; } = false;
-    [Parameter] public EventCallback OnConfirmClicked { get; set; }
-    [Parameter] public EventCallback OnCancelClicked { get; set; }
+[Parameter] public bool IsVisible { get; set; }
+[Parameter] public string Title { get; set; } = "Confirm Action";
+[Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+[Parameter] public string? ItemName { get; set; }
+[Parameter] public string? ItemDetails { get; set; }
+[Parameter] public string ConfirmText { get; set; } = "Confirm";
+[Parameter] public string CancelText { get; set; } = "Cancel";
+[Parameter] public ConfirmationType Type { get; set; } = ConfirmationType.Warning;
+[Parameter] public bool ShowWarning { get; set; } = false;
+[Parameter] public string WarningMessage { get; set; } = "This action cannot be undone.";
+[Parameter] public bool IsProcessing { get; set; } = false;
+[Parameter] public EventCallback OnConfirmClicked { get; set; }
+[Parameter] public EventCallback OnCancelClicked { get; set; }
 
-    private string IconClass => Type switch
-    {
-        ConfirmationType.Delete => "fa-trash-alt",
-        ConfirmationType.Warning => "fa-exclamation-triangle",
-        ConfirmationType.Info => "fa-info-circle",
-        ConfirmationType.Success => "fa-check-circle",
-        _ => "fa-question-circle"
-    };
+private string IconClass => Type switch
+{
+    ConfirmationType.Delete => "fa-trash-alt",
+    ConfirmationType.Warning => "fa-exclamation-triangle",
+    ConfirmationType.Info => "fa-info-circle",
+    ConfirmationType.Success => "fa-check-circle",
+    _ => "fa-question-circle"
+};
 
-    private string IconColorClass => Type switch
-    {
-        ConfirmationType.Delete => "text-danger",
-        ConfirmationType.Warning => "text-warning",
-        ConfirmationType.Info => "text-info",
-        ConfirmationType.Success => "text-success",
-        _ => ""
-    };
+private string IconColorClass => Type switch
+{
+    ConfirmationType.Delete => "text-danger",
+    ConfirmationType.Warning => "text-warning",
+    ConfirmationType.Info => "text-info",
+    ConfirmationType.Success => "text-success",
+    _ => ""
+};
 
-    private string ConfirmButtonClass => Type switch
-    {
-        ConfirmationType.Delete => "btn-danger",
-        ConfirmationType.Warning => "btn-warning",
-        _ => "btn-primary"
-    };
+private string ConfirmButtonClass => Type switch
+{
+    ConfirmationType.Delete => "btn-danger",
+    ConfirmationType.Warning => "btn-warning",
+    _ => "btn-primary"
+};
 
-    private string ConfirmIcon => Type switch
-    {
-        ConfirmationType.Delete => "fa-trash",
-        ConfirmationType.Warning => "fa-check",
-        _ => "fa-check"
-    };
+private string ConfirmIcon => Type switch
+{
+    ConfirmationType.Delete => "fa-trash",
+    ConfirmationType.Warning => "fa-check",
+    _ => "fa-check"
+};
 
-    private async Task OnConfirm()
-    {
-        await OnConfirmClicked.InvokeAsync();
+private string GetBorderColor() => Type switch
+{
+    ConfirmationType.Delete => "var(--color-danger)",
+    ConfirmationType.Warning => "var(--color-warning)",
+    ConfirmationType.Info => "var(--color-info)",
+    ConfirmationType.Success => "var(--color-success)",
+    _ => "var(--color-primary)"
+};
+
+private string GetActionVerb() => Type switch
+{
+    ConfirmationType.Delete => "delete",
+    ConfirmationType.Warning => "modify",
+    _ => "proceed with"
+};
+
+private async Task OnConfirm()
+{
+    await OnConfirmClicked.InvokeAsync();
     }
 
     private async Task OnCancel()

@@ -8,6 +8,7 @@ public class DocumentService : IDocumentService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOcrService _ocrService;
+    private readonly ILogger<DocumentService> _logger;
     private readonly string _storagePath;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -15,18 +16,67 @@ public class DocumentService : IDocumentService
         ".jpg", ".jpeg", ".png", ".gif", ".bmp",
         ".zip", ".rar"
     };
+    
+    // HIGH-07 fix: Content-type validation mapping
+    private static readonly Dictionary<string, string[]> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".pdf", new[] { "application/pdf" } },
+        { ".doc", new[] { "application/msword" } },
+        { ".docx", new[] { "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } },
+        { ".xls", new[] { "application/vnd.ms-excel" } },
+        { ".xlsx", new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } },
+        { ".csv", new[] { "text/csv", "text/plain", "application/csv" } },
+        { ".txt", new[] { "text/plain" } },
+        { ".jpg", new[] { "image/jpeg" } },
+        { ".jpeg", new[] { "image/jpeg" } },
+        { ".png", new[] { "image/png" } },
+        { ".gif", new[] { "image/gif" } },
+        { ".bmp", new[] { "image/bmp" } },
+        { ".zip", new[] { "application/zip", "application/x-zip-compressed" } },
+        { ".rar", new[] { "application/x-rar-compressed", "application/vnd.rar" } }
+    };
     private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB
 
-    public DocumentService(ApplicationDbContext context, IWebHostEnvironment environment, IOcrService ocrService)
+    public DocumentService(
+        ApplicationDbContext context, 
+        IWebHostEnvironment environment, 
+        IOcrService ocrService,
+        ILogger<DocumentService> logger)
     {
         _context = context;
         _ocrService = ocrService;
+        _logger = logger;
         _storagePath = Path.Combine(environment.ContentRootPath, "Documents");
         
         if (!Directory.Exists(_storagePath))
         {
             Directory.CreateDirectory(_storagePath);
         }
+    }
+
+    /// <summary>
+    /// Validates that the content type matches the file extension - HIGH-07 fix
+    /// </summary>
+    private bool ValidateContentType(string fileName, string contentType)
+    {
+        var extension = Path.GetExtension(fileName);
+        if (string.IsNullOrEmpty(extension)) return false;
+        
+        if (!AllowedContentTypes.TryGetValue(extension, out var allowedTypes))
+        {
+            _logger.LogWarning("Unknown file extension: {Extension}", extension);
+            return false;
+        }
+        
+        var isValid = allowedTypes.Any(t => t.Equals(contentType, StringComparison.OrdinalIgnoreCase));
+        if (!isValid)
+        {
+            _logger.LogWarning(
+                "Content type mismatch: File {FileName} has extension {Extension} but content type {ContentType}",
+                fileName, extension, contentType);
+        }
+        
+        return isValid;
     }
 
     public async Task<List<DocumentDto>> GetAllAsync(DocumentFilterRequest? filter = null)
@@ -114,11 +164,19 @@ public class DocumentService : IDocumentService
 
     public async Task<DocumentDto> UploadAsync(Stream fileStream, string fileName, string contentType, UploadDocumentRequest request)
     {
-        // Validate file
+        // Validate file extension
         var extension = Path.GetExtension(fileName);
         if (!AllowedExtensions.Contains(extension))
         {
             throw new InvalidOperationException($"File type '{extension}' is not allowed.");
+        }
+
+        // HIGH-07 fix: Validate content type matches extension
+        if (!ValidateContentType(fileName, contentType))
+        {
+            throw new InvalidOperationException(
+                $"Content type '{contentType}' does not match file extension '{extension}'. " +
+                "This may indicate a renamed file or security issue.");
         }
 
         if (fileStream.Length > MaxFileSize)

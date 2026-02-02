@@ -82,13 +82,35 @@ else if (budget != null)
         <div class="card-body">
             <div class="d-flex justify-between mb-2">
                 <strong>Overall Budget Progress</strong>
-                <span>@budget.TotalSpent.ToString("C0") / @budget.TotalBudget.ToString("C0")</span>
+                <span>
+                    @budget.TotalSpent.ToString("C0") / @budget.TotalBudget.ToString("C0")
+                    @if (budget.PercentageUsed > 100)
+                    {
+                        <span class="text-danger ml-2">
+                            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                            Over budget by @((budget.PercentageUsed - 100).ToString("N0"))%
+                        </span>
+                    }
+                </span>
             </div>
-            <div class="progress" style="height: 24px;">
+            <div class="progress" style="height: 24px; overflow: hidden; position: relative;">
                 <div class="progress-bar @GetProgressBarClass(budget.PercentageUsed)" 
-                     style="width: @Math.Min(budget.PercentageUsed, 100)%;">
+                     style="width: @Math.Min(budget.PercentageUsed, 100)%; transition: width 0.3s ease;"
+                     role="progressbar"
+                     aria-valuenow="@budget.PercentageUsed"
+                     aria-valuemin="0"
+                     aria-valuemax="100"
+                     aria-label="Budget usage: @budget.PercentageUsed.ToString("N0")%">
                     @budget.PercentageUsed.ToString("N0")%
                 </div>
+                @if (budget.PercentageUsed > 100)
+                {
+                    <!-- Visual indicator for over-budget -->
+                    <div style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); 
+                                color: white; font-size: 0.75rem; font-weight: bold;">
+                        <i class="fas fa-exclamation" aria-hidden="true"></i>
+                    </div>
+                }
             </div>
         </div>
     </div>

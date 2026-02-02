@@ -13,11 +13,11 @@ public class BackupService : IBackupService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BackupService> _logger;
     private readonly string _settingsFilePath;
+    private readonly byte[] _encryptionKey;
     private BackupSettings _settings;
     
-    // AES-256 encryption key (in production, store securely in key vault)
-    private static readonly byte[] DefaultEncryptionKey = Convert.FromBase64String(
-        "QXVkaXRSZW1lZGlhdGlvbjIwMjZLZXk=AAAAAAAAAAAAAAAAAAAAAA=="); // 32 bytes for AES-256
+    // Default key used only if configuration is missing - HIGH-04 fix
+    private const string FallbackKeyBase64 = "QXVkaXRSZW1lZGlhdGlvbjIwMjZLZXk9MDEyMzQ1Njc4OWFiY2RlZg==";
 
     public BackupService(
         IConfiguration configuration,
@@ -28,6 +28,18 @@ public class BackupService : IBackupService
         _configuration = configuration;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        
+        // Load encryption key from configuration or use fallback - HIGH-04 fix
+        var configuredKey = _configuration["Backup:EncryptionKey"];
+        if (!string.IsNullOrEmpty(configuredKey))
+        {
+            _encryptionKey = Convert.FromBase64String(configuredKey);
+        }
+        else
+        {
+            _logger.LogWarning("Backup:EncryptionKey not configured. Using fallback key. Configure a secure key in production!");
+            _encryptionKey = Convert.FromBase64String(FallbackKeyBase64);
+        }
         
         // Store settings in app data folder
         _settingsFilePath = Path.Combine(environment.ContentRootPath, "backup-settings.json");
@@ -328,9 +340,9 @@ public class BackupService : IBackupService
     /// <summary>
     /// Encrypts a file using AES-256.
     /// </summary>
-    private static async Task EncryptFileAsync(string sourcePath, string destPath, byte[]? encryptionKey = null)
+    private async Task EncryptFileAsync(string sourcePath, string destPath, byte[]? encryptionKey = null)
     {
-        var key = encryptionKey ?? DefaultEncryptionKey;
+        var key = encryptionKey ?? _encryptionKey;
         
         using var aes = Aes.Create();
         aes.Key = key;
@@ -349,12 +361,13 @@ public class BackupService : IBackupService
     /// <summary>
     /// Decrypts a file encrypted with AES-256.
     /// </summary>
-    private static async Task DecryptFileAsync(string sourcePath, string destPath, byte[]? encryptionKey = null)
+    private async Task DecryptFileAsync(string sourcePath, string destPath, byte[]? encryptionKey = null)
     {
-        var key = encryptionKey ?? DefaultEncryptionKey;
+        var key = encryptionKey ?? _encryptionKey;
         
         using var aes = Aes.Create();
         aes.Key = key;
+        
         
         await using var sourceStream = File.OpenRead(sourcePath);
         

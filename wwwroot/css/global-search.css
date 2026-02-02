@@ -134,18 +134,32 @@
     border-bottom: none;
 }
 
-.search-result-item:hover {
+.search-result-item:hover,
+.search-result-item.selected {
     background: var(--color-primary);
     color: white;
 }
 
-.search-result-item:hover .result-icon {
+.search-result-item:hover .result-icon,
+.search-result-item.selected .result-icon {
     background: rgba(255, 255, 255, 0.2);
     color: white;
 }
 
-.search-result-item:hover .result-meta {
+.search-result-item:hover .result-meta,
+.search-result-item.selected .result-meta {
     color: rgba(255, 255, 255, 0.9);
+}
+
+.search-result-item:hover .result-subtitle,
+.search-result-item.selected .result-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.search-result-item:hover .result-type-badge,
+.search-result-item.selected .result-type-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 .search-result-item:hover .result-arrow {

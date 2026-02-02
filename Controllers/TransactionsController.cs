@@ -1,14 +1,20 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NonProfitFinance.DTOs;
 using NonProfitFinance.Services;
 
 namespace NonProfitFinance.Controllers;
 
+/// <summary>
+/// API controller for transaction management.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // HIGH-06 fix: Require authorization for all endpoints
 public class TransactionsController : ControllerBase
 {
     private readonly ITransactionService _transactionService;
+    private const int MaxPageSize = 100; // HIGH-05 fix: Enforce pagination limits
 
     public TransactionsController(ITransactionService transactionService)
     {
@@ -22,6 +28,13 @@ public class TransactionsController : ControllerBase
     public async Task<ActionResult<ApiResponse<PagedResult<TransactionDto>>>> GetAll(
         [FromQuery] TransactionFilterRequest filter)
     {
+        // HIGH-05 fix: Validate pagination limits before service call
+        if (filter.PageSize > MaxPageSize)
+        {
+            return BadRequest(new ApiResponse<PagedResult<TransactionDto>>(
+                false, null, $"PageSize cannot exceed {MaxPageSize}"));
+        }
+
         var result = await _transactionService.GetAllAsync(filter);
         return Ok(new ApiResponse<PagedResult<TransactionDto>>(true, result));
     }

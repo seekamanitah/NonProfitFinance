@@ -1,11 +1,16 @@
 @inject IFundService FundService
+@inject IJSRuntime JS
 
-<div class="modal-backdrop" @onclick="Cancel">
-    <div class="modal" @onclick:stopPropagation="true">
+<div class="modal-backdrop" @onclick="Cancel" role="presentation">
+    <div class="modal" @onclick:stopPropagation="true" 
+         role="dialog" 
+         aria-modal="true" 
+         aria-labelledby="fund-modal-title"
+         @ref="modalElement">
         <div class="modal-header">
-            <h3 class="modal-title">@(IsEdit ? "Edit Fund" : "Add Fund")</h3>
-            <button class="modal-close" @onclick="Cancel">
-                <i class="fas fa-times"></i>
+            <h3 class="modal-title" id="fund-modal-title">@(IsEdit ? "Edit Fund" : "Add Fund")</h3>
+            <button class="modal-close" @onclick="Cancel" aria-label="Close dialog">
+                <i class="fas fa-times" aria-hidden="true"></i>
             </button>
         </div>
         
@@ -62,7 +67,7 @@
                             <label class="form-label">Starting Balance</label>
                             <div style="display: flex; align-items: stretch;">
                                 <span style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
-                                <InputNumber class="form-control" @bind-Value="model.StartingBalance" 
+                                <InputNumber TValue="decimal?" class="form-control" @bind-Value="model.StartingBalance" 
                                              style="border-radius: 0 6px 6px 0; flex: 1;"
                                              placeholder="0.00" step="0.01" disabled="@IsEdit" />
                             </div>
@@ -137,42 +142,52 @@
 </div>
 
 @code {
-    [Parameter] public FundDto? Fund { get; set; }
-    [Parameter] public EventCallback OnSave { get; set; }
-    [Parameter] public EventCallback OnCancel { get; set; }
+[Parameter] public FundDto? Fund { get; set; }
+[Parameter] public EventCallback OnSave { get; set; }
+[Parameter] public EventCallback OnCancel { get; set; }
 
-    private FundFormModel model = new();
-    private bool isSaving = false;
-    private string? errorMessage;
+private ElementReference modalElement;
+private FundFormModel model = new();
+private bool isSaving = false;
+private string? errorMessage;
 
-    private bool IsEdit => Fund != null;
+private bool IsEdit => Fund != null;
 
-    protected override void OnInitialized()
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
     {
-        if (Fund != null)
+        // HIGH-08 fix: Set focus to modal on open
+        await JS.InvokeVoidAsync("eval", "document.querySelector('.modal input')?.focus()");
+    }
+}
+
+protected override void OnInitialized()
+{
+    if (Fund != null)
+    {
+        model = new FundFormModel
         {
-            model = new FundFormModel
-            {
-                Name = Fund.Name,
-                Description = Fund.Description,
-                Type = Fund.Type,
-                StartingBalance = Fund.StartingBalance,
-                TargetBalance = Fund.TargetBalance,
-                IsActive = Fund.IsActive,
-                RestrictionExpiryDate = Fund.RestrictionExpiryDate
-            };
-        }
+            Name = Fund.Name,
+            Description = Fund.Description,
+            Type = Fund.Type,
+            StartingBalance = Fund.StartingBalance,
+            TargetBalance = Fund.TargetBalance,
+            IsActive = Fund.IsActive,
+            RestrictionExpiryDate = Fund.RestrictionExpiryDate
+        };
+    }
+}
+
+private async Task HandleSubmit()
+{
+    if (string.IsNullOrWhiteSpace(model.Name))
+    {
+        errorMessage = "Name is required.";
+        return;
     }
 
-    private async Task HandleSubmit()
-    {
-        if (string.IsNullOrWhiteSpace(model.Name))
-        {
-            errorMessage = "Name is required.";
-            return;
-        }
-
-        isSaving = true;
+    isSaving = true;
         errorMessage = null;
 
         try
@@ -194,7 +209,7 @@
                     model.Name!,
                     model.Type,
                     model.Description,
-                    model.StartingBalance,
+                    model.StartingBalance ?? 0m,
                     model.TargetBalance,
                     null
                 ));
@@ -222,7 +237,7 @@
         public string? Name { get; set; }
         public string? Description { get; set; }
         public FundType Type { get; set; } = FundType.Unrestricted;
-        public decimal StartingBalance { get; set; } = 0;
+        public decimal? StartingBalance { get; set; } = 0m;
         public decimal? TargetBalance { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime? RestrictionExpiryDate { get; set; }

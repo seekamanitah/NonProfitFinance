@@ -1,8 +1,47 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<div class="chart-container">
-    <canvas id="@ChartId"></canvas>
+<div class="chart-container" role="img" aria-label="@GetAccessibleDescription()">
+    <canvas id="@ChartId" aria-hidden="true"></canvas>
+    
+    <!-- Screen reader accessible data table -->
+    <div class="sr-only">
+        <h4>Pie Chart Data</h4>
+        @if (Labels.Any() && Data.Any())
+        {
+            <table>
+                <caption>Distribution breakdown</caption>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Value</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        var total = Data.Sum();
+                    }
+                    @for (int i = 0; i < Labels.Length && i < Data.Length; i++)
+                    {
+                        var percentage = total > 0 ? (Data[i] / total * 100) : 0;
+                        <tr>
+                            <td>@Labels[i]</td>
+                            <td>@Data[i].ToString("C")</td>
+                            <td>@percentage.ToString("N1")%</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><strong>Total</strong></td>
+                        <td><strong>@total.ToString("C")</strong></td>
+                        <td><strong>100%</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        }
+    </div>
 </div>
 
 @code {
@@ -56,6 +95,20 @@
                 }
             }
         });
+    }
+
+    private string GetAccessibleDescription()
+    {
+        if (!Labels.Any() || !Data.Any())
+            return "Pie chart with no data";
+        
+        var total = Data.Sum();
+        var topItems = Labels.Zip(Data, (label, value) => new { label, value })
+            .OrderByDescending(x => x.value)
+            .Take(3)
+            .Select(x => $"{x.label} ({(total > 0 ? x.value / total * 100 : 0):N0}%)");
+        
+        return $"Pie chart showing {Labels.Length} categories. Largest: {string.Join(", ", topItems)}. Total: {total:C0}";
     }
 
     public async Task UpdateData(string[] labels, decimal[] data, string[]? colors = null)

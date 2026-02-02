@@ -1,11 +1,16 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NonProfitFinance.DTOs;
 using NonProfitFinance.Services;
 
 namespace NonProfitFinance.Controllers;
 
+/// <summary>
+/// API controller for fund management.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // HIGH-06 fix: Require authorization
 public class FundsController : ControllerBase
 {
     private readonly IFundService _fundService;

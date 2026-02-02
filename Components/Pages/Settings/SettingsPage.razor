@@ -7,13 +7,33 @@
 
 <PageTitle>Settings - NonProfit Finance</PageTitle>
 
-<h2 style="margin-bottom: 1.5rem;">Settings</h2>
+<div class="d-flex justify-between align-center" style="margin-bottom: 1.5rem;">
+    <h2 style="margin: 0;">Settings</h2>
+    
+    <!-- Quick navigation for settings sections -->
+    <nav class="settings-nav" aria-label="Settings sections">
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-sm btn-outline" @onclick="@(() => ScrollToSection("organization"))">
+                <i class="fas fa-building" aria-hidden="true"></i> Organization
+            </button>
+            <button class="btn btn-sm btn-outline" @onclick="@(() => ScrollToSection("appearance"))">
+                <i class="fas fa-palette" aria-hidden="true"></i> Appearance
+            </button>
+            <button class="btn btn-sm btn-outline" @onclick="@(() => ScrollToSection("backup"))">
+                <i class="fas fa-database" aria-hidden="true"></i> Backup
+            </button>
+            <button class="btn btn-sm btn-outline" @onclick="@(() => ScrollToSection("demo"))">
+                <i class="fas fa-flask" aria-hidden="true"></i> Demo Data
+            </button>
+        </div>
+    </nav>
+</div>
 
 <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));">
     <!-- Organization Settings -->
-    <div class="card" style="grid-column: span 2;">
+    <div class="card" style="grid-column: span 2;" id="organization">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-building"></i> Organization Information</h3>
+            <h3 class="card-title"><i class="fas fa-building" aria-hidden="true"></i> Organization Information</h3>
             <p class="text-muted" style="margin: 0.25rem 0 0 0; font-size: 0.9rem;">
                 This information will appear on reports, forms, and documents
             </p>
@@ -23,7 +43,7 @@
                 <!-- Basic Information -->
                 <div class="col-md-6">
                     <h5 style="margin-bottom: 1rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem;">
-                        <i class="fas fa-info-circle"></i> Basic Information
+                        <i class="fas fa-info-circle" aria-hidden="true"></i> Basic Information
                     </h5>
                     
                     <div class="form-group">
@@ -208,9 +228,9 @@
     </div>
     
     <!-- Appearance Settings -->
-    <div class="card">
+    <div class="card" id="appearance">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-palette"></i> Appearance</h3>
+            <h3 class="card-title"><i class="fas fa-palette" aria-hidden="true"></i> Appearance</h3>
         </div>
         <div class="card-body">
             <div class="form-group">
@@ -219,12 +239,12 @@
                     <label class="d-flex align-center gap-2">
                         <input type="radio" name="theme" value="light" checked="@(currentTheme == "light")" 
                                @onclick="SetLightTheme" />
-                        <i class="fas fa-sun"></i> Light
+                        <i class="fas fa-sun" aria-hidden="true"></i> Light
                     </label>
                     <label class="d-flex align-center gap-2">
                         <input type="radio" name="theme" value="dark" checked="@(currentTheme == "dark")" 
                                @onclick="SetDarkTheme" />
-                        <i class="fas fa-moon"></i> Dark
+                        <i class="fas fa-moon" aria-hidden="true"></i> Dark
                     </label>
                 </div>
             </div>
@@ -242,8 +262,8 @@
                 <label class="form-label">Currency</label>
                 <select class="form-control" @bind="currency">
                     <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
+                    <option value="EUR">EUR (â‚¬)</option>
+                    <option value="GBP">GBP (Â£)</option>
                 </select>
             </div>
         </div>
@@ -379,9 +399,9 @@
     </div>
     
     <!-- Data Management & Backup -->
-    <div class="card">
+    <div class="card" id="backup">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-database"></i> Data Management & Backup</h3>
+            <h3 class="card-title"><i class="fas fa-database" aria-hidden="true"></i> Data Management & Backup</h3>
         </div>
         <div class="card-body">
             <!-- Backup Actions -->
@@ -561,9 +581,9 @@
     </div>
     
     <!-- Demo Data -->
-    <div class="card">
+    <div class="card" id="demo">
         <div class="card-header">
-            <h3 class="card-title"><i class="fas fa-flask"></i> Demo Data</h3>
+            <h3 class="card-title"><i class="fas fa-flask" aria-hidden="true"></i> Demo Data</h3>
         </div>
         <div class="card-body">
             <p class="text-muted">
@@ -728,6 +748,12 @@ private bool backupSuccess;
     
 // Demo Data
 private bool hasDemoData = false;
+
+// Scroll to section helper for quick navigation
+private async Task ScrollToSection(string sectionId)
+{
+    await JS.InvokeVoidAsync("eval", $"document.getElementById('{sectionId}')?.scrollIntoView({{ behavior: 'smooth', block: 'start' }})");
+}
 private bool isDemoProcessing = false;
 private string? demoMessage;
 private bool demoSuccess;

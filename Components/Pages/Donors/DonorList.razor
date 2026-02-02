@@ -9,11 +9,12 @@
     <div class="d-flex gap-3 align-center">
         <div class="form-group" style="margin-bottom: 0;">
             <input type="text" class="form-control" placeholder="Search donors..." 
-                   @bind="searchTerm" @bind:event="oninput" style="width: 250px;" />
+                   @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChanged"
+                   style="width: 250px;" aria-label="Search donors" />
         </div>
         
         <div class="form-group" style="margin-bottom: 0;">
-            <select class="form-control" @bind="typeFilter">
+            <select class="form-control" @bind="typeFilter" aria-label="Filter by donor type">
                 <option value="">All Types</option>
                 @foreach (var type in Enum.GetValues<DonorType>())
                 {
@@ -28,7 +29,7 @@
     </div>
     
     <button class="btn btn-primary" @onclick="ShowAddForm">
-        <i class="fas fa-plus"></i> Add Donor
+        <i class="fas fa-plus" aria-hidden="true"></i> Add Donor
     </button>
 </div>
 
@@ -131,17 +132,17 @@ else
                 <div class="form-row mb-3">
                     <div class="form-group">
                         <label class="form-label">Email</label>
-                        <p>@(selectedDonor.Email ?? "—")</p>
+                        <p>@(selectedDonor.Email ?? "â€”")</p>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Phone</label>
-                        <p>@(selectedDonor.Phone ?? "—")</p>
+                        <p>@(selectedDonor.Phone ?? "â€”")</p>
                     </div>
                 </div>
                 
                 <div class="form-group mb-3">
                     <label class="form-label">Address</label>
-                    <p>@(selectedDonor.Address ?? "—")</p>
+                    <p>@(selectedDonor.Address ?? "â€”")</p>
                 </div>
                 
                 @if (!string.IsNullOrEmpty(selectedDonor.Notes))
@@ -200,33 +201,51 @@ else
 }
 
 @code {
-    private List<DonorDto> donors = new();
-    private List<TransactionDto> donorContributions = new();
-    private DonorDto? selectedDonor;
-    private DonorDto? editingDonor;
-    private string searchTerm = "";
-    private DonorType? typeFilter;
-    private bool showInactive = false;
-    private bool isLoading = true;
-    private bool showForm = false;
+private List<DonorDto> donors = new();
+private List<TransactionDto> donorContributions = new();
+private DonorDto? selectedDonor;
+private DonorDto? editingDonor;
+private string searchTerm = "";
+private DonorType? typeFilter;
+private bool showInactive = false;
+private bool isLoading = true;
+private bool showForm = false;
+private System.Timers.Timer? _debounceTimer;
+private const int DebounceDelayMs = 300;
 
-    private IEnumerable<DonorDto> FilteredDonors => donors
-        .Where(d => showInactive || d.IsActive)
-        .Where(d => string.IsNullOrEmpty(searchTerm) || 
-                    d.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    (d.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
-        .Where(d => !typeFilter.HasValue || d.Type == typeFilter.Value)
-        .OrderByDescending(d => d.TotalContributions);
+private IEnumerable<DonorDto> FilteredDonors => donors
+    .Where(d => showInactive || d.IsActive)
+    .Where(d => string.IsNullOrEmpty(searchTerm) || 
+                d.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (d.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+    .Where(d => !typeFilter.HasValue || d.Type == typeFilter.Value)
+    .OrderByDescending(d => d.TotalContributions);
 
-    protected override async Task OnInitializedAsync()
+// Debounced search handler
+private void OnSearchChanged()
+{
+    _debounceTimer?.Stop();
+    _debounceTimer?.Dispose();
+        
+    _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
+    _debounceTimer.Elapsed += async (sender, args) =>
     {
-        await LoadDonors();
-    }
+        _debounceTimer?.Stop();
+        await InvokeAsync(StateHasChanged);
+    };
+    _debounceTimer.AutoReset = false;
+    _debounceTimer.Start();
+}
 
-    private async Task LoadDonors()
-    {
-        isLoading = true;
-        donors = await DonorService.GetAllAsync(includeInactive: true);
+protected override async Task OnInitializedAsync()
+{
+    await LoadDonors();
+}
+
+private async Task LoadDonors()
+{
+    isLoading = true;
+    donors = await DonorService.GetAllAsync(includeInactive: true);
         isLoading = false;
     }
 

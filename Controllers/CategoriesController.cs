@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NonProfitFinance.DTOs;
 using NonProfitFinance.Models;
@@ -5,8 +6,12 @@ using NonProfitFinance.Services;
 
 namespace NonProfitFinance.Controllers;
 
+/// <summary>
+/// API controller for category management.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // HIGH-06 fix: Require authorization
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;

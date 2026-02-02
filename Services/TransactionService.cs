@@ -187,89 +187,105 @@ public class TransactionService : ITransactionService
             {
                 // Warning only - don't prevent, but log
                 // Organizations may allow temporary negative balances
+                _logger.LogWarning("Transaction may cause negative balance for Fund {FundId}", request.FundId);
             }
         }
 
-        var transaction = new Transaction
-        {
-            Date = request.Date,
-            Amount = request.Amount,
-            Description = request.Description,
-            Type = request.Type,
-            CategoryId = request.CategoryId,
-            FundType = request.FundType,
-            FundId = request.FundId,
-            DonorId = request.DonorId,
-            GrantId = request.GrantId,
-            Payee = request.Payee,
-            Tags = request.Tags,
-            ReferenceNumber = request.ReferenceNumber,
-            PONumber = request.PONumber,
-            IsRecurring = request.IsRecurring,
-            RecurrencePattern = request.RecurrencePattern
-        };
+        // Use explicit transaction for atomicity - CRIT-04 fix
+        await using var dbTransaction = await _context.Database.BeginTransactionAsync();
 
-        // Calculate next recurrence date if recurring
-        if (request.IsRecurring && !string.IsNullOrEmpty(request.RecurrencePattern))
+        try
         {
-            transaction.NextRecurrenceDate = CalculateNextRecurrence(request.Date, request.RecurrencePattern);
-        }
-
-        _context.Transactions.Add(transaction);
-        await _context.SaveChangesAsync();
-
-        // Add splits if provided (with validation)
-        if (request.Splits?.Any() == true)
-        {
-            // Validate split amounts equal transaction total
-            var splitTotal = request.Splits.Sum(s => s.Amount);
-            if (Math.Abs(splitTotal - request.Amount) > 0.01m)
+            var transaction = new Transaction
             {
-                throw new InvalidOperationException(
-                    $"Split amounts (${splitTotal:N2}) must equal transaction amount (${request.Amount:N2})");
+                Date = request.Date,
+                Amount = request.Amount,
+                Description = request.Description,
+                Type = request.Type,
+                CategoryId = request.CategoryId,
+                FundType = request.FundType,
+                FundId = request.FundId,
+                DonorId = request.DonorId,
+                GrantId = request.GrantId,
+                Payee = request.Payee,
+                Tags = request.Tags,
+                ReferenceNumber = request.ReferenceNumber,
+                PONumber = request.PONumber,
+                IsRecurring = request.IsRecurring,
+                RecurrencePattern = request.RecurrencePattern
+            };
+
+            // Calculate next recurrence date if recurring
+            if (request.IsRecurring && !string.IsNullOrEmpty(request.RecurrencePattern))
+            {
+                transaction.NextRecurrenceDate = CalculateNextRecurrence(request.Date, request.RecurrencePattern);
+            }
+
+            _context.Transactions.Add(transaction);
+            await _context.SaveChangesAsync();
+
+            // Add splits if provided (with validation)
+            if (request.Splits?.Any() == true)
+            {
+                // Validate split amounts equal transaction total
+                var splitTotal = request.Splits.Sum(s => s.Amount);
+                if (Math.Abs(splitTotal - request.Amount) > 0.01m)
+                {
+                    throw new InvalidOperationException(
+                        $"Split amounts (${splitTotal:N2}) must equal transaction amount (${request.Amount:N2})");
             }
 
             foreach (var split in request.Splits)
-            {
-                _context.TransactionSplits.Add(new TransactionSplit
                 {
-                    TransactionId = transaction.Id,
-                    CategoryId = split.CategoryId,
-                    Amount = split.Amount,
-                    Description = split.Description
-                });
+                    _context.TransactionSplits.Add(new TransactionSplit
+                    {
+                        TransactionId = transaction.Id,
+                        CategoryId = split.CategoryId,
+                        Amount = split.Amount,
+                        Description = split.Description
+                    });
+                }
+                await _context.SaveChangesAsync();
             }
-            await _context.SaveChangesAsync();
-        }
 
-        // Update donor totals if applicable
-        if (request.DonorId.HasValue && request.Type == TransactionType.Income)
+            // Update donor totals if applicable
+            if (request.DonorId.HasValue && request.Type == TransactionType.Income)
+            {
+                await UpdateDonorTotalsAsync(request.DonorId.Value);
+            }
+
+            // Update grant usage if applicable
+            if (request.GrantId.HasValue)
+            {
+                await UpdateGrantUsageAsync(request.GrantId.Value);
+            }
+
+            // Update fund balance
+            if (request.FundId.HasValue)
+            {
+                await UpdateFundBalanceAsync(request.FundId.Value);
+            }
+
+            // Commit the transaction
+            await dbTransaction.CommitAsync();
+
+            // Audit log (outside transaction - non-critical)
+            await _auditService.LogAsync(
+                AuditAction.Create,
+                "Transaction",
+                transaction.Id,
+                $"Created {request.Type} transaction for ${request.Amount:N2}",
+                newValues: new { request.Amount, request.Type, request.CategoryId, request.FundId, request.Description }
+            );
+
+            return (await GetByIdAsync(transaction.Id))!;
+        }
+        catch (Exception ex)
         {
-            await UpdateDonorTotalsAsync(request.DonorId.Value);
+            await dbTransaction.RollbackAsync();
+            _logger.LogError(ex, "Failed to create transaction, rolling back");
+            throw;
         }
-
-        // Update grant usage if applicable
-        if (request.GrantId.HasValue)
-        {
-            await UpdateGrantUsageAsync(request.GrantId.Value);
-        }
-
-        // Update fund balance
-        if (request.FundId.HasValue)
-        {
-            await UpdateFundBalanceAsync(request.FundId.Value);
-        }
-
-        // Audit log
-        await _auditService.LogAsync(
-            AuditAction.Create,
-            "Transaction",
-            transaction.Id,
-            $"Created {request.Type} transaction for ${request.Amount:N2}",
-            newValues: new { request.Amount, request.Type, request.CategoryId, request.FundId, request.Description }
-        );
-
-        return (await GetByIdAsync(transaction.Id))!;
     }
 
     private async Task<TransactionDto> CreateTransferAsync(CreateTransactionRequest request)

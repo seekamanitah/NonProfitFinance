@@ -39,7 +39,7 @@
     
     <div class="filter-group">
         <span class="filter-label">Category</span>
-        <select class="form-control" @bind="filter.CategoryId" style="width: 180px;">
+        <select class="form-control" value="@filter.CategoryId" @onchange="OnCategoryChanged" style="width: 180px;">
             <option value="">All Categories</option>
             @foreach (var cat in categories)
             {
@@ -50,7 +50,7 @@
     
     <div class="filter-group">
         <span class="filter-label">Account</span>
-        <select class="form-control" @bind="filter.FundId" style="width: 160px;">
+        <select class="form-control" value="@filter.FundId" @onchange="OnFundChanged" style="width: 160px;">
             <option value="">All Accounts</option>
             @foreach (var fund in funds)
             {
@@ -61,12 +61,13 @@
     
     <div class="filter-group">
         <span class="filter-label">Type</span>
-        <select class="form-control" @bind="filter.Type" style="width: 120px;">
+        <select class="form-control" value="@filter.Type" @onchange="OnTypeChanged" style="width: 120px;">
             <option value="">All Types</option>
             <option value="@TransactionType.Income">Income</option>
             <option value="@TransactionType.Expense">Expense</option>
         </select>
     </div>
+    
     
     <div class="filter-group">
         <span class="filter-label">Tags</span>
@@ -77,7 +78,8 @@
     <div class="filter-group">
         <span class="filter-label">Search</span>
         <input type="text" class="form-control" placeholder="Description, payee..." 
-               @bind="filter.SearchTerm" @bind:event="oninput" style="width: 180px;" />
+               @bind="filter.SearchTerm" @bind:event="oninput" @bind:after="OnSearchTermChanged" 
+               style="width: 180px;" aria-label="Search transactions" />
     </div>
     
     <div class="filter-group" style="align-self: flex-end;">
@@ -243,10 +245,10 @@
         Transaction="selectedTransaction"
         Categories="categories"
         Funds="funds"
-        PreFillAmount="receiptData?.Amount"
-        PreFillDescription="receiptData?.Description"
-        PreFillDate="receiptData?.Date"
-        PreFillPayee="receiptData?.Payee"
+        PreFillAmount="@receiptData?.Amount"
+        PreFillDescription="@receiptData?.Description"
+        PreFillDate="@receiptData?.Date"
+        PreFillPayee="@receiptData?.Payee"
         OnSave="OnTransactionSaved"
         OnCancel="CloseForm" />
 }
@@ -282,6 +284,10 @@ private int totalPages = 1;
 
 // Receipt pre-fill data
 private ReceiptPreFillData? receiptData;
+
+// MED-09 fix: Debounce timer for search
+private System.Timers.Timer? _debounceTimer;
+private const int DebounceDelayMs = 300;
 
 protected override async Task OnInitializedAsync()
 {
@@ -336,6 +342,51 @@ private async Task LoadTransactions()
     {
         filter.Page = 1;
         await LoadTransactions();
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        filter.CategoryId = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await ApplyFilters();
+    }
+
+    private async Task OnFundChanged(ChangeEventArgs e)
+    {
+        filter.FundId = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await ApplyFilters();
+    }
+
+    private async Task OnTypeChanged(ChangeEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Value?.ToString()))
+        {
+            filter.Type = null;
+        }
+        else if (Enum.TryParse<TransactionType>(e.Value.ToString(), out var type))
+        {
+            filter.Type = type;
+        }
+        await ApplyFilters();
+    }
+
+    // MED-09 fix: Debounced search handler
+    private void OnSearchTermChanged()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+        
+        _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            _debounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                await ApplyFilters();
+                StateHasChanged();
+            });
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
     }
 
     private async Task ClearFilters()

@@ -1,11 +1,16 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NonProfitFinance.DTOs;
 using NonProfitFinance.Services;
 
 namespace NonProfitFinance.Controllers;
 
+/// <summary>
+/// API controller for report generation.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // HIGH-06 fix: Require authorization
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _reportService;

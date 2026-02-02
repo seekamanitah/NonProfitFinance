@@ -17,9 +17,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"));
     
-    // Configure command timeout (30 seconds default, prevents runaway queries)
-    options.ConfigureWarnings(warnings => warnings.Log(
-        Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted));
+    // Configure warnings - suppress pending model changes since we use manual SQL for table creation
+    options.ConfigureWarnings(warnings =>
+    {
+        warnings.Log(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.CommandExecuted);
+        // Suppress pending model changes warning - we handle schema manually via ExecuteSqlRawAsync
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning);
+    });
 });
 
 // Add ASP.NET Identity with secure cookie configuration
@@ -88,16 +92,23 @@ builder.Services.AddHostedService<RecurringTransactionHostedService>();
 // Add Health Checks
 builder.Services.AddHealthChecks();
 
-// Add Blazor Server-side rendering
+// HIGH-10 fix: Configure Blazor circuit options to hide detailed errors in production
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options =>
+    {
+        // Only show detailed errors in development
+        options.DetailedErrors = builder.Environment.IsDevelopment();
+    });
 
 // Add controllers for API
 builder.Services.AddControllers();
 
-// Add API explorer and Swagger for development
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Add API explorer and Swagger for development only - HIGH-03 fix
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+}
 
 var app = builder.Build();
 
@@ -119,6 +130,9 @@ app.UseStatusCodePagesWithReExecute("/error/{0}");
 
 // Security headers (CSP, X-Frame-Options, etc.)
 app.UseSecurityHeaders();
+
+// Rate limiting to prevent DoS attacks - HIGH-09 fix
+app.UseRateLimiting();
 
 // Request logging for API calls
 app.UseRequestLogging();

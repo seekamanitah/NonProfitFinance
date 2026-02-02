@@ -6,17 +6,35 @@
 
 <div class="d-flex justify-between align-center mb-3">
     <div class="tabs" style="border-bottom: none; margin-bottom: 0;">
-        <div class="tab @(activeTab == CategoryType.Income ? "active" : "")" 
-             @onclick="() => SwitchTab(CategoryType.Income)">
-            <i class="fas fa-arrow-down text-success"></i> Income Categories
+        <div class="tab @(activeTab == CategoryType.Income ? "active" : "") @(isLoading ? "disabled" : "")" 
+             @onclick="() => SwitchTab(CategoryType.Income)"
+             style="@(isLoading ? "pointer-events: none; opacity: 0.6;" : "")">
+            @if (isLoading && activeTab == CategoryType.Income)
+            {
+                <span class="spinner" style="width: 14px; height: 14px; margin-right: 0.5rem;"></span>
+            }
+            else
+            {
+                <i class="fas fa-arrow-down text-success"></i>
+            }
+            Income Categories
         </div>
-        <div class="tab @(activeTab == CategoryType.Expense ? "active" : "")" 
-             @onclick="() => SwitchTab(CategoryType.Expense)">
-            <i class="fas fa-arrow-up text-danger"></i> Expense Categories
+        <div class="tab @(activeTab == CategoryType.Expense ? "active" : "") @(isLoading ? "disabled" : "")" 
+             @onclick="() => SwitchTab(CategoryType.Expense)"
+             style="@(isLoading ? "pointer-events: none; opacity: 0.6;" : "")">
+            @if (isLoading && activeTab == CategoryType.Expense)
+            {
+                <span class="spinner" style="width: 14px; height: 14px; margin-right: 0.5rem;"></span>
+            }
+            else
+            {
+                <i class="fas fa-arrow-up text-danger"></i>
+            }
+            Expense Categories
         </div>
     </div>
     
-    <button class="btn btn-primary" @onclick="ShowAddForm">
+    <button class="btn btn-primary" @onclick="ShowAddForm" disabled="@isLoading">
         <i class="fas fa-plus"></i> Add Category
     </button>
 </div>

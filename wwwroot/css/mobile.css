@@ -1,0 +1,343 @@
+/* ============================================
+   Mobile Responsiveness Fixes - MED-06
+   ============================================ */
+
+/* Mobile hamburger menu toggle button */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1100;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    cursor: pointer;
+    font-size: 1.25rem;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Tablet and smaller screens */
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 220px;
+    }
+    
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-bar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .filter-group {
+        min-width: 140px;
+    }
+}
+
+/* Mobile screens */
+@media (max-width: 768px) {
+    /* Show hamburger menu button */
+    .mobile-menu-toggle {
+        display: flex;
+    }
+    
+    /* Hide sidebar by default on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+        width: 280px;
+        transition: transform 0.3s ease;
+    }
+    
+    /* Show sidebar when open */
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Overlay when sidebar is open */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+    }
+    
+    .sidebar-overlay.visible {
+        display: block;
+    }
+    
+    /* Main content takes full width */
+    .main-content {
+        margin-left: 0 !important;
+    }
+    
+    /* Adjust page content padding */
+    .page-content {
+        padding: 1rem;
+        padding-top: 4rem; /* Room for hamburger button */
+    }
+    
+    /* Stack filter bar vertically */
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        width: 100% !important;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+        width: 100% !important;
+    }
+    
+    /* Responsive tables */
+    .data-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .data-table th,
+    .data-table td {
+        min-width: 100px;
+    }
+    
+    /* Stack form rows */
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .form-row .form-group {
+        width: 100%;
+    }
+    
+    /* Responsive metric cards */
+    .metric-cards {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    
+    .metric-card {
+        padding: 1rem;
+    }
+    
+    .metric-value {
+        font-size: 1.25rem;
+    }
+    
+    /* Modal adjustments */
+    .modal {
+        width: calc(100% - 2rem);
+        max-width: none;
+        margin: 1rem;
+        max-height: calc(100vh - 2rem);
+    }
+    
+    .modal-body {
+        max-height: calc(100vh - 10rem);
+        overflow-y: auto;
+    }
+    
+    /* Button groups stack on mobile */
+    .d-flex.gap-2 {
+        flex-wrap: wrap;
+    }
+    
+    /* Page header responsive */
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .page-header .d-flex {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    
+    /* Hide non-essential columns on mobile */
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+    .metric-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .page-content {
+        padding: 0.75rem;
+        padding-top: 4rem;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    h2 {
+        font-size: 1.25rem;
+    }
+    
+    /* Full width buttons on small screens */
+    .btn-primary,
+    .btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ============================================
+   Print styles - LOW-10 fix
+   ============================================ */
+@media print {
+    /* Hide non-printable elements */
+    .sidebar,
+    .main-header,
+    .mobile-menu-toggle,
+    .filter-bar,
+    .page-header-right,
+    .nav-menu,
+    .skip-link,
+    .skip-to-content,
+    .btn:not(.btn-print),
+    .modal-backdrop,
+    .search-input-wrapper,
+    .global-search,
+    .demo-badge,
+    button[type="button"],
+    .alert-info,
+    .alert-warning:not(.print-warning) {
+        display: none !important;
+    }
+    
+    /* Reset layout for printing */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    .page-content {
+        padding: 0 !important;
+    }
+    
+    /* Ensure proper page breaks */
+    .card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        margin-bottom: 1rem;
+        box-shadow: none !important;
+        border: 1px solid #ccc;
+    }
+    
+    .card-header {
+        background: #f5f5f5 !important;
+        color: #000 !important;
+    }
+    
+    /* Tables print nicely */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    th, td {
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+        text-align: left;
+    }
+    
+    th {
+        background: #f0f0f0 !important;
+        font-weight: bold;
+    }
+    
+    /* Force black text for readability */
+    body {
+        color: #000 !important;
+        background: #fff !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #000 !important;
+        page-break-after: avoid;
+    }
+    
+    /* Show link URLs in print */
+    a[href]:after {
+        content: " (" attr(href) ")";
+        font-size: 0.8em;
+        color: #666;
+    }
+    
+    a[href^="#"]:after,
+    a[href^="javascript"]:after {
+        content: "";
+    }
+    
+    /* Metric cards print layout */
+    .metric-cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .metric-card {
+        flex: 1 1 200px;
+        border: 1px solid #ccc;
+        padding: 1rem;
+    }
+    
+    /* Charts - show placeholder message */
+    .chart-container canvas {
+        display: none !important;
+    }
+    
+    .chart-container:before {
+        content: "[Chart - See screen version for visual]";
+        display: block;
+        padding: 2rem;
+        text-align: center;
+        background: #f9f9f9;
+        border: 1px dashed #ccc;
+        color: #666;
+    }
+    
+    /* Amount colors for print */
+    .amount.income,
+    .text-success,
+    .positive {
+        color: #000 !important;
+    }
+    
+    .amount.expense,
+    .text-danger,
+    .negative {
+        color: #000 !important;
+    }
+    
+    /* Print footer with page info */
+    @page {
+        margin: 1.5cm;
+    }
+}

@@ -3,20 +3,28 @@
 <div class="tree-item @(Category.Id == SelectedId ? "selected" : "") @(Category.IsArchived ? "text-muted" : "")"
      style="padding-left: @(Level * 1.5)rem;"
      @onclick="() => OnSelect.InvokeAsync(Category)"
-     @onclick:stopPropagation="true">
+     @onclick:stopPropagation="true"
+     role="treeitem"
+     aria-expanded="@(HasChildren ? isExpanded : null)"
+     aria-selected="@(Category.Id == SelectedId)">
     
     @if (HasChildren)
     {
-        <span class="tree-toggle" @onclick="ToggleExpand" @onclick:stopPropagation="true">
-            <i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
-        </span>
+        <button class="tree-toggle" 
+                @onclick="ToggleExpand" 
+                @onclick:stopPropagation="true"
+                style="min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; 
+                       background: transparent; border: none; cursor: pointer; padding: 0; margin: -0.5rem 0;"
+                aria-label="@(isExpanded ? "Collapse" : "Expand") @Category.Name">
+            <i class="fas @(isExpanded ? "fa-chevron-down" : "fa-chevron-right")" aria-hidden="true"></i>
+        </button>
     }
     else
     {
-        <span class="tree-toggle"></span>
+        <span class="tree-toggle" style="min-width: 44px;"></span>
     }
     
-    <span class="tree-color" style="background: @(Category.Color ?? "#6c757d");"></span>
+    <span class="tree-color" style="background: @(Category.Color ?? "#6c757d");" aria-hidden="true"></span>
     
     <span class="tree-name">
         @Category.Name
@@ -26,17 +34,29 @@
         }
     </span>
     
-    <div class="tree-actions" style="margin-left: auto;" @onclick:stopPropagation="true">
-        <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnAddChild.InvokeAsync(Category)" title="Add subcategory">
-            <i class="fas fa-plus"></i>
+    <div class="tree-actions" style="margin-left: auto; display: flex; gap: 0.25rem;" @onclick:stopPropagation="true">
+        <button class="btn btn-sm btn-icon btn-outline" 
+                @onclick="() => OnAddChild.InvokeAsync(Category)" 
+                title="Add subcategory"
+                aria-label="Add subcategory to @Category.Name"
+                style="min-width: 44px; min-height: 44px;">
+            <i class="fas fa-plus" aria-hidden="true"></i>
         </button>
-        <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnEdit.InvokeAsync(Category)" title="Edit">
-            <i class="fas fa-edit"></i>
+        <button class="btn btn-sm btn-icon btn-outline" 
+                @onclick="() => OnEdit.InvokeAsync(Category)" 
+                title="Edit @Category.Name"
+                aria-label="Edit @Category.Name"
+                style="min-width: 44px; min-height: 44px;">
+            <i class="fas fa-edit" aria-hidden="true"></i>
         </button>
         @if (!Category.IsArchived)
         {
-            <button class="btn btn-sm btn-icon btn-outline" @onclick="() => OnArchive.InvokeAsync(Category)" title="Archive">
-                <i class="fas fa-archive"></i>
+            <button class="btn btn-sm btn-icon btn-outline" 
+                    @onclick="() => OnArchive.InvokeAsync(Category)" 
+                    title="Archive @Category.Name"
+                    aria-label="Archive @Category.Name"
+                    style="min-width: 44px; min-height: 44px;">
+                <i class="fas fa-archive" aria-hidden="true"></i>
             </button>
         }
     </div>

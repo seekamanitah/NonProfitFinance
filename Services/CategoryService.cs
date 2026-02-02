@@ -83,14 +83,14 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryDto> CreateAsync(CreateCategoryRequest request)
     {
-        // Validate no duplicate name at same level
+        // Validate no duplicate name at same level (case-insensitive)
         var exists = await _context.Categories.AnyAsync(c =>
             c.ParentId == request.ParentId &&
-            c.Name == request.Name &&
+            c.Name.ToLower() == request.Name.ToLower() &&
             c.Type == request.Type);
 
         if (exists)
-            throw new InvalidOperationException($"A category named '{request.Name}' already exists at this level.");
+            throw new InvalidOperationException($"A category named '{request.Name}' already exists at this level (case-insensitive).");
 
         // Validate category depth limit
         if (request.ParentId.HasValue)
@@ -144,15 +144,15 @@ public class CategoryService : ICategoryService
         var category = await _context.Categories.FindAsync(id);
         if (category == null) return null;
 
-        // Validate no duplicate name at same level (excluding self)
+        // Validate no duplicate name at same level (excluding self, case-insensitive)
         var exists = await _context.Categories.AnyAsync(c =>
             c.Id != id &&
             c.ParentId == request.ParentId &&
-            c.Name == request.Name &&
+            c.Name.ToLower() == request.Name.ToLower() &&
             c.Type == category.Type);
 
         if (exists)
-            throw new InvalidOperationException($"A category named '{request.Name}' already exists at this level.");
+            throw new InvalidOperationException($"A category named '{request.Name}' already exists at this level (case-insensitive).");
 
         // Prevent circular reference
         if (request.ParentId.HasValue)

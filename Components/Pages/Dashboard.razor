@@ -11,8 +11,9 @@
 
 <PageHeader Title="Dashboard">
     <DemoBadge />
-    <button class="btn btn-primary" @onclick="ShowQuickAdd">
-        <i class="fas fa-plus"></i> Quick Add
+    <button class="btn btn-primary btn-quick-add" @onclick="ShowQuickAdd"
+            style="font-weight: 600; padding: 0.6rem 1.25rem; box-shadow: 0 2px 8px rgba(196, 30, 58, 0.3);">
+        <i class="fas fa-plus" aria-hidden="true"></i> Quick Add Transaction
     </button>
 </PageHeader>
 
@@ -38,7 +39,7 @@ else
             <strong>Critical Deadlines:</strong>
             @foreach (var reminder in criticalReminders.Take(3))
             {
-                <span class="ml-2">• @reminder.Title (due @reminder.DueDate.ToString("MMM d"))</span>
+                <span class="ml-2">â€¢ @reminder.Title (due @reminder.DueDate.ToString("MMM d"))</span>
             }
             <a href="/compliance" class="btn btn-sm btn-outline ml-2" style="color: inherit; border-color: currentColor;">View All</a>
         </div>
@@ -142,7 +143,7 @@ else
                         {
                             <tr>
                                 <td>@tx.Date.ToString("MMM dd")</td>
-                                <td>@(tx.Description ?? tx.Payee ?? "—")</td>
+                                <td>@(tx.Description ?? tx.Payee ?? "â€”")</td>
                                 <td>@tx.CategoryName</td>
                                 <td class="text-right amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
                                     @(tx.Type == TransactionType.Income ? "+" : "-")@FormatCurrency(tx.Amount)

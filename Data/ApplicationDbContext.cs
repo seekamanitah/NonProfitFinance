@@ -115,7 +115,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(t => t.Date);
             entity.HasIndex(t => t.Type);
             entity.HasIndex(t => t.CategoryId);
+            entity.HasIndex(t => t.FundId);
+            entity.HasIndex(t => t.DonorId);
+            entity.HasIndex(t => t.GrantId);
+            entity.HasIndex(t => t.Payee);
+            entity.HasIndex(t => t.ReferenceNumber);
+            entity.HasIndex(t => t.PONumber);
             entity.HasIndex(t => new { t.Date, t.Type }); // Composite for reports
+            entity.HasIndex(t => new { t.FundId, t.Date }); // Fund balance queries
             
             // Concurrency token for optimistic locking
             entity.Property(t => t.RowVersion)
@@ -153,6 +160,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(f => f.Description).HasMaxLength(500);
             entity.Property(f => f.Balance).HasPrecision(18, 2);
             
+            // Unique constraint on Fund.Name - MED-02 fix
+            entity.HasIndex(f => f.Name).IsUnique();
+            
             // Concurrency token for optimistic locking (SQLite uses xmin equivalent)
             entity.Property(f => f.RowVersion)
                 .IsRowVersion()
@@ -174,6 +184,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.HasIndex(d => d.Name);
             entity.HasIndex(d => d.Type);
             entity.HasIndex(d => d.IsActive);
+            entity.HasIndex(d => d.Email); // HIGH-02 fix
         });
 
         // Grant
@@ -217,6 +228,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany()
                 .HasForeignKey(d => d.TransactionId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Performance indexes - HIGH-02 fix
+            entity.HasIndex(d => d.OriginalFileName);
+            entity.HasIndex(d => d.Type);
+            entity.HasIndex(d => d.UploadedAt);
+            entity.HasIndex(d => d.IsArchived);
         });
 
         // CategorizationRule

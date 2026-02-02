@@ -1,8 +1,40 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<div class="chart-container">
-    <canvas id="@ChartId"></canvas>
+<div class="chart-container" role="img" aria-label="@GetAccessibleDescription()">
+    <canvas id="@ChartId" aria-hidden="true"></canvas>
+    
+    <!-- Screen reader accessible data table -->
+    <div class="sr-only">
+        <h4>Chart Data: @(Datasets.FirstOrDefault()?.Label ?? "Line Chart")</h4>
+        @if (Labels.Any() && Datasets.Any())
+        {
+            <table>
+                <caption>Data for @(Datasets.FirstOrDefault()?.Label ?? "chart")</caption>
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        @foreach (var dataset in Datasets)
+                        {
+                            <th>@dataset.Label</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Labels.Length; i++)
+                    {
+                        <tr>
+                            <td>@Labels[i]</td>
+                            @foreach (var dataset in Datasets)
+                            {
+                                <td>@(i < dataset.Data.Length ? dataset.Data[i].ToString("N2") : "N/A")</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
 </div>
 
 @code {
@@ -45,6 +77,25 @@
         }).ToArray();
 
         await JS.InvokeVoidAsync("chartInterop.createLineChart", ChartId, Labels, datasets, new { });
+    }
+
+    private string GetAccessibleDescription()
+    {
+        if (!Labels.Any() || !Datasets.Any())
+            return "Line chart with no data";
+        
+        var descriptions = new List<string>();
+        foreach (var dataset in Datasets)
+        {
+            if (dataset.Data.Any())
+            {
+                var min = dataset.Data.Min();
+                var max = dataset.Data.Max();
+                var avg = dataset.Data.Average();
+                descriptions.Add($"{dataset.Label}: ranges from {min:N0} to {max:N0}, average {avg:N0}");
+            }
+        }
+        return $"Line chart showing {string.Join("; ", descriptions)} across {Labels.Length} periods from {Labels.First()} to {Labels.Last()}";
     }
 
     public async Task UpdateData(string[] labels, List<ChartDataset> datasets)

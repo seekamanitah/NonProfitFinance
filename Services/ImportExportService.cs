@@ -16,6 +16,8 @@ public class ImportExportService : IImportExportService
     private readonly IDonorService _donorService;
     private readonly IGrantService _grantService;
     private readonly IFundService _fundService;
+    private readonly IAuditService _auditService; // MED-05 fix: Add audit service
+    private readonly ILogger<ImportExportService> _logger;
 
     public ImportExportService(
         ApplicationDbContext context, 
@@ -23,7 +25,9 @@ public class ImportExportService : IImportExportService
         ICategoryService categoryService,
         IDonorService donorService,
         IGrantService grantService,
-        IFundService fundService)
+        IFundService fundService,
+        IAuditService auditService,
+        ILogger<ImportExportService> logger)
     {
         _context = context;
         _transactionService = transactionService;
@@ -31,6 +35,8 @@ public class ImportExportService : IImportExportService
         _donorService = donorService;
         _grantService = grantService;
         _fundService = fundService;
+        _auditService = auditService;
+        _logger = logger;
     }
 
     public async Task<ImportPreviewResult> PreviewImportAsync(Stream csvStream, ImportMappingConfig mapping)
@@ -294,6 +300,25 @@ public class ImportExportService : IImportExportService
                 skippedRows++;
             }
         }
+
+        // MED-05 fix: Audit log for bulk import
+        await _auditService.LogAsync(
+            AuditAction.Create,
+            "BulkImport",
+            0,
+            $"Imported {importedRows} transactions from CSV (Total: {totalRows}, Skipped: {skippedRows}, Errors: {errors.Count})",
+            newValues: new { 
+                TotalRows = totalRows, 
+                ImportedRows = importedRows, 
+                SkippedRows = skippedRows,
+                ErrorCount = errors.Count,
+                CreatedCategories = createdCategories
+            }
+        );
+
+        _logger.LogInformation(
+            "CSV Import completed: {ImportedRows} imported, {SkippedRows} skipped, {ErrorCount} errors",
+            importedRows, skippedRows, errors.Count);
 
         return new ImportResult(
             errors.Count == 0,

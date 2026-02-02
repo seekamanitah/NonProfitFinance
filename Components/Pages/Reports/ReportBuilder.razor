@@ -128,36 +128,47 @@
         </div>
         
         <!-- Export Options -->
-        <div class="d-flex gap-2 mt-3">
-            <div class="dropdown">
-                <button class="btn btn-outline" @onclick="ToggleExportMenu">
-                    <i class="fas fa-download"></i> Export <i class="fas fa-caret-down"></i>
+        <div class="d-flex gap-2 mt-3 align-center">
+            <div class="dropdown" style="position: relative;">
+                <button class="btn btn-outline" 
+                        @onclick="ToggleExportMenu" 
+                        disabled="@(!hasGeneratedReport)"
+                        title="@(hasGeneratedReport ? "Export report in various formats" : "Generate a report first to enable export options")"
+                        aria-expanded="@showExportMenu"
+                        aria-haspopup="true">
+                    <i class="fas fa-download" aria-hidden="true"></i> Export <i class="fas fa-caret-down" aria-hidden="true"></i>
                 </button>
+                @if (!hasGeneratedReport)
+                {
+                    <small class="text-muted d-block" style="font-size: 0.75rem; margin-top: 0.25rem;">
+                        <i class="fas fa-info-circle" aria-hidden="true"></i> Generate report first
+                    </small>
+                }
                 @if (showExportMenu)
                 {
-                    <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
-                        <button class="dropdown-item" @onclick="ExportToPdf">
-                            <i class="fas fa-file-pdf text-danger"></i> Export to PDF
+                    <div class="dropdown-menu show" style="position: absolute; z-index: 1000;" role="menu">
+                        <button class="dropdown-item" @onclick="ExportToPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Export to PDF
                         </button>
-                        <button class="dropdown-item" @onclick="ExportToExcel">
-                            <i class="fas fa-file-excel text-success"></i> Export to Excel
+                        <button class="dropdown-item" @onclick="ExportToExcel" role="menuitem">
+                            <i class="fas fa-file-excel text-success" aria-hidden="true"></i> Export to Excel
                         </button>
                         <hr style="margin: 0.5rem 0;" />
-                        <button class="dropdown-item" @onclick="ExportTransactionsPdf">
-                            <i class="fas fa-file-pdf text-danger"></i> Transaction Report (PDF)
+                        <button class="dropdown-item" @onclick="ExportTransactionsPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Transaction Report (PDF)
                         </button>
-                        <button class="dropdown-item" @onclick="ExportDonorsPdf">
-                            <i class="fas fa-file-pdf text-danger"></i> Donor Report (PDF)
+                        <button class="dropdown-item" @onclick="ExportDonorsPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Donor Report (PDF)
                         </button>
-                        <button class="dropdown-item" @onclick="ExportGrantsPdf">
-                            <i class="fas fa-file-pdf text-danger"></i> Grant Report (PDF)
+                        <button class="dropdown-item" @onclick="ExportGrantsPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Grant Report (PDF)
                         </button>
                     </div>
                 }
             </div>
             
             <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control" @bind="selectedTheme" style="width: auto;">
+                <select class="form-control" @bind="selectedTheme" style="width: auto;" aria-label="Report theme">
                     <option value="Modern">Modern Theme</option>
                     <option value="Classic">Classic Theme</option>
                     <option value="FireDepartment">Fire Dept Theme</option>
@@ -376,6 +387,7 @@ private List<TrendDataDto> trendData = new();
 private bool isLoading = false;
 private bool isExporting = false;
 private bool showExportMenu = false;
+private bool hasGeneratedReport = false;
 private string selectedTheme = "Modern";
 private List<ReportPreset> savedPresets = new();
 private bool showSavePresetDialog = false;
@@ -503,6 +515,7 @@ private async Task DownloadFile(byte[] content, string fileName, string contentT
 private async Task GenerateReport()
 {
     isLoading = true;
+    hasGeneratedReport = false;
     StateHasChanged();
 
     try
@@ -516,6 +529,7 @@ private async Task GenerateReport()
         var filter = new ReportFilterRequest(startDate, endDate, categoryId, fundId, donorId, grantId);
         summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
         trendData = await ReportService.GetTrendDataAsync(startDate, endDate, "monthly");
+        hasGeneratedReport = true;
     }
     finally
     {

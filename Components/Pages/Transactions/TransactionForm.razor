@@ -39,14 +39,30 @@
                         <div class="d-flex align-center">
                             <span class="text-muted" style="margin-right: 0.5rem;">$</span>
                             <InputNumber class="form-control" @bind-Value="model.Amount" 
-                                         min="0" step="0.01" />
+                                         min="0" step="0.01" aria-describedby="amount-help" />
                         </div>
                         <ValidationMessage For="@(() => model.Amount)" />
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Date *</label>
-                        <InputDate class="form-control" @bind-Value="model.Date" />
+                        <InputDate class="form-control" @bind-Value="model.Date" 
+                                   max="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                   aria-describedby="date-help" />
+                        @if (model.Date > DateTime.Today)
+                        {
+                            <small class="text-danger" role="alert">
+                                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                                Future dates are not allowed for transactions
+                            </small>
+                        }
+                        else if (model.Date < DateTime.Today.AddYears(-10))
+                        {
+                            <small class="text-warning">
+                                <i class="fas fa-info-circle" aria-hidden="true"></i>
+                                This date is more than 10 years ago
+                            </small>
+                        }
                         <ValidationMessage For="@(() => model.Date)" />
                     </div>
                 </div>
@@ -123,6 +139,7 @@
                                placeholder="Enter description..." />
                 </div>
                 
+                
                 <!-- Payee with Auto-complete -->
                 <div class="form-group" style="position: relative;">
                     <label class="form-label">Payee</label>
@@ -130,15 +147,23 @@
                            value="@model.Payee"
                            @oninput="OnPayeeInput"
                            @onfocus="() => showPayeeSuggestions = payeeSuggestions.Any()"
-                           @onblur="OnPayeeBlur"
-                           placeholder="Start typing to see suggestions..." />
+                           @onblur="OnPayeeBlurDelayed"
+                           placeholder="Start typing to see suggestions..."
+                           autocomplete="off" />
                     
                     @if (showPayeeSuggestions && payeeSuggestions.Any())
                     {
-                        <div class="autocomplete-dropdown">
+                        <div class="autocomplete-dropdown" role="listbox" aria-label="Payee suggestions">
                             @foreach (var suggestion in payeeSuggestions)
                             {
-                                <div class="autocomplete-item" @onmousedown="() => SelectPayee(suggestion)">
+                                <div class="autocomplete-item" 
+                                     @onmousedown="() => SelectPayee(suggestion)"
+                                     @onmousedown:preventDefault="true"
+                                     @ontouchstart="() => SelectPayee(suggestion)"
+                                     @ontouchstart:preventDefault="true"
+                                     role="option"
+                                     tabindex="-1"
+                                     style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                                     <div class="d-flex justify-between">
                                         <strong>@suggestion.Payee</strong>
                                         <small class="text-muted">@suggestion.UsageCount uses</small>
@@ -257,32 +282,45 @@
                                     </div>
                                     <div style="flex: 1;">
                                         <input type="number" class="form-control" step="0.01" 
-                                               @bind="splits[index].Amount" placeholder="Amount" />
+                                               value="@splits[index].Amount"
+                                               @oninput="e => OnSplitAmountChanged(index, e)"
+                                               placeholder="Amount"
+                                               aria-label="Split amount" />
                                     </div>
                                     <div style="flex: 2;">
                                         <input type="text" class="form-control" 
                                                @bind="splits[index].Description" placeholder="Description" />
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline text-danger" 
-                                            @onclick="() => RemoveSplit(index)" disabled="@(splits.Count <= 2)">
-                                        <i class="fas fa-times"></i>
+                                            @onclick="() => RemoveSplit(index)" disabled="@(splits.Count <= 2)"
+                                            aria-label="Remove split">
+                                        <i class="fas fa-times" aria-hidden="true"></i>
                                     </button>
                                 </div>
                             }
                             
-                            <div class="d-flex justify-between mt-2">
-                                <span class="text-muted">Total: @splits.Sum(s => s.Amount).ToString("C")</span>
-                                @if (Math.Abs(splits.Sum(s => s.Amount) - model.Amount) > 0.01m)
+                            <!-- Real-time split validation indicator -->
+                            <div class="d-flex justify-between align-center mt-2 p-2" 
+                                 style="background: @(IsSplitBalanced ? "var(--color-success)" : "var(--color-danger)"); 
+                                        background-opacity: 0.1; border-radius: 4px;">
+                                <span class="text-muted">
+                                    <strong>Split Total:</strong> @splits.Sum(s => s.Amount).ToString("C")
+                                    <span class="ml-2">|</span>
+                                    <strong class="ml-2">Transaction:</strong> @model.Amount.ToString("C")
+                                </span>
+                                @if (!IsSplitBalanced)
                                 {
-                                    <span class="text-danger">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                        Difference: @((model.Amount - splits.Sum(s => s.Amount)).ToString("C"))
+                                    <span class="text-danger" role="alert" aria-live="polite">
+                                        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                                        <strong>Difference: @SplitDifference.ToString("C")</strong>
+                                        - Splits must equal transaction amount
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="text-success">
-                                        <i class="fas fa-check"></i> Balanced
+                                    <span class="text-success" role="status">
+                                        <i class="fas fa-check-circle" aria-hidden="true"></i>
+                                        <strong>Balanced</strong>
                                     </span>
                                 }
                             </div>
@@ -339,6 +377,23 @@ private string? errorMessage;
 private System.Timers.Timer? debounceTimer;
 
 private bool IsEdit => Transaction != null;
+
+// Split validation helpers
+private bool IsSplitBalanced => !isSplitTransaction || Math.Abs(splits.Sum(s => s.Amount) - model.Amount) <= 0.01m;
+private decimal SplitDifference => model.Amount - splits.Sum(s => s.Amount);
+
+private void OnSplitAmountChanged(int index, ChangeEventArgs e)
+{
+    if (decimal.TryParse(e.Value?.ToString(), out var amount))
+    {
+        splits[index].Amount = amount;
+    }
+    else
+    {
+        splits[index].Amount = 0;
+    }
+    StateHasChanged();
+}
     
     private IEnumerable<CategoryDto> FilteredCategories => Categories
         .Where(c => c.Type == (model.Type == TransactionType.Income ? CategoryType.Income : CategoryType.Expense));
@@ -466,6 +521,7 @@ private bool IsEdit => Transaction != null;
                 model.CategoryId = suggestion.LastCategoryId.Value;
             }
         }
+        StateHasChanged();
     }
 
     private async Task OnPayeeBlur()
@@ -475,8 +531,30 @@ private bool IsEdit => Transaction != null;
         showPayeeSuggestions = false;
     }
 
+    private async Task OnPayeeBlurDelayed()
+    {
+        // Longer delay for mobile touch events to register
+        await Task.Delay(300);
+        showPayeeSuggestions = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task HandleSubmit()
     {
+        // Validate date - not in the future
+        if (model.Date > DateTime.Today)
+        {
+            errorMessage = "Transaction date cannot be in the future.";
+            return;
+        }
+        
+        // Validate date - not unreasonably old
+        if (model.Date < DateTime.Today.AddYears(-50))
+        {
+            errorMessage = "Transaction date appears to be invalid (more than 50 years ago).";
+            return;
+        }
+
         // Validate transfer
         if (model.Type == TransactionType.Transfer)
         {
