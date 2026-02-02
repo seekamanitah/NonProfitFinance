@@ -129,6 +129,11 @@ public class ImportExportService : IImportExportService
 
     public async Task<ImportResult> ImportTransactionsFromCsvAsync(Stream csvStream, ImportMappingConfig mapping)
     {
+        return await ImportTransactionsFromCsvAsync(csvStream, mapping, null);
+    }
+
+    public async Task<ImportResult> ImportTransactionsFromCsvAsync(Stream csvStream, ImportMappingConfig mapping, IProgress<ImportProgress>? progress)
+    {
         var errors = new List<ImportError>();
         var createdCategories = new List<string>();
         
@@ -148,27 +153,29 @@ public class ImportExportService : IImportExportService
         var importedRows = 0;
         var skippedRows = 0;
         var totalRows = 0;
-
-        using var reader = new StreamReader(csvStream);
-        var rowNumber = 0;
-        string? line;
-
-        while ((line = await reader.ReadLineAsync()) != null)
+        
+        // First pass: count total rows for progress reporting
+        var allLines = new List<string>();
+        using (var countReader = new StreamReader(csvStream, leaveOpen: true))
         {
-            rowNumber++;
+            string? countLine;
+            while ((countLine = await countReader.ReadLineAsync()) != null)
+            {
+                if (!string.IsNullOrWhiteSpace(countLine))
+                {
+                    allLines.Add(countLine);
+                }
+            }
+        }
+        
+        var totalDataRows = mapping.HasHeaderRow ? allLines.Count - 1 : allLines.Count;
+        var startIndex = mapping.HasHeaderRow ? 1 : 0;
+
+        for (int i = startIndex; i < allLines.Count; i++)
+        {
+            var line = allLines[i];
+            var rowNumber = i + 1;
             totalRows++;
-
-            if (rowNumber == 1 && mapping.HasHeaderRow)
-            {
-                totalRows--;
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                totalRows--;
-                continue;
-            }
 
             try
             {
@@ -177,39 +184,74 @@ public class ImportExportService : IImportExportService
                 // Parse required fields
                 if (!DateTime.TryParse(columns[mapping.DateColumn], out var date))
                 {
-                    errors.Add(new ImportError(rowNumber, "Date", "Invalid date format"));
+                    errors.Add(new ImportError(rowNumber, "Date", "Invalid date format", line));
                     skippedRows++;
+                    ReportProgress(progress, rowNumber, totalDataRows, importedRows, skippedRows, null);
                     continue;
                 }
 
-                var amountStr = columns[mapping.AmountColumn].Replace("$", "").Replace(",", "").Trim();
-                if (!decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
+                // Parse amount with support for various formats:
+                // - Parentheses for negative: (500.00) = -500
+                // - Minus sign: -500.00 = -500
+                // - Plus sign: +500.00 = 500
+                // - No sign: 500.00 = 500
+                var rawAmountStr = columns[mapping.AmountColumn].Trim();
+                var (parsedAmount, isNegativeFromFormat) = ParseAmountWithSign(rawAmountStr);
+                
+                if (!parsedAmount.HasValue)
                 {
-                    errors.Add(new ImportError(rowNumber, "Amount", "Invalid amount format"));
+                    errors.Add(new ImportError(rowNumber, "Amount", "Invalid amount format", line));
                     skippedRows++;
+                    ReportProgress(progress, rowNumber, totalDataRows, importedRows, skippedRows, null);
                     continue;
                 }
+                
+                var amount = parsedAmount.Value;
 
                 var description = mapping.DescriptionColumn < columns.Length ? columns[mapping.DescriptionColumn] : "";
 
-                // Determine transaction type
+                // Determine transaction type with fallback logic:
+                // 1. First try explicit type column
+                // 2. Fall back to amount sign (parentheses, +/- prefix)
                 var type = TransactionType.Expense;
+                var typeWasDetermined = false;
+                
                 if (mapping.TypeColumn.HasValue && mapping.TypeColumn.Value < columns.Length)
                 {
                     var typeStr = columns[mapping.TypeColumn.Value].Trim().ToLower();
-                    type = typeStr switch
+                    if (!string.IsNullOrEmpty(typeStr))
                     {
-                        "income" or "deposit" or "credit" or "i" => TransactionType.Income,
-                        "expense" or "withdrawal" or "debit" or "e" => TransactionType.Expense,
-                        "transfer" or "t" => TransactionType.Transfer,
-                        _ => amount >= 0 ? TransactionType.Income : TransactionType.Expense
-                    };
-                    _logger.LogDebug("Row {Row}: Type column value='{TypeStr}', parsed as {Type}", rowNumber, typeStr, type);
+                        var parsedType = typeStr switch
+                        {
+                            "income" or "deposit" or "credit" or "i" or "cr" => TransactionType.Income,
+                            "expense" or "withdrawal" or "debit" or "e" or "dr" => TransactionType.Expense,
+                            "transfer" or "t" or "xfer" => TransactionType.Transfer,
+                            _ => (TransactionType?)null
+                        };
+                        
+                        if (parsedType.HasValue)
+                        {
+                            type = parsedType.Value;
+                            typeWasDetermined = true;
+                            _logger.LogDebug("Row {Row}: Type from column='{TypeStr}' -> {Type}", rowNumber, typeStr, type);
+                        }
+                    }
                 }
-                else
+                
+                // Fallback: determine type from amount format (parentheses, +/- sign)
+                if (!typeWasDetermined)
                 {
-                    type = amount >= 0 ? TransactionType.Income : TransactionType.Expense;
-                    _logger.LogDebug("Row {Row}: No type column, inferred {Type} from amount {Amount}", rowNumber, type, amount);
+                    if (isNegativeFromFormat || amount < 0)
+                    {
+                        type = TransactionType.Expense;
+                        amount = Math.Abs(amount); // Normalize to positive
+                    }
+                    else
+                    {
+                        type = TransactionType.Income;
+                    }
+                    _logger.LogDebug("Row {Row}: Type inferred from amount format -> {Type} (negative={Negative})", 
+                        rowNumber, type, isNegativeFromFormat);
                 }
 
                 // Handle category
@@ -295,11 +337,13 @@ public class ImportExportService : IImportExportService
                 ));
 
                 importedRows++;
+                ReportProgress(progress, rowNumber, totalDataRows, importedRows, skippedRows, description);
             }
             catch (Exception ex)
             {
-                errors.Add(new ImportError(rowNumber, "Row", ex.Message));
+                errors.Add(new ImportError(rowNumber, "Row", ex.Message, line));
                 skippedRows++;
+                ReportProgress(progress, rowNumber, totalDataRows, importedRows, skippedRows, null);
             }
         }
 
@@ -330,6 +374,82 @@ public class ImportExportService : IImportExportService
             errors,
             createdCategories
         );
+    }
+
+    private static void ReportProgress(IProgress<ImportProgress>? progress, int currentRow, int totalRows, int imported, int skipped, string? description)
+    {
+        progress?.Report(new ImportProgress(currentRow, totalRows, imported, skipped, description));
+    }
+
+    /// <summary>
+    /// Parses an amount string with support for various formats:
+    /// - Parentheses for negative: (500.00) = -500
+    /// - Minus sign prefix: -500.00 = -500  
+    /// - Plus sign prefix: +500.00 = 500
+    /// - No sign: 500.00 = 500
+    /// - Currency symbols are stripped
+    /// </summary>
+    /// <returns>Tuple of (parsed amount, whether format indicated negative)</returns>
+    private static (decimal? Amount, bool IsNegativeFromFormat) ParseAmountWithSign(string rawAmount)
+    {
+        if (string.IsNullOrWhiteSpace(rawAmount))
+            return (null, false);
+
+        var amountStr = rawAmount.Trim();
+        var isNegativeFromFormat = false;
+
+        // Check for parentheses format: (500.00) means negative
+        if (amountStr.StartsWith('(') && amountStr.EndsWith(')'))
+        {
+            amountStr = amountStr[1..^1]; // Remove parentheses
+            isNegativeFromFormat = true;
+        }
+        // Check for explicit minus sign
+        else if (amountStr.StartsWith('-'))
+        {
+            isNegativeFromFormat = true;
+            // Keep the minus for parsing
+        }
+        // Check for explicit plus sign
+        else if (amountStr.StartsWith('+'))
+        {
+            amountStr = amountStr[1..]; // Remove plus sign
+            isNegativeFromFormat = false;
+        }
+
+        // Remove currency symbols and thousands separators
+        amountStr = amountStr
+            .Replace("$", "")
+            .Replace("€", "")
+            .Replace("£", "")
+            .Replace("¥", "")
+            .Replace(",", "")
+            .Trim();
+
+        if (decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount))
+        {
+            // If parentheses format, ensure the result is negative
+            if (isNegativeFromFormat && amount > 0)
+            {
+                amount = -amount;
+            }
+            return (amount, isNegativeFromFormat);
+        }
+
+        return (null, false);
+    }
+
+    public byte[] GenerateErrorReportCsv(ImportResult result)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Row Number,Column,Error Message,Original Data");
+
+        foreach (var error in result.Errors)
+        {
+            sb.AppendLine($"{error.RowNumber},{EscapeCsv(error.Column)},{EscapeCsv(error.Message)},{EscapeCsv(error.OriginalData)}");
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
     }
 
     public async Task<byte[]> ExportTransactionsToCsvAsync(TransactionFilterRequest filter)

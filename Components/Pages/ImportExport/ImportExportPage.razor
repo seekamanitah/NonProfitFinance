@@ -104,6 +104,38 @@
                 </div>
             }
             
+            @* Progress Bar *@
+            @if (isProcessing && importProgress != null)
+            {
+                <div class="mt-3">
+                    <div class="d-flex justify-between mb-1">
+                        <span class="text-muted">
+                            Processing row @importProgress.CurrentRow of @importProgress.TotalRows
+                        </span>
+                        <span class="text-muted">@GetProgressPercentage()%</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar" 
+                             role="progressbar" 
+                             style="width: @GetProgressPercentage()%; background-color: var(--primary-color);"
+                             aria-valuenow="@GetProgressPercentage()" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    <div class="d-flex gap-3 mt-2 text-sm">
+                        <span class="text-success"><i class="fas fa-check"></i> Imported: @importProgress.ImportedCount</span>
+                        <span class="text-warning"><i class="fas fa-forward"></i> Skipped: @importProgress.SkippedCount</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(importProgress.CurrentDescription))
+                    {
+                        <small class="text-muted d-block mt-1">
+                            <i class="fas fa-file-alt"></i> @importProgress.CurrentDescription
+                        </small>
+                    }
+                </div>
+            }
+            
             @if (importResult != null)
             {
                 <div class="alert @(importResult.Success ? "alert-success" : "alert-warning") mt-3">
@@ -116,6 +148,12 @@
                             <li>Errors: @importResult.Errors.Count</li>
                         }
                     </ul>
+                    @if (importResult.Errors.Any())
+                    {
+                        <button class="btn btn-sm btn-outline mt-2" @onclick="DownloadErrorReport">
+                            <i class="fas fa-download"></i> Download Error Report
+                        </button>
+                    }
                 </div>
             }
             
@@ -275,6 +313,7 @@ private int? typeColumn = 3; // Default to column 3 (Type in exported CSV)
 private int? categoryColumn = 4; // Default to column 4 (Category in exported CSV)
 private string dateFormat = "yyyy-MM-dd";
 private bool isProcessing = false;
+private ImportProgress? importProgress;
     
 private DateTime exportStartDate = DateTime.Today.AddMonths(-1);
 private DateTime exportEndDate = DateTime.Today;
@@ -336,6 +375,7 @@ private async Task PreviewImport()
 
         isProcessing = true;
         importResult = null;
+        importProgress = null;
         await InvokeAsync(StateHasChanged);
         
         try
@@ -350,7 +390,18 @@ private async Task PreviewImport()
                 categoryColumn, null, null, null, typeColumn,
                 null, null, hasHeaderRow, dateFormat);
 
-            importResult = await ImportExportService.ImportTransactionsFromCsvAsync(memoryStream, mapping);
+            // Create progress reporter that updates UI
+            var progress = new Progress<ImportProgress>(async p =>
+            {
+                importProgress = p;
+                // Only update UI every 10 rows to avoid overwhelming
+                if (p.CurrentRow % 10 == 0 || p.CurrentRow == p.TotalRows)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            importResult = await ImportExportService.ImportTransactionsFromCsvAsync(memoryStream, mapping, progress);
             
             // Clear preview after successful import
             if (importResult.Success || importResult.ImportedRows > 0)
@@ -369,8 +420,23 @@ private async Task PreviewImport()
         finally
         {
             isProcessing = false;
+            importProgress = null;
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private int GetProgressPercentage()
+    {
+        if (importProgress == null || importProgress.TotalRows == 0) return 0;
+        return (int)((double)importProgress.CurrentRow / importProgress.TotalRows * 100);
+    }
+
+    private async Task DownloadErrorReport()
+    {
+        if (importResult == null || !importResult.Errors.Any()) return;
+        
+        var csv = ImportExportService.GenerateErrorReportCsv(importResult);
+        await DownloadFile(csv, $"import_errors_{DateTime.Now:yyyyMMdd_HHmmss}.csv", "text/csv");
     }
 
     private async Task ExportToExcel()

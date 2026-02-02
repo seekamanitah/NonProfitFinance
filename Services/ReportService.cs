@@ -141,10 +141,13 @@ public class ReportService : IReportService
         int? grantId,
         bool includeSubcategories)
     {
+        // Convert CategoryType to TransactionType for filtering
+        var transactionType = type == CategoryType.Income ? TransactionType.Income : TransactionType.Expense;
+        
         var query = _context.Transactions
             .Include(t => t.Category)
             .Where(t => t.Date >= startDate && t.Date <= endDate)
-            .Where(t => t.Category!.Type == type);
+            .Where(t => t.Type == transactionType); // Filter by Transaction.Type, not Category.Type
 
         if (fundId.HasValue)
             query = query.Where(t => t.FundId == fundId.Value);
@@ -170,21 +173,25 @@ public class ReportService : IReportService
 
         var transactions = await query.ToListAsync();
 
-        // Group by top-level category
-        var topLevelCategories = await _context.Categories
-            .Where(c => c.Type == type && c.ParentId == null && !c.IsArchived)
+        // Get categories used by these transactions (regardless of category type)
+        var usedCategoryIds = transactions.Select(t => t.CategoryId).Distinct().ToList();
+        
+        // Get all categories that are either of the matching type OR used by transactions
+        var relevantCategories = await _context.Categories
+            .Where(c => !c.IsArchived && (c.Type == type || usedCategoryIds.Contains(c.Id)))
             .ToListAsync();
-
-        var allCategories = await _context.Categories
-            .Where(c => c.Type == type && !c.IsArchived)
-            .ToListAsync();
+        
+        // Group by top-level category (find parent of each category)
+        var topLevelCategories = relevantCategories
+            .Where(c => c.ParentId == null)
+            .ToList();
 
         var total = transactions.Sum(t => t.Amount);
         var summaries = new List<CategorySummaryDto>();
 
         foreach (var topCategory in topLevelCategories)
         {
-            var categoryIds = GetDescendantIds(topCategory.Id, allCategories);
+            var categoryIds = GetDescendantIds(topCategory.Id, relevantCategories);
             categoryIds.Add(topCategory.Id);
 
             var categoryAmount = transactions
@@ -194,7 +201,7 @@ public class ReportService : IReportService
             if (categoryAmount > 0)
             {
                 var subcategories = includeSubcategories
-                    ? GetSubcategorySummaries(topCategory.Id, allCategories, transactions, categoryAmount)
+                    ? GetSubcategorySummaries(topCategory.Id, relevantCategories, transactions, categoryAmount)
                     : null;
 
                 summaries.Add(new CategorySummaryDto(
@@ -206,6 +213,32 @@ public class ReportService : IReportService
                     subcategories?.Count > 0 ? subcategories : null
                 ));
             }
+        }
+        
+        // Handle transactions with categories that have no top-level parent in our list
+        var handledCategoryIds = summaries.SelectMany(s => 
+        {
+            var ids = new List<int> { s.CategoryId };
+            if (s.Subcategories != null)
+                ids.AddRange(s.Subcategories.Select(sub => sub.CategoryId));
+            return ids;
+        }).ToHashSet();
+        
+        var orphanTransactions = transactions
+            .Where(t => !handledCategoryIds.Contains(t.CategoryId))
+            .ToList();
+        
+        if (orphanTransactions.Any())
+        {
+            var orphanAmount = orphanTransactions.Sum(t => t.Amount);
+            summaries.Add(new CategorySummaryDto(
+                0,
+                "Other",
+                "#6c757d",
+                orphanAmount,
+                total > 0 ? (orphanAmount / total) * 100 : 0,
+                null
+            ));
         }
 
         return summaries.OrderByDescending(s => s.Amount).ToList();

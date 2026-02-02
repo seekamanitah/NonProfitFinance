@@ -6,7 +6,11 @@ public interface IImportExportService
 {
     // Import
     Task<ImportResult> ImportTransactionsFromCsvAsync(Stream csvStream, ImportMappingConfig mapping);
+    Task<ImportResult> ImportTransactionsFromCsvAsync(Stream csvStream, ImportMappingConfig mapping, IProgress<ImportProgress>? progress);
     Task<ImportPreviewResult> PreviewImportAsync(Stream csvStream, ImportMappingConfig mapping);
+    
+    // Error Report
+    byte[] GenerateErrorReportCsv(ImportResult result);
     
     // Export CSV
     Task<byte[]> ExportTransactionsToCsvAsync(TransactionFilterRequest filter);
@@ -50,6 +54,14 @@ public record ImportResult(
     List<string> CreatedCategories
 );
 
+public record ImportProgress(
+    int CurrentRow,
+    int TotalRows,
+    int ImportedCount,
+    int SkippedCount,
+    string? CurrentDescription
+);
+
 public record ImportPreviewResult(
     List<TransactionPreviewDto> Transactions,
     List<ImportError> ValidationErrors,
@@ -72,5 +84,6 @@ public record TransactionPreviewDto(
 public record ImportError(
     int RowNumber,
     string Column,
-    string Message
+    string Message,
+    string? OriginalData = null
 );
