@@ -306,6 +306,9 @@ private async Task PreviewImport()
     if (selectedFile == null) return;
 
     isProcessing = true;
+    previewResult = null;
+    await InvokeAsync(StateHasChanged);
+    
     try
     {
             using var stream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
@@ -323,6 +326,7 @@ private async Task PreviewImport()
         finally
         {
             isProcessing = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -331,6 +335,9 @@ private async Task PreviewImport()
         if (selectedFile == null) return;
 
         isProcessing = true;
+        importResult = null;
+        await InvokeAsync(StateHasChanged);
+        
         try
         {
             using var stream = selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
@@ -344,11 +351,25 @@ private async Task PreviewImport()
                 null, null, hasHeaderRow, dateFormat);
 
             importResult = await ImportExportService.ImportTransactionsFromCsvAsync(memoryStream, mapping);
-            previewResult = null;
+            
+            // Clear preview after successful import
+            if (importResult.Success || importResult.ImportedRows > 0)
+            {
+                previewResult = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            importResult = new ImportResult(
+                false, 0, 0, 0,
+                new List<ImportError> { new ImportError(0, "Import", ex.Message) },
+                new List<string>()
+            );
         }
         finally
         {
             isProcessing = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

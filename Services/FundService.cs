@@ -99,7 +99,8 @@ public class FundService : IFundService
                 .Where(t => t.FundId == fund.Id && t.Type == TransactionType.Expense)
                 .SumAsync(t => t.Amount);
 
-            fund.Balance = income - expenses;
+            // Balance = Starting Balance + Income - Expenses
+            fund.Balance = fund.StartingBalance + income - expenses;
             fund.UpdatedAt = DateTime.UtcNow;
         }
 

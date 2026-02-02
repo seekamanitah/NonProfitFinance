@@ -196,18 +196,20 @@ public class ImportExportService : IImportExportService
                 var type = TransactionType.Expense;
                 if (mapping.TypeColumn.HasValue && mapping.TypeColumn.Value < columns.Length)
                 {
-                    var typeStr = columns[mapping.TypeColumn.Value].ToLower();
+                    var typeStr = columns[mapping.TypeColumn.Value].Trim().ToLower();
                     type = typeStr switch
                     {
-                        "income" or "deposit" or "credit" => TransactionType.Income,
-                        "expense" or "withdrawal" or "debit" => TransactionType.Expense,
-                        "transfer" => TransactionType.Transfer,
+                        "income" or "deposit" or "credit" or "i" => TransactionType.Income,
+                        "expense" or "withdrawal" or "debit" or "e" => TransactionType.Expense,
+                        "transfer" or "t" => TransactionType.Transfer,
                         _ => amount >= 0 ? TransactionType.Income : TransactionType.Expense
                     };
+                    _logger.LogDebug("Row {Row}: Type column value='{TypeStr}', parsed as {Type}", rowNumber, typeStr, type);
                 }
                 else
                 {
                     type = amount >= 0 ? TransactionType.Income : TransactionType.Expense;
+                    _logger.LogDebug("Row {Row}: No type column, inferred {Type} from amount {Amount}", rowNumber, type, amount);
                 }
 
                 // Handle category

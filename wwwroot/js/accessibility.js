@@ -1,4 +1,5 @@
 // Accessibility Helpers for NonProfit Finance
+// Ensure we always have both a global and local reference.
 window.accessibilityHelpers = window.accessibilityHelpers || {
     
     /**
@@ -125,26 +126,39 @@ window.accessibilityHelpers = window.accessibilityHelpers || {
     }
 };
 
+// Local alias used by code below (some pages may reference accessibilityHelpers directly)
+const accessibilityHelpers = window.accessibilityHelpers;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Load saved UI scale
-    accessibilityHelpers.loadUiScale();
+    // Ensure we have the helpers object
+    const helpers = window.accessibilityHelpers;
+    if (!helpers) return;
     
-    // Check OS-level preferences
-    if (accessibilityHelpers.isHighContrast()) {
-        accessibilityHelpers.applyHighContrast(true);
+    // Load saved UI scale
+    if (typeof helpers.loadUiScale === 'function') {
+        helpers.loadUiScale();
     }
     
-    if (accessibilityHelpers.isReducedMotion()) {
-        accessibilityHelpers.applyReducedMotion(true);
+    // Check OS-level preferences
+    if (typeof helpers.isHighContrast === 'function' && helpers.isHighContrast()) {
+        helpers.applyHighContrast(true);
+    }
+    
+    if (typeof helpers.isReducedMotion === 'function' && helpers.isReducedMotion()) {
+        helpers.applyReducedMotion(true);
     }
     
     // Listen for preference changes
     window.matchMedia('(prefers-contrast: high)').addEventListener('change', (e) => {
-        accessibilityHelpers.applyHighContrast(e.matches);
+        if (typeof accessibilityHelpers.applyHighContrast === 'function') {
+            accessibilityHelpers.applyHighContrast(e.matches);
+        }
     });
     
     window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-        accessibilityHelpers.applyReducedMotion(e.matches);
+        if (typeof accessibilityHelpers.applyReducedMotion === 'function') {
+            accessibilityHelpers.applyReducedMotion(e.matches);
+        }
     });
 });

@@ -41,6 +41,9 @@ const themeManager = {
     }
 };
 
+// Export to window for access from other scripts
+window.themeManager = themeManager;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     themeManager.init();
