@@ -142,6 +142,13 @@
                             }
                         </select>
                         <small class="text-muted">All transactions will go to this account</small>
+                        @if (!defaultFundId.HasValue && (!fundColumn.HasValue || fundColumn == -1))
+                        {
+                            <div class="alert alert-info mt-2" style="padding: 0.5rem;">
+                                <i class="fas fa-info-circle"></i> 
+                                <small>Transactions will be assigned to the "General" fund automatically.</small>
+                            </div>
+                        }
                     </div>
                     <div class="form-group">
                         <label class="form-label">Date Format</label>
@@ -257,6 +264,7 @@
                             <tr>
                                 <th>Date</th>
                                 <th>Amount</th>
+                                <th>Type</th>
                                 <th>Description</th>
                                 <th>Category</th>
                                 <th>Status</th>
@@ -268,6 +276,7 @@
                                 <tr>
                                     <td>@row.Date?.ToString("MM/dd/yyyy")</td>
                                     <td>@row.Amount?.ToString("C")</td>
+                                    <td><span class="badge @(row.DetectedType == "Income" ? "badge-success" : row.DetectedType == "Expense" ? "badge-danger" : "badge-primary")">@row.DetectedType</span></td>
                                     <td>@row.Description</td>
                                     <td>@row.Category</td>
                                     <td><span class="badge badge-success">Valid</span></td>
@@ -276,7 +285,7 @@
                             @foreach (var row in invalidRows.Take(3))
                             {
                                 <tr class="text-muted">
-                                    <td colspan="4">@string.Join(", ", row.Errors)</td>
+                                    <td colspan="5">@string.Join(", ", row.Errors)</td>
                                     <td><span class="badge badge-danger">Invalid</span></td>
                                 </tr>
                             }

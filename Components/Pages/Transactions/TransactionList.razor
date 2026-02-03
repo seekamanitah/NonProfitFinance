@@ -4,6 +4,7 @@
 @inject ICategoryService CategoryService
 @inject IFundService FundService
 @inject ITextToSpeechService TtsService
+@inject IToastService Toast
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -14,6 +15,9 @@
         <h2 style="margin: 0;">Transactions</h2>
     </div>
     <div class="d-flex gap-2">
+        <a href="/transactions/duplicates" class="btn btn-outline" title="Find duplicate transactions">
+            <i class="fas fa-clone"></i> Duplicates
+        </a>
         <a href="/transactions/recycle-bin" class="btn btn-outline" title="View deleted transactions">
             <i class="fas fa-trash-restore"></i> Recycle Bin
         </a>
@@ -93,21 +97,16 @@
     </div>
 </div>
 
-<!-- Actions Bar -->
-<div class="d-flex justify-between align-center mb-3">
-    <div class="text-muted">
-        Showing @transactions.Count of @totalCount transactions
-    </div>
-</div>
+<!-- Actions Bar - count shown in pagination below -->
+
+
 
 <!-- Transactions Table -->
 <div class="card">
     <div class="card-body" style="padding: 0; overflow-x: auto;">
         @if (isLoading)
         {
-            <div class="loading">
-                <div class="spinner"></div>
-            </div>
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="10" Columns="7" />
         }
         else
         {
@@ -231,21 +230,17 @@
 </div>
 
 <!-- Pagination -->
-@if (totalPages > 1)
+@if (totalPages > 0)
 {
-    <div class="d-flex justify-between align-center mt-3">
-        <div class="text-muted">
-            Page @filter.Page of @totalPages
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline" @onclick="PreviousPage" disabled="@(filter.Page <= 1)">
-                <i class="fas fa-chevron-left"></i> Previous
-            </button>
-            <button class="btn btn-outline" @onclick="NextPage" disabled="@(filter.Page >= totalPages)">
-                Next <i class="fas fa-chevron-right"></i>
-            </button>
-        </div>
-    </div>
+    <Pagination 
+        CurrentPage="filter.Page"
+        PageSize="filter.PageSize"
+        TotalItems="totalCount"
+        ShowPageNumbers="true"
+        ShowPageSizeSelector="true"
+        ShowItemCount="false"
+        OnPageChange="OnPageChange"
+        OnPageSizeChange="OnPageSizeChange" />
 }
 
 <!-- Edit/Add Modal -->
@@ -464,22 +459,17 @@ private async Task LoadTransactions()
         await LoadTransactions();
     }
 
-    private async Task PreviousPage()
+    private async Task OnPageChange(int page)
     {
-        if (filter.Page > 1)
-        {
-            filter.Page--;
-            await LoadTransactions();
-        }
+        filter.Page = page;
+        await LoadTransactions();
     }
 
-    private async Task NextPage()
+    private async Task OnPageSizeChange(int pageSize)
     {
-        if (filter.Page < totalPages)
-        {
-            filter.Page++;
-            await LoadTransactions();
-        }
+        filter.PageSize = pageSize;
+        filter.Page = 1;
+        await LoadTransactions();
     }
 
     private void ShowAddForm()
@@ -548,7 +538,12 @@ private async Task LoadTransactions()
             await TransactionService.DeleteAsync(transactionToDelete.Id);
             await LoadTransactions();
             showDeleteConfirm = false;
+            Toast.ShowSuccess("Transaction moved to recycle bin", "Deleted");
             transactionToDelete = null;
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to delete transaction: {ex.Message}", "Error");
         }
         finally
         {
@@ -567,6 +562,9 @@ private async Task LoadTransactions()
         showForm = false;
         receiptData = null; // Clear receipt data after use
         await LoadTransactions();
+        
+        // Show toast notification
+        Toast.ShowSuccess("Transaction saved successfully", "Saved");
         
         // Announce with TTS
         await TtsService.AnnounceSuccessAsync("Transaction saved successfully");

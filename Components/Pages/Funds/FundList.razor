@@ -1,5 +1,6 @@
 @page "/funds"
 @inject IFundService FundService
+@inject IToastService Toast
 @rendermode InteractiveServer
 
 <PageTitle>Accounts - NonProfit Finance</PageTitle>
@@ -12,7 +13,15 @@
     </div>
     <div class="d-flex gap-2">
         <button class="btn btn-outline" @onclick="RecalculateBalances" disabled="@isRecalculating">
-            <i class="fas fa-sync"></i> Recalculate
+            @if (isRecalculating)
+            {
+                <LoadingSpinner Size="LoadingSpinner.SpinnerSize.Small" />
+            }
+            else
+            {
+                <i class="fas fa-sync"></i>
+            }
+            Recalculate
         </button>
         <button class="btn btn-primary" @onclick="ShowAddForm">
             <i class="fas fa-plus"></i> Add Account
@@ -21,61 +30,66 @@
 </div>
 
 <!-- Summary Cards -->
-<div class="metric-cards mb-3">
-    <div class="metric-card">
-        <div class="metric-icon income">
-            <i class="fas fa-unlock"></i>
-        </div>
-        <div class="metric-content">
-            <div class="metric-label">Unrestricted Accounts</div>
-            <div class="metric-value positive">@unrestrictedTotal.ToString("C0")</div>
-        </div>
-    </div>
-    
-    <div class="metric-card">
-        <div class="metric-icon primary">
-            <i class="fas fa-lock"></i>
-        </div>
-        <div class="metric-content">
-            <div class="metric-label">Restricted Accounts</div>
-            <div class="metric-value">@restrictedTotal.ToString("C0")</div>
-        </div>
-    </div>
-    
-    <div class="metric-card">
-        <div class="metric-icon neutral">
-            <i class="fas fa-clock"></i>
-        </div>
-        <div class="metric-content">
-            <div class="metric-label">Temporarily Restricted</div>
-            <div class="metric-value">@tempRestrictedTotal.ToString("C0")</div>
-        </div>
-    </div>
-    
-    <div class="metric-card">
-        <div class="metric-icon expense">
-            <i class="fas fa-infinity"></i>
-        </div>
-        <div class="metric-content">
-            <div class="metric-label">Permanently Restricted</div>
-            <div class="metric-value">@permRestrictedTotal.ToString("C0")</div>
-        </div>
-    </div>
-</div>
-
-<!-- Accounts List -->
 @if (isLoading)
 {
-    <div class="loading">
-        <div class="spinner"></div>
-    </div>
+    <SkeletonLoader Type="SkeletonLoader.SkeletonType.MetricCards" Count="4" />
 }
 else
 {
-    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
-        @foreach (var fund in funds)
-        {
-            <div class="card">
+    <div class="metric-cards mb-3">
+        <div class="metric-card">
+            <div class="metric-icon income">
+                <i class="fas fa-unlock"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Unrestricted Accounts</div>
+                <div class="metric-value positive">@unrestrictedTotal.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon primary">
+                <i class="fas fa-lock"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Restricted Accounts</div>
+                <div class="metric-value">@restrictedTotal.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon neutral">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Temporarily Restricted</div>
+                <div class="metric-value">@tempRestrictedTotal.ToString("C0")</div>
+            </div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-icon expense">
+                <i class="fas fa-infinity"></i>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Permanently Restricted</div>
+                <div class="metric-value">@permRestrictedTotal.ToString("C0")</div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Accounts List -->
+<PageWrapper IsLoading="@isLoading" 
+             IsEmpty="@(!funds.Any())"
+             EmptyIcon="fas fa-wallet"
+             EmptyTitle="No Accounts Created"
+             EmptyMessage="Click 'Add Account' to create your first account.">
+    <Content>
+        <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
+            @foreach (var fund in funds)
+            {
+                <div class="card" @key="fund.Id">
                 <div class="card-header">
                     <h4 style="margin: 0;">@fund.Name</h4>
                     <span class="badge @GetTypeBadgeClass(fund.Type)">@fund.Type</span>
@@ -123,18 +137,9 @@ else
                 </div>
             </div>
         }
-        
-        @if (!funds.Any())
-        {
-            <div class="card">
-                <div class="card-body text-center text-muted">
-                    <i class="fas fa-wallet" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                    <p>No funds created yet. Click "Add Fund" to get started.</p>
-                </div>
-            </div>
-        }
     </div>
-}
+    </Content>
+</PageWrapper>
 
 <!-- Add/Edit Form Modal -->
 @if (showForm)
@@ -168,11 +173,12 @@ private async Task LoadFunds()
     isLoading = true;
     funds = await FundService.GetAllAsync(true);
         
-    // Calculate totals from funds
-    unrestrictedTotal = funds.Where(f => f.Type == FundType.Unrestricted).Sum(f => f.Balance);
-    restrictedTotal = funds.Where(f => f.Type == FundType.Restricted).Sum(f => f.Balance);
-    tempRestrictedTotal = funds.Where(f => f.Type == FundType.TemporarilyRestricted).Sum(f => f.Balance);
-    permRestrictedTotal = funds.Where(f => f.Type == FundType.PermanentlyRestricted).Sum(f => f.Balance);
+    // Calculate totals from ACTIVE funds only (matches Dashboard calculation)
+    var activeFunds = funds.Where(f => f.IsActive).ToList();
+    unrestrictedTotal = activeFunds.Where(f => f.Type == FundType.Unrestricted).Sum(f => f.Balance);
+    restrictedTotal = activeFunds.Where(f => f.Type == FundType.Restricted).Sum(f => f.Balance);
+    tempRestrictedTotal = activeFunds.Where(f => f.Type == FundType.TemporarilyRestricted).Sum(f => f.Balance);
+    permRestrictedTotal = activeFunds.Where(f => f.Type == FundType.PermanentlyRestricted).Sum(f => f.Balance);
         
     isLoading = false;
 }

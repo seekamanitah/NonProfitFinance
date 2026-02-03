@@ -7,13 +7,105 @@
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
     <NotFound>
-        <PageTitle>Not Found</PageTitle>
+        <PageTitle>Not Found - NonProfit Finance</PageTitle>
         <LayoutView Layout="typeof(Layout.MainLayout)">
-            <div class="not-found">
-                <h1>Page Not Found</h1>
-                <p>Sorry, the page you're looking for doesn't exist.</p>
-                <a href="/" class="btn btn-primary">Return to Dashboard</a>
+            <div class="not-found-container">
+                <div class="not-found-content">
+                    <div class="not-found-icon">
+                        <i class="fas fa-map-signs"></i>
+                    </div>
+                    <h1>Page Not Found</h1>
+                    <p class="not-found-message">
+                        Sorry, the page you're looking for doesn't exist or has been moved.
+                    </p>
+                    <div class="not-found-actions">
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-home"></i> Return to Dashboard
+                        </a>
+                        <a href="/transactions" class="btn btn-outline">
+                            <i class="fas fa-list"></i> View Transactions
+                        </a>
+                    </div>
+                    <div class="not-found-suggestions">
+                        <p>You might want to try:</p>
+                        <ul>
+                            <li><a href="/reports">Generate Reports</a></li>
+                            <li><a href="/budgets">Manage Budgets</a></li>
+                            <li><a href="/donors">View Donors</a></li>
+                            <li><a href="/grants">Manage Grants</a></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
+            <style>
+                .not-found-container {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 60vh;
+                    padding: 2rem;
+                }
+
+                .not-found-content {
+                    text-align: center;
+                    max-width: 500px;
+                }
+
+                .not-found-icon {
+                    font-size: 4rem;
+                    color: var(--primary-color);
+                    margin-bottom: 1.5rem;
+                    opacity: 0.8;
+                }
+
+                .not-found-content h1 {
+                    font-size: 2rem;
+                    margin-bottom: 0.75rem;
+                    color: var(--text-primary);
+                }
+
+                .not-found-message {
+                    color: var(--text-muted);
+                    margin-bottom: 1.5rem;
+                    font-size: 1.1rem;
+                }
+
+                .not-found-actions {
+                    display: flex;
+                    gap: 1rem;
+                    justify-content: center;
+                    flex-wrap: wrap;
+                    margin-bottom: 2rem;
+                }
+
+                .not-found-suggestions {
+                    padding-top: 1.5rem;
+                    border-top: 1px solid var(--border-color);
+                }
+
+                .not-found-suggestions p {
+                    color: var(--text-muted);
+                    margin-bottom: 0.75rem;
+                }
+
+                .not-found-suggestions ul {
+                    list-style: none;
+                    padding: 0;
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 0.5rem 1.5rem;
+                }
+
+                .not-found-suggestions a {
+                    color: var(--primary-color);
+                    text-decoration: none;
+                }
+
+                .not-found-suggestions a:hover {
+                    text-decoration: underline;
+                }
+            </style>
         </LayoutView>
     </NotFound>
 </Router>

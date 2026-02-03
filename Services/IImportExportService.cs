@@ -81,6 +81,7 @@ public record TransactionPreviewDto(
     string? Category,
     string? Fund,
     string? Donor,
+    string? DetectedType, // Income, Expense, or Transfer based on amount sign or type column
     bool IsValid,
     List<string> Errors
 );

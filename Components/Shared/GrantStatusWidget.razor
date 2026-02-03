@@ -1,0 +1,287 @@
+@namespace NonProfitFinance.Components.Shared
+@inject IGrantService GrantService
+
+<div class="card grant-status-widget @CssClass">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-hand-holding-usd"></i> Grant Overview
+        </h3>
+        <a href="/grants" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.List" Rows="4" />
+        }
+        else if (grants.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="fas fa-hand-holding-usd"></i>
+                <p>No active grants. <a href="/grants">Add a grant</a></p>
+            </div>
+        }
+        else
+        {
+            <!-- Summary Stats -->
+            <div class="grant-stats mb-3">
+                <div class="stat-item">
+                    <div class="stat-value">@activeGrants.Count()</div>
+                    <div class="stat-label">Active</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value income">@totalAwarded.ToString("C0")</div>
+                    <div class="stat-label">Total Awarded</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value expense">@totalSpent.ToString("C0")</div>
+                    <div class="stat-label">Spent</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">@totalRemaining.ToString("C0")</div>
+                    <div class="stat-label">Remaining</div>
+                </div>
+            </div>
+
+            <!-- Grant List -->
+            <div class="grant-list">
+                @foreach (var grant in GetDisplayGrants())
+                {
+                    var percentUsed = grant.Amount > 0 ? (grant.AmountUsed / grant.Amount) * 100 : 0;
+                    var daysRemaining = grant.EndDate.HasValue ? (grant.EndDate.Value - DateTime.Today).Days : 0;
+                    
+                    <div class="grant-item">
+                        <div class="grant-header">
+                            <div class="grant-name">
+                                @grant.Name
+                                @if (daysRemaining <= 30 && daysRemaining >= 0)
+                                {
+                                    <span class="badge badge-warning ml-1">@daysRemaining days left</span>
+                                }
+                            </div>
+                            <div class="grant-funder text-muted">@grant.GrantorName</div>
+                        </div>
+                        
+                        <div class="grant-progress">
+                            <div class="progress-info">
+                                <span>@grant.AmountUsed.ToString("C0") of @grant.Amount.ToString("C0")</span>
+                                <span class="@GetPercentClass(percentUsed)">@percentUsed.ToString("N0")%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill @GetPercentClass(percentUsed)" style="width: @Math.Min(percentUsed, 100)%"></div>
+                            </div>
+                        </div>
+                        
+                        @if (grant.NextReportDueDate.HasValue)
+                        {
+                            var reportDays = (grant.NextReportDueDate.Value - DateTime.Today).Days;
+                            <div class="grant-report @(reportDays <= 7 ? "urgent" : reportDays <= 14 ? "soon" : "")">
+                                <i class="fas fa-file-alt"></i>
+                                Report due @grant.NextReportDueDate.Value.ToString("MMM d")
+                                @if (reportDays <= 7)
+                                {
+                                    <span class="badge badge-danger ml-1">Urgent</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (grants.Count > MaxGrants)
+            {
+                <div class="view-more">
+                    <a href="/grants">View all @grants.Count grants</a>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .grant-status-widget .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    .grant-status-widget .empty-state i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .grant-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .stat-value.income {
+        color: #22c55e;
+    }
+
+    .stat-value.expense {
+        color: #ef4444;
+    }
+
+    .stat-label {
+        font-size: 0.6875rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .grant-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .grant-item {
+        padding: 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        transition: all 0.15s ease;
+    }
+
+    .grant-item:hover {
+        border-color: var(--primary-color);
+    }
+
+    .grant-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    .grant-name {
+        font-weight: 500;
+        font-size: 0.9375rem;
+    }
+
+    .grant-funder {
+        font-size: 0.8125rem;
+    }
+
+    .grant-progress {
+        margin-bottom: 0.5rem;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8125rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .progress-bar-container {
+        height: 6px;
+        background: var(--bg-secondary);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+
+    .progress-bar-fill.healthy {
+        background: #22c55e;
+    }
+
+    .progress-bar-fill.warning {
+        background: #f59e0b;
+    }
+
+    .progress-bar-fill.danger {
+        background: #ef4444;
+    }
+
+    .grant-report {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--border-color);
+    }
+
+    .grant-report.urgent {
+        color: #ef4444;
+    }
+
+    .grant-report.soon {
+        color: #f59e0b;
+    }
+
+    .healthy {
+        color: #22c55e;
+    }
+
+    .warning {
+        color: #f59e0b;
+    }
+
+    .danger {
+        color: #ef4444;
+    }
+
+    .view-more {
+        text-align: center;
+        padding-top: 0.75rem;
+        font-size: 0.875rem;
+    }
+</style>
+
+@code {
+    [Parameter] public int MaxGrants { get; set; } = 3;
+    [Parameter] public string? CssClass { get; set; }
+
+    private List<GrantDto> grants = [];
+    private bool isLoading = true;
+
+    private IEnumerable<GrantDto> activeGrants => grants.Where(g => g.Status == GrantStatus.Active);
+    private decimal totalAwarded => activeGrants.Sum(g => g.Amount);
+    private decimal totalSpent => activeGrants.Sum(g => g.AmountUsed);
+    private decimal totalRemaining => activeGrants.Sum(g => g.RemainingBalance);
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        grants = await GrantService.GetAllAsync(GrantStatus.Active);
+        isLoading = false;
+    }
+
+    private IEnumerable<GrantDto> GetDisplayGrants()
+    {
+        return grants
+            .OrderByDescending(g => g.NextReportDueDate.HasValue)
+            .ThenBy(g => g.EndDate)
+            .Take(MaxGrants);
+    }
+
+    private string GetPercentClass(decimal percent)
+    {
+        return percent switch
+        {
+            > 95 => "danger",
+            > 80 => "warning",
+            _ => "healthy"
+        };
+    }
+}

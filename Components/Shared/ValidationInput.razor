@@ -1,0 +1,363 @@
+@*
+    ValidationInput - Enhanced input with real-time validation feedback
+    Usage: <ValidationInput @bind-Value="model.Name" Label="Name" Required="true" />
+*@
+
+<div class="validation-input-group @(HasError ? "has-error" : "") @(IsValid ? "is-valid" : "")">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="form-label" for="@inputId">
+            @Label
+            @if (Required)
+            {
+                <span class="required-indicator">*</span>
+            }
+        </label>
+    }
+    
+    <div class="input-wrapper">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <span class="input-icon">
+                <i class="@Icon"></i>
+            </span>
+        }
+        
+        @if (Type == "textarea")
+        {
+            <textarea id="@inputId"
+                      class="form-control @(HasIcon ? "has-icon" : "")"
+                      value="@Value"
+                      @oninput="HandleInput"
+                      @onblur="HandleBlur"
+                      placeholder="@Placeholder"
+                      disabled="@Disabled"
+                      rows="@Rows"
+                      maxlength="@MaxLength"
+                      @attributes="AdditionalAttributes"></textarea>
+        }
+        else
+        {
+            <input id="@inputId"
+                   type="@Type"
+                   class="form-control @(HasIcon ? "has-icon" : "")"
+                   value="@Value"
+                   @oninput="HandleInput"
+                   @onblur="HandleBlur"
+                   placeholder="@Placeholder"
+                   disabled="@Disabled"
+                   maxlength="@MaxLength"
+                   min="@Min"
+                   max="@Max"
+                   step="@Step"
+                   @attributes="AdditionalAttributes" />
+        }
+        
+        @if (HasError || IsValid)
+        {
+            <span class="validation-icon">
+                <i class="fas @(HasError ? "fa-exclamation-circle" : "fa-check-circle")"></i>
+            </span>
+        }
+    </div>
+    
+    @if (!string.IsNullOrEmpty(currentError))
+    {
+        <div class="validation-message error">
+            <i class="fas fa-exclamation-circle"></i>
+            @currentError
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(HelpText))
+    {
+        <div class="validation-message help">
+            @HelpText
+        </div>
+    }
+    
+    @if (MaxLength.HasValue && ShowCharacterCount)
+    {
+        <div class="character-count @(IsNearLimit ? "near-limit" : "")">
+            @currentLength / @MaxLength
+        </div>
+    }
+</div>
+
+<style>
+    .validation-input-group {
+        margin-bottom: 1rem;
+        position: relative;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.375rem;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+    
+    .required-indicator {
+        color: #ef4444;
+        margin-left: 0.25rem;
+    }
+    
+    .input-wrapper {
+        position: relative;
+    }
+    
+    .input-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+    }
+    
+    .form-control.has-icon {
+        padding-left: 2.5rem;
+    }
+    
+    .validation-icon {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+    
+    .validation-input-group.has-error .validation-icon {
+        color: #ef4444;
+    }
+    
+    .validation-input-group.is-valid .validation-icon {
+        color: #10b981;
+    }
+    
+    .validation-input-group.has-error .form-control {
+        border-color: #ef4444;
+        padding-right: 2.5rem;
+    }
+    
+    .validation-input-group.has-error .form-control:focus {
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+    
+    .validation-input-group.is-valid .form-control {
+        border-color: #10b981;
+        padding-right: 2.5rem;
+    }
+    
+    .validation-input-group.is-valid .form-control:focus {
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    
+    .validation-message {
+        font-size: 0.8rem;
+        margin-top: 0.375rem;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+    
+    .validation-message.error {
+        color: #ef4444;
+    }
+    
+    .validation-message.help {
+        color: var(--text-muted);
+    }
+    
+    .character-count {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-align: right;
+        margin-top: 0.25rem;
+    }
+    
+    .character-count.near-limit {
+        color: #f59e0b;
+    }
+    
+    /* Shake animation for errors */
+    .validation-input-group.has-error .form-control {
+        animation: shake 0.3s;
+    }
+    
+    @@keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+    }
+</style>
+
+@code {
+    private string inputId = $"input-{Guid.NewGuid():N}";
+    private string? currentError;
+    private bool touched = false;
+    private int currentLength = 0;
+    
+    /// <summary>
+    /// Current value
+    /// </summary>
+    [Parameter] public string? Value { get; set; }
+    
+    /// <summary>
+    /// Callback when value changes
+    /// </summary>
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    
+    /// <summary>
+    /// Input label
+    /// </summary>
+    [Parameter] public string? Label { get; set; }
+    
+    /// <summary>
+    /// Input type (text, email, password, number, date, textarea)
+    /// </summary>
+    [Parameter] public string Type { get; set; } = "text";
+    
+    /// <summary>
+    /// Placeholder text
+    /// </summary>
+    [Parameter] public string? Placeholder { get; set; }
+    
+    /// <summary>
+    /// Icon class (FontAwesome)
+    /// </summary>
+    [Parameter] public string? Icon { get; set; }
+    
+    /// <summary>
+    /// Help text shown below input
+    /// </summary>
+    [Parameter] public string? HelpText { get; set; }
+    
+    /// <summary>
+    /// Whether field is required
+    /// </summary>
+    [Parameter] public bool Required { get; set; }
+    
+    /// <summary>
+    /// Whether field is disabled
+    /// </summary>
+    [Parameter] public bool Disabled { get; set; }
+    
+    /// <summary>
+    /// Maximum length
+    /// </summary>
+    [Parameter] public int? MaxLength { get; set; }
+    
+    /// <summary>
+    /// Minimum value for number inputs
+    /// </summary>
+    [Parameter] public string? Min { get; set; }
+    
+    /// <summary>
+    /// Maximum value for number inputs
+    /// </summary>
+    [Parameter] public string? Max { get; set; }
+    
+    /// <summary>
+    /// Step for number inputs
+    /// </summary>
+    [Parameter] public string? Step { get; set; }
+    
+    /// <summary>
+    /// Rows for textarea
+    /// </summary>
+    [Parameter] public int Rows { get; set; } = 3;
+    
+    /// <summary>
+    /// Show character count
+    /// </summary>
+    [Parameter] public bool ShowCharacterCount { get; set; }
+    
+    /// <summary>
+    /// Custom validation function
+    /// </summary>
+    [Parameter] public Func<string?, string?>? Validate { get; set; }
+    
+    /// <summary>
+    /// Validate on input (real-time) vs only on blur
+    /// </summary>
+    [Parameter] public bool ValidateOnInput { get; set; } = true;
+    
+    /// <summary>
+    /// Additional attributes
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+    
+    private bool HasError => touched && !string.IsNullOrEmpty(currentError);
+    private bool IsValid => touched && string.IsNullOrEmpty(currentError) && !string.IsNullOrEmpty(Value);
+    private bool HasIcon => !string.IsNullOrEmpty(Icon);
+    private bool IsNearLimit => MaxLength.HasValue && currentLength > MaxLength.Value * 0.9;
+    
+    protected override void OnParametersSet()
+    {
+        currentLength = Value?.Length ?? 0;
+        
+        if (touched)
+        {
+            ValidateValue();
+        }
+    }
+    
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        var newValue = e.Value?.ToString();
+        currentLength = newValue?.Length ?? 0;
+        
+        await ValueChanged.InvokeAsync(newValue);
+        
+        if (ValidateOnInput && touched)
+        {
+            ValidateValue();
+        }
+    }
+    
+    private void HandleBlur()
+    {
+        touched = true;
+        ValidateValue();
+    }
+    
+    private void ValidateValue()
+    {
+        currentError = null;
+        
+        // Required validation
+        if (Required && string.IsNullOrWhiteSpace(Value))
+        {
+            currentError = $"{Label ?? "This field"} is required";
+            return;
+        }
+        
+        // Email validation
+        if (Type == "email" && !string.IsNullOrEmpty(Value))
+        {
+            if (!Value.Contains('@') || !Value.Contains('.'))
+            {
+                currentError = "Please enter a valid email address";
+                return;
+            }
+        }
+        
+        // Custom validation
+        if (Validate != null && !string.IsNullOrEmpty(Value))
+        {
+            currentError = Validate(Value);
+        }
+    }
+    
+    /// <summary>
+    /// Force validation and return whether valid
+    /// </summary>
+    public bool ForceValidate()
+    {
+        touched = true;
+        ValidateValue();
+        StateHasChanged();
+        return !HasError;
+    }
+}

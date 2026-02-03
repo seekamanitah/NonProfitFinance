@@ -6,7 +6,10 @@
 @inject IGrantService GrantService
 @inject IPdfExportService PdfExportService
 @inject IImportExportService ImportExportService
+@inject IReportCustomizationService ReportCustomizationService
+@inject IReportPresetService ReportPresetService
 @inject IJSRuntime JS
+@inject IToastService Toast
 @rendermode InteractiveServer
 
 <PageTitle>Reports - NonProfit Finance</PageTitle>
@@ -31,28 +34,17 @@
         </div>
     </div>
     <div class="card-body">
+        <!-- Date Range Selector -->
+        <div class="mb-3">
+            <DateRangeSelector 
+                StartDate="@startDate"
+                EndDate="@endDate"
+                ShowComparison="true"
+                OnRangeChanged="OnDateRangeChanged"
+                OnComparisonChanged="OnComparisonChanged" />
+        </div>
+
         <div class="form-row">
-            <div class="form-group">
-                <label class="form-label">Report Period</label>
-                <select class="form-control" @onchange="OnPeriodChange">
-                    <option value="month">This Month</option>
-                    <option value="quarter">This Quarter</option>
-                    <option value="ytd" selected>Year to Date</option>
-                    <option value="year">Last 12 Months</option>
-                    <option value="custom">Custom Range</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Start Date</label>
-                <input type="date" class="form-control" @bind="startDate" />
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">End Date</label>
-                <input type="date" class="form-control" @bind="endDate" />
-            </div>
-            
             <div class="form-group">
                 <label class="form-label">Filter By</label>
                 <select class="form-control" @bind="filterType">
@@ -176,6 +168,10 @@
                     <option value="Light">Light Theme</option>
                 </select>
             </div>
+            
+            <button class="btn btn-outline" @onclick="ShowCustomizationModal" title="Customize report columns and export options">
+                <i class="fas fa-columns"></i> Customize
+            </button>
         </div>
         
         @if (isExporting)
@@ -189,9 +185,9 @@
 
 @if (isLoading)
 {
-    <div class="loading">
-        <div class="spinner"></div>
-        <span>Generating report...</span>
+    <SkeletonLoader Type="SkeletonLoader.SkeletonType.MetricCards" Count="4" />
+    <div class="mt-3">
+        <SkeletonLoader Type="SkeletonLoader.SkeletonType.CardGrid" Count="2" />
     </div>
 }
 else if (summary != null)
@@ -202,20 +198,26 @@ else if (summary != null)
             Title="Total Income" 
             Value="@summary.TotalIncome.ToString("C0")"
             Icon="fa-arrow-down"
-            IconType="income" />
+            IconType="income"
+            Change="@GetComparisonChange(summary.TotalIncome, comparisonSummary?.TotalIncome)"
+            ChangeLabel="@(comparisonEnabled ? "vs prior period" : null)" />
         
         <MetricCard 
             Title="Total Expenses" 
             Value="@summary.TotalExpenses.ToString("C0")"
             Icon="fa-arrow-up"
-            IconType="expense" />
+            IconType="expense"
+            Change="@GetComparisonChange(summary.TotalExpenses, comparisonSummary?.TotalExpenses, true)"
+            ChangeLabel="@(comparisonEnabled ? "vs prior period" : null)" />
         
         <MetricCard 
             Title="Net Income" 
             Value="@summary.NetIncome.ToString("C0")"
             Icon="fa-balance-scale"
             IconType="@(summary.NetIncome >= 0 ? "income" : "expense")"
-            ValueClass="@(summary.NetIncome >= 0 ? "positive" : "negative")" />
+            ValueClass="@(summary.NetIncome >= 0 ? "positive" : "negative")"
+            Change="@GetComparisonChange(summary.NetIncome, comparisonSummary?.NetIncome)"
+            ChangeLabel="@(comparisonEnabled ? "vs prior period" : null)" />
         
         <MetricCard 
             Title="Net Margin" 
@@ -223,6 +225,14 @@ else if (summary != null)
             Icon="fa-percentage"
             IconType="neutral" />
     </div>
+    
+    @if (comparisonEnabled && comparisonSummary != null)
+    {
+        <div class="alert alert-info mb-3">
+            <i class="fas fa-info-circle"></i>
+            Comparing to <strong>@comparisonStartDate.ToString("MMM d") - @comparisonEndDate.ToString("MMM d, yyyy")</strong>
+        </div>
+    }
     
     <!-- Charts -->
     <div class="charts-grid">
@@ -370,6 +380,14 @@ else if (summary != null)
     </div>
 }
 
+@if (showCustomizationModal)
+{
+    <ReportCustomizationModal 
+        ReportType="@currentReportType"
+        OnApply="ApplyCustomization"
+        OnCancel="CloseCustomizationModal" />
+}
+
 @code {
 private DateTime startDate = new DateTime(DateTime.Today.Year, 1, 1);
 private DateTime endDate = DateTime.Today;
@@ -383,6 +401,7 @@ private List<CategoryDto> categories = new();
 private List<DonorDto> donors = new();
 private List<GrantDto> grants = new();
 private IncomeExpenseSummaryDto? summary;
+private IncomeExpenseSummaryDto? comparisonSummary;
 private List<TrendDataDto> trendData = new();
 private bool isLoading = false;
 private bool isExporting = false;
@@ -394,6 +413,16 @@ private bool showSavePresetDialog = false;
 private string presetName = "";
 private bool presetIsDefault = false;
 
+// Comparison mode
+private bool comparisonEnabled = false;
+private DateTime comparisonStartDate;
+private DateTime comparisonEndDate;
+
+// Report customization
+private bool showCustomizationModal = false;
+private CustomizableReportType currentReportType = CustomizableReportType.IncomeExpenseSummary;
+private ReportColumnSettings? columnSettings;
+
 protected override async Task OnInitializedAsync()
 {
     funds = await FundService.GetAllAsync();
@@ -401,8 +430,54 @@ protected override async Task OnInitializedAsync()
     donors = await DonorService.GetAllAsync();
     grants = await GrantService.GetAllAsync(null);
     await LoadSavedPresets();
+    columnSettings = await ReportCustomizationService.GetSettingsAsync(currentReportType);
     await GenerateReport();
 }
+
+private async Task OnDateRangeChanged((DateTime Start, DateTime End) range)
+{
+    startDate = range.Start;
+    endDate = range.End;
+    await GenerateReport();
+}
+
+private async Task OnComparisonChanged((DateTime Start, DateTime End)? comparison)
+{
+    if (comparison.HasValue)
+    {
+        comparisonEnabled = true;
+        comparisonStartDate = comparison.Value.Start;
+        comparisonEndDate = comparison.Value.End;
+        await LoadComparisonData();
+    }
+    else
+    {
+        comparisonEnabled = false;
+        comparisonSummary = null;
+    }
+    StateHasChanged();
+}
+
+private async Task LoadComparisonData()
+{
+    var filter = new ReportFilterRequest(comparisonStartDate, comparisonEndDate, 
+        filterType == "category" ? selectedCategoryId : null,
+        selectedFundId,
+        filterType == "donor" ? selectedDonorId : null,
+        filterType == "grant" ? selectedGrantId : null);
+    comparisonSummary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
+}
+
+private string? GetComparisonChange(decimal current, decimal? previous, bool invertPositive = false)
+{
+    if (!comparisonEnabled || previous == null || previous == 0) return null;
+    var change = ((current - previous.Value) / Math.Abs(previous.Value)) * 100;
+    var isPositive = invertPositive ? change <= 0 : change >= 0;
+    var prefix = change >= 0 ? "+" : "";
+    return $"{prefix}{change:N1}%";
+}
+
+
 
 protected override async Task OnAfterRenderAsync(bool firstRender)
 {
@@ -577,35 +652,6 @@ private async Task RenderCharts()
         }
     }
 
-    private async Task OnPeriodChange(ChangeEventArgs e)
-    {
-        var period = e.Value?.ToString();
-        var today = DateTime.Today;
-
-        switch (period)
-        {
-            case "month":
-                startDate = new DateTime(today.Year, today.Month, 1);
-                endDate = today;
-                break;
-            case "quarter":
-                var quarterStart = new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1);
-                startDate = quarterStart;
-                endDate = today;
-                break;
-            case "ytd":
-                startDate = new DateTime(today.Year, 1, 1);
-                endDate = today;
-                break;
-            case "year":
-                startDate = today.AddYears(-1);
-                endDate = today;
-                break;
-        }
-
-        await GenerateReport();
-    }
-
     private string GetNetMargin()
     {
         if (summary == null || summary.TotalIncome == 0) return "0.0%";
@@ -614,8 +660,7 @@ private async Task RenderCharts()
 
     private async Task LoadSavedPresets()
     {
-        // Load from database (will implement service)
-        savedPresets = new List<ReportPreset>(); // Placeholder
+        savedPresets = await ReportPresetService.GetAllPresetsAsync("Financial");
     }
 
     private void ShowSavePresetDialog()
@@ -634,6 +679,7 @@ private async Task RenderCharts()
     {
         if (string.IsNullOrWhiteSpace(presetName))
         {
+            Toast.ShowWarning("Please enter a preset name", "Required");
             return;
         }
 
@@ -652,10 +698,11 @@ private async Task RenderCharts()
             IsDefault = presetIsDefault
         };
 
-        // Save to database (will implement)
-        savedPresets.Add(preset);
+        await ReportPresetService.SavePresetAsync(preset);
+        await LoadSavedPresets();
         
         showSavePresetDialog = false;
+        Toast.ShowSuccess($"Preset '{presetName}' saved successfully", "Saved");
         StateHasChanged();
     }
 
@@ -676,6 +723,29 @@ private async Task RenderCharts()
         selectedGrantId = preset.GrantId;
         selectedTheme = preset.PdfTheme ?? "Modern";
 
+        await GenerateReport();
+    }
+    
+    // Report Customization Methods
+    private void ShowCustomizationModal()
+    {
+        showCustomizationModal = true;
+        StateHasChanged();
+    }
+    
+    private void CloseCustomizationModal()
+    {
+        showCustomizationModal = false;
+        StateHasChanged();
+    }
+    
+    private async Task ApplyCustomization(ReportColumnSettings settings)
+    {
+        columnSettings = settings;
+        showCustomizationModal = false;
+        StateHasChanged();
+        
+        // Regenerate report with new settings
         await GenerateReport();
     }
 }

@@ -1,6 +1,7 @@
 @page "/donors"
 @using System.Web
 @inject IDonorService DonorService
+@inject IToastService Toast
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -9,14 +10,16 @@
 <!-- Filter Bar -->
 <div class="d-flex justify-between align-center mb-3">
     <div class="d-flex gap-3 align-center">
-        <div class="form-group" style="margin-bottom: 0;">
-            <input type="text" class="form-control" placeholder="Search donors..." 
-                   @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChanged"
-                   style="width: 250px;" aria-label="Search donors" />
-        </div>
+        <SearchInput 
+            @bind-Value="searchTerm"
+            OnSearch="OnSearchChanged"
+            Placeholder="Search donors..."
+            AriaLabel="Search donors"
+            ShowClearButton="true"
+            DebounceMs="300" />
         
         <div class="form-group" style="margin-bottom: 0;">
-            <select class="form-control" @bind="typeFilter" aria-label="Filter by donor type">
+            <select class="form-control" value="@typeFilter" @onchange="OnTypeFilterChanged" aria-label="Filter by donor type">
                 <option value="">All Types</option>
                 @foreach (var type in Enum.GetValues<DonorType>())
                 {
@@ -38,9 +41,7 @@
 <!-- Donor Cards -->
 @if (isLoading)
 {
-    <div class="loading">
-        <div class="spinner"></div>
-    </div>
+    <SkeletonLoader Type="SkeletonLoader.SkeletonType.CardGrid" Count="6" />
 }
 else
 {
@@ -212,8 +213,6 @@ private DonorType? typeFilter;
 private bool showInactive = false;
 private bool isLoading = true;
 private bool showForm = false;
-private System.Timers.Timer? _debounceTimer;
-private const int DebounceDelayMs = 300;
 
 private IEnumerable<DonorDto> FilteredDonors => donors
     .Where(d => showInactive || d.IsActive)
@@ -223,20 +222,24 @@ private IEnumerable<DonorDto> FilteredDonors => donors
     .Where(d => !typeFilter.HasValue || d.Type == typeFilter.Value)
     .OrderByDescending(d => d.TotalContributions);
 
-// Debounced search handler
-private void OnSearchChanged()
+// Search handler from SearchInput component
+private async Task OnSearchChanged(string value)
 {
-    _debounceTimer?.Stop();
-    _debounceTimer?.Dispose();
-        
-    _debounceTimer = new System.Timers.Timer(DebounceDelayMs);
-    _debounceTimer.Elapsed += async (sender, args) =>
+    searchTerm = value;
+    await InvokeAsync(StateHasChanged);
+}
+
+private void OnTypeFilterChanged(ChangeEventArgs e)
+{
+    if (string.IsNullOrEmpty(e.Value?.ToString()))
     {
-        _debounceTimer?.Stop();
-        await InvokeAsync(StateHasChanged);
-    };
-    _debounceTimer.AutoReset = false;
-    _debounceTimer.Start();
+        typeFilter = null;
+    }
+    else if (Enum.TryParse<DonorType>(e.Value.ToString(), out var type))
+    {
+        typeFilter = type;
+    }
+    StateHasChanged();
 }
 
 protected override async Task OnInitializedAsync()
@@ -292,6 +295,7 @@ private async Task LoadDonors()
     {
         showForm = false;
         await LoadDonors();
+        Toast.ShowSuccess("Donor saved successfully", "Saved");
     }
 
     private void CloseForm()

@@ -1,0 +1,131 @@
+@* 
+    LoadingSpinner - Consistent loading indicator for the application
+    Usage: <LoadingSpinner /> or <LoadingSpinner Size="SpinnerSize.Large" Text="Loading data..." />
+*@
+
+<div class="loading-spinner-container @(Overlay ? "overlay" : "") @(Centered ? "centered" : "")">
+    <div class="loading-spinner @SizeClass">
+        <div class="spinner"></div>
+        @if (!string.IsNullOrEmpty(Text))
+        {
+            <span class="loading-text">@Text</span>
+        }
+    </div>
+</div>
+
+<style>
+    .loading-spinner-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .loading-spinner-container.centered {
+        width: 100%;
+        min-height: 200px;
+        display: flex;
+    }
+    
+    .loading-spinner-container.overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        display: flex;
+    }
+    
+    .loading-spinner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    
+    .loading-spinner .spinner {
+        border: 3px solid var(--border-color, #e5e7eb);
+        border-top-color: var(--accent-color, #3b82f6);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    /* Size variants */
+    .loading-spinner.small .spinner {
+        width: 1rem;
+        height: 1rem;
+        border-width: 2px;
+    }
+    
+    .loading-spinner.medium .spinner {
+        width: 2rem;
+        height: 2rem;
+        border-width: 3px;
+    }
+    
+    .loading-spinner.large .spinner {
+        width: 3rem;
+        height: 3rem;
+        border-width: 4px;
+    }
+    
+    .loading-spinner.xlarge .spinner {
+        width: 4rem;
+        height: 4rem;
+        border-width: 5px;
+    }
+    
+    .loading-text {
+        color: var(--text-secondary, #6b7280);
+        font-size: 0.875rem;
+    }
+    
+    .loading-spinner-container.overlay .loading-spinner {
+        background: var(--bg-primary, white);
+        padding: 2rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    .loading-spinner-container.overlay .loading-text {
+        color: var(--text-primary, #1f2937);
+    }
+    
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    public enum SpinnerSize { Small, Medium, Large, XLarge }
+    
+    /// <summary>
+    /// Size of the spinner (Small, Medium, Large, XLarge)
+    /// </summary>
+    [Parameter] public SpinnerSize Size { get; set; } = SpinnerSize.Medium;
+    
+    /// <summary>
+    /// Optional text to display below the spinner
+    /// </summary>
+    [Parameter] public string? Text { get; set; }
+    
+    /// <summary>
+    /// Whether to show as a full-screen overlay
+    /// </summary>
+    [Parameter] public bool Overlay { get; set; }
+    
+    /// <summary>
+    /// Whether to center the spinner in its container
+    /// </summary>
+    [Parameter] public bool Centered { get; set; }
+    
+    private string SizeClass => Size switch
+    {
+        SpinnerSize.Small => "small",
+        SpinnerSize.Medium => "medium",
+        SpinnerSize.Large => "large",
+        SpinnerSize.XLarge => "xlarge",
+        _ => "medium"
+    };
+}

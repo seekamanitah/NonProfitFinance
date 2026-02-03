@@ -1,0 +1,334 @@
+@inject IReportCustomizationService CustomizationService
+@inject IJSRuntime JS
+
+<div class="modal-backdrop" @onclick="Cancel">
+    <div class="modal" style="max-width: 700px; max-height: 90vh; overflow-y: auto;" @onclick:stopPropagation="true">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fas fa-columns"></i> Customize Report Columns
+            </h3>
+            <button class="modal-close" @onclick="Cancel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <!-- Column Visibility & Order -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h4 class="card-title" style="margin: 0;"><i class="fas fa-eye"></i> Visible Columns</h4>
+                    <p class="text-muted" style="margin: 0.25rem 0 0 0; font-size: 0.85rem;">
+                        Check columns to show in report. Drag to reorder.
+                    </p>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div class="column-list">
+                        @foreach (var column in columns.OrderBy(c => c.Order))
+                        {
+                            <div class="column-item @(column.IsVisible ? "visible" : "hidden")" 
+                                 draggable="true"
+                                 @ondragstart="() => DragStart(column)"
+                                 @ondragover:preventDefault
+                                 @ondrop="() => Drop(column)">
+                                <div class="d-flex align-center gap-2">
+                                    <i class="fas fa-grip-vertical drag-handle" title="Drag to reorder"></i>
+                                    <input type="checkbox" 
+                                           @bind="column.IsVisible" 
+                                           id="col-@column.ColumnId"
+                                           class="form-checkbox" />
+                                    <label for="col-@column.ColumnId" class="column-label">
+                                        @column.DisplayName
+                                    </label>
+                                </div>
+                                <div class="column-options">
+                                    <select @bind="column.Alignment" class="form-control form-control-sm" style="width: 80px;">
+                                        <option value="@ColumnAlignment.Left">Left</option>
+                                        <option value="@ColumnAlignment.Center">Center</option>
+                                        <option value="@ColumnAlignment.Right">Right</option>
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export Options -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h4 class="card-title" style="margin: 0;"><i class="fas fa-file-export"></i> Export Options</h4>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Page Orientation</label>
+                            <select class="form-control" @bind="settings.PageOrientation">
+                                <option value="@PageOrientation.Portrait">Portrait</option>
+                                <option value="@PageOrientation.Landscape">Landscape</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Paper Size</label>
+                            <select class="form-control" @bind="settings.PaperSize">
+                                <option value="@PaperSize.Letter">Letter (8.5" x 11")</option>
+                                <option value="@PaperSize.Legal">Legal (8.5" x 14")</option>
+                                <option value="@PaperSize.A4">A4</option>
+                                <option value="@PaperSize.Tabloid">Tabloid (11" x 17")</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Date Format</label>
+                            <select class="form-control" @bind="settings.DateFormat">
+                                <option value="MM/dd/yyyy">MM/DD/YYYY (01/15/2025)</option>
+                                <option value="dd/MM/yyyy">DD/MM/YYYY (15/01/2025)</option>
+                                <option value="yyyy-MM-dd">YYYY-MM-DD (2025-01-15)</option>
+                                <option value="MMMM d, yyyy">Month D, YYYY (January 15, 2025)</option>
+                                <option value="d MMM yyyy">D Mon YYYY (15 Jan 2025)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Currency Format</label>
+                            <select class="form-control" @bind="settings.CurrencyFormat">
+                                <option value="C0">$1,234 (no decimals)</option>
+                                <option value="C2">$1,234.56 (2 decimals)</option>
+                                <option value="N0">1,234 (number only)</option>
+                                <option value="N2">1,234.56 (number with decimals)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row" style="margin-top: 1rem;">
+                        <div class="form-group">
+                            <label class="d-flex align-center gap-2">
+                                <input type="checkbox" @bind="settings.IncludeOrganizationHeader" class="form-checkbox" />
+                                <span>Include Organization Header</span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="d-flex align-center gap-2">
+                                <input type="checkbox" @bind="settings.IncludeSummaryTotals" class="form-checkbox" />
+                                <span>Include Summary Totals</span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="d-flex align-center gap-2">
+                                <input type="checkbox" @bind="settings.IncludeCharts" class="form-checkbox" />
+                                <span>Include Charts (PDF only)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Save Preset -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title" style="margin: 0;"><i class="fas fa-save"></i> Save as Preset</h4>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">Preset Name</label>
+                            <input type="text" class="form-control" @bind="presetName" 
+                                   placeholder="e.g., Monthly Summary, Board Report" />
+                        </div>
+                        
+                        <div class="form-group" style="align-self: flex-end;">
+                            <label class="d-flex align-center gap-2">
+                                <input type="checkbox" @bind="saveAsDefault" class="form-checkbox" />
+                                <span>Set as Default</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn btn-secondary" @onclick="ResetToDefaults">
+                <i class="fas fa-undo"></i> Reset to Defaults
+            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline" @onclick="Cancel">Cancel</button>
+                <button class="btn btn-primary" @onclick="Apply">
+                    <i class="fas fa-check"></i> Apply
+                </button>
+                @if (!string.IsNullOrEmpty(presetName))
+                {
+                    <button class="btn btn-success" @onclick="SavePreset">
+                        <i class="fas fa-save"></i> Save Preset
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .column-list {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .column-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: background-color 0.2s;
+    }
+    
+    .column-item:hover {
+        background-color: var(--bg-secondary);
+    }
+    
+    .column-item.hidden {
+        opacity: 0.6;
+    }
+    
+    .column-item:last-child {
+        border-bottom: none;
+    }
+    
+    .drag-handle {
+        cursor: grab;
+        color: var(--text-muted);
+    }
+    
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+    
+    .column-label {
+        cursor: pointer;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .column-options {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .form-checkbox {
+        width: 1.25rem;
+        height: 1.25rem;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+[Parameter] public CustomizableReportType ReportType { get; set; }
+[Parameter] public EventCallback<ReportColumnSettings> OnApply { get; set; }
+[Parameter] public EventCallback OnCancel { get; set; }
+    
+private ReportColumnSettings settings = new();
+private List<ReportColumnConfig> columns = [];
+private ReportColumnConfig? draggedColumn;
+private string presetName = "";
+private bool saveAsDefault = false;
+    
+protected override async Task OnInitializedAsync()
+{
+    settings = await CustomizationService.GetSettingsAsync(ReportType);
+    columns = CustomizationService.GetDefaultColumns(ReportType);
+        
+        // If we have saved columns, merge with defaults
+        if (!string.IsNullOrEmpty(settings.ColumnsJson) && settings.ColumnsJson != "[]")
+        {
+            try
+            {
+                var savedColumns = System.Text.Json.JsonSerializer.Deserialize<List<ReportColumnConfig>>(settings.ColumnsJson);
+                if (savedColumns != null)
+                {
+                    foreach (var saved in savedColumns)
+                    {
+                        var match = columns.FirstOrDefault(c => c.ColumnId == saved.ColumnId);
+                        if (match != null)
+                        {
+                            match.IsVisible = saved.IsVisible;
+                            match.Order = saved.Order;
+                            match.Alignment = saved.Alignment;
+                            match.IncludeInExport = saved.IncludeInExport;
+                        }
+                    }
+                }
+            }
+            catch { /* Use defaults if parsing fails */ }
+        }
+    }
+    
+    private void DragStart(ReportColumnConfig column)
+    {
+        draggedColumn = column;
+    }
+    
+    private void Drop(ReportColumnConfig targetColumn)
+    {
+        if (draggedColumn == null || draggedColumn == targetColumn)
+            return;
+            
+        var draggedOrder = draggedColumn.Order;
+        var targetOrder = targetColumn.Order;
+        
+        // Reorder columns
+        foreach (var col in columns)
+        {
+            if (draggedOrder < targetOrder)
+            {
+                // Moving down
+                if (col.Order > draggedOrder && col.Order <= targetOrder)
+                    col.Order--;
+            }
+            else
+            {
+                // Moving up
+                if (col.Order >= targetOrder && col.Order < draggedOrder)
+                    col.Order++;
+            }
+        }
+        
+        draggedColumn.Order = targetOrder;
+        draggedColumn = null;
+    }
+    
+    private void ResetToDefaults()
+    {
+        columns = CustomizationService.GetDefaultColumns(ReportType);
+        settings = new ReportColumnSettings
+        {
+            ReportType = ReportType,
+            ColumnsJson = System.Text.Json.JsonSerializer.Serialize(columns)
+        };
+    }
+    
+    private async Task Apply()
+    {
+        settings.ColumnsJson = System.Text.Json.JsonSerializer.Serialize(columns);
+        await OnApply.InvokeAsync(settings);
+    }
+    
+    private async Task SavePreset()
+    {
+        settings.PresetName = presetName;
+        settings.IsDefault = saveAsDefault;
+        settings.ReportType = ReportType;
+        settings.ColumnsJson = System.Text.Json.JsonSerializer.Serialize(columns);
+        
+        await CustomizationService.SaveSettingsAsync(settings);
+        await OnApply.InvokeAsync(settings);
+    }
+    
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+}

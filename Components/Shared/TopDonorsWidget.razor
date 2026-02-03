@@ -1,0 +1,288 @@
+@namespace NonProfitFinance.Components.Shared
+@inject IDonorService DonorService
+
+<div class="card top-donors-widget @CssClass">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-users"></i> Top Contributors
+        </h3>
+        <div class="d-flex gap-2 align-center">
+            <a href="/donors" class="btn btn-sm btn-outline">View All</a>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.List" Rows="5" />
+        }
+        else if (donors.Count == 0)
+        {
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <p>No donors found. <a href="/donors">Add a donor</a></p>
+            </div>
+        }
+        else
+        {
+            <!-- Summary Stats -->
+            <div class="donor-stats mb-3">
+                <div class="stat-item">
+                    <div class="stat-value">@totalDonors</div>
+                    <div class="stat-label">Donors</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value income">@totalContributions.ToString("C0")</div>
+                    <div class="stat-label">Contributions</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">@averageContribution.ToString("C0")</div>
+                    <div class="stat-label">Average</div>
+                </div>
+            </div>
+
+            <!-- Donor List -->
+            <div class="donor-list">
+                @{ var rank = 1; }
+                @foreach (var donor in topDonors)
+                {
+                    <div class="donor-item">
+                        <div class="donor-rank">@rank</div>
+                        <div class="donor-info">
+                            <div class="donor-header">
+                                <span class="donor-name">@donor.Name</span>
+                                <Badge CssClass="@GetDonorTypeBadgeClass(donor.Type)">@GetDonorTypeLabel(donor.Type)</Badge>
+                            </div>
+                            <div class="donor-details">
+                                <span class="donor-amount income">@donor.TotalContributions.ToString("C0")</span>
+                                @if (donor.LastContributionDate.HasValue)
+                                {
+                                    <span class="donor-last-date text-muted">
+                                        Last: @donor.LastContributionDate.Value.ToString("MMM d, yyyy")
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    rank++;
+                }
+            </div>
+
+            @if (totalDonors > MaxDonors)
+            {
+                <div class="view-more">
+                    <a href="/donors">View all @totalDonors donors</a>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .top-donors-widget .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    .top-donors-widget .empty-state i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .donor-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .stat-value.income {
+        color: #22c55e;
+    }
+
+    .stat-label {
+        font-size: 0.6875rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .donor-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .donor-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        transition: all 0.15s ease;
+    }
+
+    .donor-item:hover {
+        border-color: var(--primary-color);
+    }
+
+    .donor-rank {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-secondary);
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    .donor-item:nth-child(1) .donor-rank {
+        background: linear-gradient(135deg, #ffd700, #ffed4a);
+        color: #92400e;
+    }
+
+    .donor-item:nth-child(2) .donor-rank {
+        background: linear-gradient(135deg, #c0c0c0, #e5e7eb);
+        color: #4b5563;
+    }
+
+    .donor-item:nth-child(3) .donor-rank {
+        background: linear-gradient(135deg, #cd7f32, #fbbf24);
+        color: #78350f;
+    }
+
+    .donor-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .donor-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .donor-name {
+        font-weight: 500;
+        font-size: 0.9375rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .donor-details {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.125rem;
+    }
+
+    .donor-amount {
+        font-weight: 600;
+        font-size: 0.9375rem;
+    }
+
+    .donor-last-date {
+        font-size: 0.75rem;
+    }
+
+    .income {
+        color: #22c55e;
+    }
+
+    .view-more {
+        text-align: center;
+        padding-top: 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    .badge-individual {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+
+    .badge-corporate {
+        background: rgba(139, 92, 246, 0.1);
+        color: #8b5cf6;
+    }
+
+    .badge-foundation {
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+    }
+
+    .badge-government {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .badge-other {
+        background: rgba(107, 114, 128, 0.1);
+        color: #6b7280;
+    }
+</style>
+
+@code {
+    [Parameter] public int MaxDonors { get; set; } = 5;
+    [Parameter] public string? CssClass { get; set; }
+
+    private List<DonorDto> donors = [];
+    private bool isLoading = true;
+
+    private IEnumerable<DonorDto> topDonors => donors
+        .OrderByDescending(d => d.TotalContributions)
+        .Take(MaxDonors);
+
+    private int totalDonors => donors.Count;
+    private decimal totalContributions => donors.Sum(d => d.TotalContributions);
+    private decimal averageContribution => totalDonors > 0 ? totalContributions / totalDonors : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        donors = await DonorService.GetAllAsync();
+        isLoading = false;
+    }
+
+    private static string GetDonorTypeBadgeClass(DonorType type)
+    {
+        return type switch
+        {
+            DonorType.Individual => "badge-individual",
+            DonorType.Corporate => "badge-corporate",
+            DonorType.Foundation => "badge-foundation",
+            DonorType.Government => "badge-government",
+            _ => "badge-other"
+        };
+    }
+
+    private static string GetDonorTypeLabel(DonorType type)
+    {
+        return type switch
+        {
+            DonorType.Individual => "Individual",
+            DonorType.Corporate => "Corporate",
+            DonorType.Foundation => "Foundation",
+            DonorType.Government => "Government",
+            _ => "Other"
+        };
+    }
+}

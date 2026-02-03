@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Navigation
 
-<nav class="nav-menu">
+<nav class="nav-menu" @onclick="HandleNavClick">
     <NavLink class="nav-item" href="/landing" Match="NavLinkMatch.All">
         <i class="fas fa-home"></i>
         <span>Home</span>
@@ -104,3 +105,19 @@
         border-left: 3px solid var(--color-white);
     }
 </style>
+
+@code {
+    [Parameter] public EventCallback OnNavigate { get; set; }
+    
+    private async Task HandleNavClick(MouseEventArgs e)
+    {
+        // Small delay to allow navigation to complete
+        await Task.Delay(50);
+        
+        // Notify parent to close mobile menu
+        if (OnNavigate.HasDelegate)
+        {
+            await OnNavigate.InvokeAsync();
+        }
+    }
+}

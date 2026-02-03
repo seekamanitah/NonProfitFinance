@@ -31,6 +31,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetLineItem> BudgetLineItems => Set<BudgetLineItem>();
     public DbSet<ImportPreset> ImportPresets => Set<ImportPreset>();
+    public DbSet<ScheduledReport> ScheduledReports => Set<ScheduledReport>();
 
     // ==================== Inventory Module ====================
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
@@ -53,6 +54,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     
     // ==================== Audit ====================
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    
+    // ==================== Settings & Preferences ====================
+    public DbSet<ReportColumnSettings> ReportColumnSettings => Set<ReportColumnSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

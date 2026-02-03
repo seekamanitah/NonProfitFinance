@@ -1,0 +1,281 @@
+@namespace NonProfitFinance.Components.Shared
+
+<span class="badge badge-@Variant.ToString().ToLower() @(Size == BadgeSize.Small ? "badge-sm" : Size == BadgeSize.Large ? "badge-lg" : "") @(Pill ? "badge-pill" : "") @(Outlined ? "badge-outlined" : "") @(Clickable ? "badge-clickable" : "") @CssClass"
+      @onclick="HandleClick"
+      title="@Title"
+      style="@Style">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <i class="@Icon badge-icon"></i>
+    }
+    @if (ChildContent != null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        @Text
+    }
+    @if (ShowCount && Count.HasValue)
+    {
+        <span class="badge-count">@(Count > 99 ? "99+" : Count.ToString())</span>
+    }
+    @if (Dismissible)
+    {
+        <button type="button" class="badge-dismiss" @onclick="HandleDismiss" @onclick:stopPropagation="true" title="Remove">
+            <i class="fas fa-times"></i>
+        </button>
+    }
+</span>
+
+<style>
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.4;
+        border-radius: 0.25rem;
+        white-space: nowrap;
+        vertical-align: middle;
+        transition: all 0.15s ease;
+    }
+
+    /* Sizes */
+    .badge-sm {
+        padding: 0.125rem 0.375rem;
+        font-size: 0.6875rem;
+    }
+
+    .badge-lg {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+
+    /* Pill variant */
+    .badge-pill {
+        border-radius: 9999px;
+    }
+
+    /* Clickable */
+    .badge-clickable {
+        cursor: pointer;
+    }
+
+    .badge-clickable:hover {
+        filter: brightness(0.9);
+    }
+
+    /* Variants - solid */
+    .badge-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .badge-secondary {
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+
+    .badge-success {
+        background-color: #22c55e;
+        color: white;
+    }
+
+    .badge-danger {
+        background-color: #ef4444;
+        color: white;
+    }
+
+    .badge-warning {
+        background-color: #f59e0b;
+        color: #1a1a1a;
+    }
+
+    .badge-info {
+        background-color: #3b82f6;
+        color: white;
+    }
+
+    .badge-income {
+        background-color: rgba(34, 197, 94, 0.15);
+        color: #16a34a;
+    }
+
+    .badge-expense {
+        background-color: rgba(239, 68, 68, 0.15);
+        color: #dc2626;
+    }
+
+    .badge-muted {
+        background-color: var(--bg-secondary);
+        color: var(--text-muted);
+    }
+
+    /* Outlined variants */
+    .badge-outlined.badge-primary {
+        background-color: transparent;
+        border: 1px solid var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .badge-outlined.badge-success {
+        background-color: transparent;
+        border: 1px solid #22c55e;
+        color: #22c55e;
+    }
+
+    .badge-outlined.badge-danger {
+        background-color: transparent;
+        border: 1px solid #ef4444;
+        color: #ef4444;
+    }
+
+    .badge-outlined.badge-warning {
+        background-color: transparent;
+        border: 1px solid #f59e0b;
+        color: #f59e0b;
+    }
+
+    .badge-outlined.badge-info {
+        background-color: transparent;
+        border: 1px solid #3b82f6;
+        color: #3b82f6;
+    }
+
+    .badge-outlined.badge-income {
+        background-color: transparent;
+        border: 1px solid #22c55e;
+        color: #22c55e;
+    }
+
+    .badge-outlined.badge-expense {
+        background-color: transparent;
+        border: 1px solid #ef4444;
+        color: #ef4444;
+    }
+
+    /* Icon */
+    .badge-icon {
+        font-size: 0.625em;
+        opacity: 0.9;
+    }
+
+    .badge-sm .badge-icon {
+        font-size: 0.5625em;
+    }
+
+    .badge-lg .badge-icon {
+        font-size: 0.75em;
+    }
+
+    /* Count */
+    .badge-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.25rem;
+        height: 1.25rem;
+        padding: 0 0.25rem;
+        margin-left: 0.25rem;
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 9999px;
+        font-size: 0.625rem;
+        font-weight: 600;
+    }
+
+    .badge-outlined .badge-count {
+        background-color: currentColor;
+        color: white;
+    }
+
+    /* Dismiss button */
+    .badge-dismiss {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1rem;
+        height: 1rem;
+        margin-left: 0.25rem;
+        margin-right: -0.25rem;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: inherit;
+        opacity: 0.7;
+        cursor: pointer;
+        border-radius: 50%;
+        transition: all 0.15s ease;
+    }
+
+    .badge-dismiss:hover {
+        opacity: 1;
+        background-color: rgba(0, 0, 0, 0.1);
+    }
+
+    .badge-dismiss i {
+        font-size: 0.5rem;
+    }
+
+    /* Badge group */
+    .badge-group {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+</style>
+
+@code {
+    public enum BadgeVariant
+    {
+        Primary,
+        Secondary,
+        Success,
+        Danger,
+        Warning,
+        Info,
+        Income,
+        Expense,
+        Muted
+    }
+
+    public enum BadgeSize
+    {
+        Small,
+        Medium,
+        Large
+    }
+
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public BadgeVariant Variant { get; set; } = BadgeVariant.Secondary;
+    [Parameter] public BadgeSize Size { get; set; } = BadgeSize.Medium;
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Pill { get; set; } = false;
+    [Parameter] public bool Outlined { get; set; } = false;
+    [Parameter] public bool Dismissible { get; set; } = false;
+    [Parameter] public bool Clickable { get; set; } = false;
+    [Parameter] public bool ShowCount { get; set; } = false;
+    [Parameter] public int? Count { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (Clickable)
+        {
+            await OnClick.InvokeAsync();
+        }
+    }
+
+    private async Task HandleDismiss()
+    {
+        await OnDismiss.InvokeAsync();
+    }
+}

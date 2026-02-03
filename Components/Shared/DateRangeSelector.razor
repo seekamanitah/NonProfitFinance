@@ -1,0 +1,296 @@
+@namespace NonProfitFinance.Components.Shared
+
+<div class="date-range-selector @CssClass">
+    <div class="date-range-presets">
+        @foreach (var preset in Presets)
+        {
+            <button type="button"
+                    class="preset-btn @(IsPresetActive(preset) ? "active" : "")"
+                    @onclick="() => ApplyPreset(preset)">
+                @preset.Label
+            </button>
+        }
+    </div>
+
+    <div class="date-range-inputs">
+        <div class="date-input-group">
+            <label class="date-label">From</label>
+            <input type="date"
+                   class="form-control date-input"
+                   value="@StartDate.ToString("yyyy-MM-dd")"
+                   @onchange="OnStartDateChanged" />
+        </div>
+        <span class="date-separator">to</span>
+        <div class="date-input-group">
+            <label class="date-label">To</label>
+            <input type="date"
+                   class="form-control date-input"
+                   value="@EndDate.ToString("yyyy-MM-dd")"
+                   @onchange="OnEndDateChanged" />
+        </div>
+    </div>
+
+    @if (ShowComparison)
+    {
+        <div class="comparison-section">
+            <label class="comparison-toggle">
+                <input type="checkbox" @bind="comparisonEnabled" @bind:after="OnComparisonToggled" />
+                <span>Compare to previous period</span>
+            </label>
+            @if (comparisonEnabled)
+            {
+                <div class="comparison-dates text-muted">
+                    <i class="fas fa-calendar-alt"></i>
+                    @ComparisonStartDate.ToString("MMM d, yyyy") - @ComparisonEndDate.ToString("MMM d, yyyy")
+                </div>
+            }
+        </div>
+    }
+
+    @if (ShowFiscalYear)
+    {
+        <div class="fiscal-year-section">
+            <label class="fiscal-toggle">
+                <input type="checkbox" @bind="useFiscalYear" @bind:after="OnFiscalYearToggled" />
+                <span>Use fiscal year (@FiscalYearStartMonth.ToString("MMM") start)</span>
+            </label>
+        </div>
+    }
+</div>
+
+<style>
+    .date-range-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .date-range-presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+
+    .preset-btn {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 0.8125rem;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .preset-btn:hover {
+        background: var(--bg-secondary);
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .preset-btn.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+    }
+
+    .date-range-inputs {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+
+    .date-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .date-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .date-input {
+        width: 140px;
+        font-size: 0.875rem;
+    }
+
+    .date-separator {
+        color: var(--text-muted);
+        padding-bottom: 0.5rem;
+    }
+
+    .comparison-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        padding: 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
+    }
+
+    .comparison-toggle,
+    .fiscal-toggle {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+
+    .comparison-dates {
+        font-size: 0.8125rem;
+        margin-left: 1.5rem;
+    }
+
+    .fiscal-year-section {
+        padding: 0.5rem 0;
+    }
+
+    @@media (max-width: 640px) {
+        .date-range-presets {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 0.25rem;
+        }
+
+        .date-range-inputs {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .date-input {
+            width: 100%;
+        }
+
+        .date-separator {
+            display: none;
+        }
+    }
+</style>
+
+@code {
+    public record DatePreset(string Key, string Label, Func<DateTime> GetStart, Func<DateTime> GetEnd);
+
+    [Parameter] public DateTime StartDate { get; set; } = DateTime.Today.AddMonths(-1);
+    [Parameter] public DateTime EndDate { get; set; } = DateTime.Today;
+    [Parameter] public EventCallback<(DateTime Start, DateTime End)> OnRangeChanged { get; set; }
+    [Parameter] public EventCallback<(DateTime Start, DateTime End)?> OnComparisonChanged { get; set; }
+    [Parameter] public bool ShowComparison { get; set; } = false;
+    [Parameter] public bool ShowFiscalYear { get; set; } = false;
+    [Parameter] public int FiscalYearStartMonth { get; set; } = 1; // January
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public List<DatePreset>? CustomPresets { get; set; }
+
+    private bool comparisonEnabled;
+    private bool useFiscalYear;
+    private string? activePresetKey;
+
+    private DateTime ComparisonStartDate => StartDate.AddDays(-(EndDate - StartDate).Days - 1).AddDays(1);
+    private DateTime ComparisonEndDate => StartDate.AddDays(-1);
+
+    private List<DatePreset> Presets => CustomPresets ?? DefaultPresets;
+
+    private static List<DatePreset> DefaultPresets =>
+    [
+        new("today", "Today", () => DateTime.Today, () => DateTime.Today),
+        new("yesterday", "Yesterday", () => DateTime.Today.AddDays(-1), () => DateTime.Today.AddDays(-1)),
+        new("last7", "Last 7 Days", () => DateTime.Today.AddDays(-6), () => DateTime.Today),
+        new("last30", "Last 30 Days", () => DateTime.Today.AddDays(-29), () => DateTime.Today),
+        new("thisMonth", "This Month", () => new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1), () => DateTime.Today),
+        new("lastMonth", "Last Month", 
+            () => new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(-1),
+            () => new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddDays(-1)),
+        new("thisQuarter", "This Quarter", 
+            () => GetQuarterStart(DateTime.Today),
+            () => DateTime.Today),
+        new("lastQuarter", "Last Quarter",
+            () => GetQuarterStart(DateTime.Today).AddMonths(-3),
+            () => GetQuarterStart(DateTime.Today).AddDays(-1)),
+        new("ytd", "Year to Date", () => new DateTime(DateTime.Today.Year, 1, 1), () => DateTime.Today),
+        new("lastYear", "Last Year",
+            () => new DateTime(DateTime.Today.Year - 1, 1, 1),
+            () => new DateTime(DateTime.Today.Year - 1, 12, 31)),
+        new("last12", "Last 12 Months", () => DateTime.Today.AddMonths(-11).AddDays(1 - DateTime.Today.Day), () => DateTime.Today)
+    ];
+
+    private static DateTime GetQuarterStart(DateTime date)
+    {
+        var quarter = (date.Month - 1) / 3;
+        return new DateTime(date.Year, quarter * 3 + 1, 1);
+    }
+
+    private bool IsPresetActive(DatePreset preset)
+    {
+        var presetStart = preset.GetStart();
+        var presetEnd = preset.GetEnd();
+        return StartDate.Date == presetStart.Date && EndDate.Date == presetEnd.Date;
+    }
+
+    private async Task ApplyPreset(DatePreset preset)
+    {
+        activePresetKey = preset.Key;
+        StartDate = preset.GetStart();
+        EndDate = preset.GetEnd();
+        await NotifyRangeChanged();
+    }
+
+    private async Task OnStartDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            StartDate = date;
+            activePresetKey = null;
+            await NotifyRangeChanged();
+        }
+    }
+
+    private async Task OnEndDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            EndDate = date;
+            activePresetKey = null;
+            await NotifyRangeChanged();
+        }
+    }
+
+    private async Task NotifyRangeChanged()
+    {
+        await OnRangeChanged.InvokeAsync((StartDate, EndDate));
+        if (comparisonEnabled)
+        {
+            await OnComparisonChanged.InvokeAsync((ComparisonStartDate, ComparisonEndDate));
+        }
+    }
+
+    private async Task OnComparisonToggled()
+    {
+        if (comparisonEnabled)
+        {
+            await OnComparisonChanged.InvokeAsync((ComparisonStartDate, ComparisonEndDate));
+        }
+        else
+        {
+            await OnComparisonChanged.InvokeAsync(null);
+        }
+    }
+
+    private void OnFiscalYearToggled()
+    {
+        if (useFiscalYear)
+        {
+            // Adjust to fiscal year
+            var today = DateTime.Today;
+            var fiscalYearStart = today.Month >= FiscalYearStartMonth
+                ? new DateTime(today.Year, FiscalYearStartMonth, 1)
+                : new DateTime(today.Year - 1, FiscalYearStartMonth, 1);
+            StartDate = fiscalYearStart;
+            EndDate = today;
+            _ = NotifyRangeChanged();
+        }
+    }
+}

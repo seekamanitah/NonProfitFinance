@@ -24,8 +24,8 @@
 
     private bool showQuickAddModal = false;
     private string currentTheme = "light";
-    private IJSObjectReference? module;
-    private IJSObjectReference? themeListener;
+    private IJSObjectReference? themeModule;
+    private DotNetObjectReference<TopBarInteractive>? dotNetReference;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -33,26 +33,16 @@
         {
             try
             {
-                // Try to get theme with timeout
-                var timeoutTask = Task.Delay(500);
-                var getThemeTask = JS.InvokeAsync<string>("themeManager.getTheme").AsTask();
+                // Create reference to this component for JS callbacks
+                dotNetReference = DotNetObjectReference.Create(this);
                 
-                var completedTask = await Task.WhenAny(getThemeTask, timeoutTask);
-                
-                if (completedTask == getThemeTask)
-                {
-                    currentTheme = getThemeTask.Result;
-                }
-                else
-                {
-                    // Fallback to light theme if timeout
-                    currentTheme = "light";
-                }
-                
+                // Get current theme
+                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
                 StateHasChanged();
                 
-                // Set up event listener for theme changes from other components
-                await SetupThemeListener();
+                // Set up event listener using custom event
+                themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme-listener.js");
+                await themeModule.InvokeVoidAsync("setupThemeListener", dotNetReference);
             }
             catch (Exception ex)
             {
@@ -62,23 +52,11 @@
         }
     }
 
-    private async Task SetupThemeListener()
-    {
-        try
-        {
-            // Register Blazor callback with JavaScript theme manager
-            await JS.InvokeVoidAsync("themeManager.onThemeChange", new Action<string>(OnThemeChangedFromJS));
-        }
-        catch
-        {
-            // Event listener setup is optional
-        }
-    }
-
-    private void OnThemeChangedFromJS(string newTheme)
+    [JSInvokable]
+    public void OnThemeChanged(string newTheme)
     {
         currentTheme = newTheme;
-        StateHasChanged();
+        InvokeAsync(StateHasChanged);
     }
 
     private void ShowQuickAdd()
@@ -95,12 +73,27 @@
     {
         try
         {
-            currentTheme = await JS.InvokeAsync<string>("themeManager.toggle");
+            // Optimistically update UI first for immediate feedback
+            var previousTheme = currentTheme;
+            currentTheme = currentTheme == "dark" ? "light" : "dark";
             StateHasChanged();
+            
+            // Then sync with JS
+            var actualTheme = await JS.InvokeAsync<string>("themeManager.toggle");
+            
+            // Ensure we're in sync with actual theme
+            if (actualTheme != currentTheme)
+            {
+                currentTheme = actualTheme;
+                StateHasChanged();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Theme toggle error: {ex.Message}");
+            // Revert on error
+            currentTheme = currentTheme == "dark" ? "light" : "dark";
+            StateHasChanged();
         }
     }
 
@@ -114,10 +107,12 @@
     {
         try
         {
-            if (module is not null)
+            if (themeModule is not null)
             {
-                await module.DisposeAsync();
+                await themeModule.DisposeAsync();
             }
+            
+            dotNetReference?.Dispose();
         }
         catch
         {

@@ -50,8 +50,9 @@ public class Form990Service : IForm990Service
         var startDate = new DateTime(fiscalYear, 1, 1);
         var endDate = new DateTime(fiscalYear, 12, 31);
 
+        // Exclude transfer transactions from revenue calculation
         return await _context.Transactions
-            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .SumAsync(t => t.Amount);
     }
 
@@ -154,9 +155,9 @@ public class Form990Service : IForm990Service
                     column.Item().Background(Colors.Yellow.Lighten4).Padding(10).Column(noteCol =>
                     {
                         noteCol.Item().Text("Notes:").FontSize(10).Bold();
-                        noteCol.Item().Text("• This worksheet is for planning purposes only").FontSize(9);
-                        noteCol.Item().Text("• Consult with a tax professional for actual filing").FontSize(9);
-                        noteCol.Item().Text("• Some line items may require manual allocation").FontSize(9);
+                        noteCol.Item().Text("â€¢ This worksheet is for planning purposes only").FontSize(9);
+                        noteCol.Item().Text("â€¢ Consult with a tax professional for actual filing").FontSize(9);
+                        noteCol.Item().Text("â€¢ Some line items may require manual allocation").FontSize(9);
                     });
                 });
 
@@ -221,12 +222,13 @@ public class Form990Service : IForm990Service
     // Helper methods
     private async Task<Form990PartI> GetPartIDataAsync(DateTime startDate, DateTime endDate)
     {
+        // Exclude transfer transactions from Form 990 calculations
         var income = await _context.Transactions
-            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .ToListAsync();
 
         var expenses = await _context.Transactions
-            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .ToListAsync();
 
         var totalIncome = income.Sum(t => t.Amount);
@@ -266,10 +268,11 @@ public class Form990Service : IForm990Service
 
     private async Task<Form990PartVIII> GetPartVIIIDataAsync(DateTime startDate, DateTime endDate)
     {
+        // Exclude transfer transactions from Form 990 revenue
         var income = await _context.Transactions
             .Include(t => t.Category)
             .Include(t => t.Grant)
-            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Income && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .ToListAsync();
 
         var governmentGrants = income.Where(t => t.Grant != null).Sum(t => t.Amount);
@@ -290,9 +293,10 @@ public class Form990Service : IForm990Service
 
     private async Task<Form990PartIX> GetPartIXDataAsync(DateTime startDate, DateTime endDate)
     {
+        // Exclude transfer transactions from Form 990 expenses
         var expenses = await _context.Transactions
             .Include(t => t.Category)
-            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .ToListAsync();
 
         var totalExpenses = expenses.Sum(t => t.Amount);

@@ -4,6 +4,8 @@
 @inject ITransactionService TransactionService
 @inject IGrantService GrantService
 @inject IComplianceService ComplianceService
+@inject IToastService ToastService
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -24,9 +26,20 @@
 
 @if (isLoading)
 {
-    <div class="loading">
-        <div class="spinner"></div>
-        <span class="ml-2">Loading dashboard...</span>
+    <div class="dashboard-loading">
+        <!-- Skeleton metrics -->
+        <SkeletonLoader Type="SkeletonLoader.SkeletonType.MetricCards" Count="4" />
+        
+        <!-- Skeleton charts -->
+        <div class="charts-grid" style="margin-top: 1.5rem;">
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Card" />
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Card" />
+        </div>
+        
+        <!-- Loading indicator -->
+        <div style="margin-top: 1.5rem;">
+            <LoadingSpinner Size="LoadingSpinner.SpinnerSize.Medium" Text="Loading dashboard data..." Centered="true" />
+        </div>
     </div>
 }
 else
@@ -122,49 +135,92 @@ else
         <!-- Cash Flow Forecast -->
         <CashFlowWidget />
         
-        <!-- Recent Transactions -->
-        <div class="card">
+        <!-- Recent Transactions with Inline Actions -->
+        <div class="card recent-transactions-card">
             <div class="card-header">
                 <h3 class="card-title">Recent Transactions</h3>
-                <a href="/transactions" class="btn btn-sm btn-outline">View All</a>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline" @onclick="ShowQuickAdd" title="Add Transaction">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <a href="/transactions" class="btn btn-sm btn-outline">View All</a>
+                </div>
             </div>
             <div class="card-body" style="padding: 0;">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Category</th>
-                            <th class="text-right">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var tx in recentTransactions)
-                        {
-                            <tr>
-                                <td>@tx.Date.ToString("MMM dd")</td>
-                                <td>@(tx.Description ?? tx.Payee ?? "—")</td>
-                                <td>@tx.CategoryName</td>
-                                <td class="text-right amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
-                                    @(tx.Type == TransactionType.Income ? "+" : "-")@FormatCurrency(tx.Amount)
-                                </td>
-                            </tr>
-                        }
-                        @if (!recentTransactions.Any())
-                        {
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">No recent transactions</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                <div class="recent-transactions-list">
+                    @foreach (var tx in recentTransactions)
+                    {
+                        <div class="transaction-row @(selectedTransactionId == tx.Id ? "selected" : "")" 
+                             @onclick="() => SelectTransaction(tx.Id)"
+                             @onclick:stopPropagation="true">
+                            <div class="transaction-icon @(tx.Type == TransactionType.Income ? "income" : "expense")">
+                                <i class="fas @GetTransactionIcon(tx.Type)"></i>
+                            </div>
+                            <div class="transaction-main">
+                                <div class="transaction-header">
+                                    <span class="transaction-description">@(tx.Description ?? tx.Payee ?? "—")</span>
+                                    <span class="transaction-amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
+                                        @(tx.Type == TransactionType.Income ? "+" : "-")@FormatCurrency(tx.Amount)
+                                    </span>
+                                </div>
+                                <div class="transaction-meta">
+                                    <span class="transaction-date">
+                                        <i class="fas fa-calendar"></i> @tx.Date.ToString("MMM dd, yyyy")
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(tx.CategoryName))
+                                    {
+                                        <span class="transaction-category">
+                                            <i class="fas fa-tag"></i> @tx.CategoryName
+                                        </span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(tx.FundName))
+                                    {
+                                        <span class="transaction-fund">
+                                            <i class="fas fa-folder"></i> @tx.FundName
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="transaction-actions">
+                                <button class="btn-icon" @onclick="() => ViewTransaction(tx.Id)" @onclick:stopPropagation="true" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon" @onclick="() => EditTransaction(tx.Id)" @onclick:stopPropagation="true" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon" @onclick="() => DuplicateTransaction(tx)" @onclick:stopPropagation="true" title="Duplicate">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                <button class="btn-icon danger" @onclick="() => ConfirmDeleteTransaction(tx)" @onclick:stopPropagation="true" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    @if (!recentTransactions.Any())
+                    {
+                        <div class="empty-transactions">
+                            <i class="fas fa-receipt"></i>
+                            <p>No recent transactions</p>
+                            <button class="btn btn-primary btn-sm" @onclick="ShowQuickAdd">Add Transaction</button>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Third Row -->
-    <div class="charts-grid">        
-        <!-- Grants & Alerts -->
+    <!-- Third Row - Budget & Grants -->
+    <div class="charts-grid">
+        <BudgetProgressWidget MaxCategories="4" />
+        <GrantStatusWidget MaxGrants="3" />
+    </div>
+    
+    <!-- Fourth Row - Top Donors -->
+    <div class="charts-grid">
+        <TopDonorsWidget MaxDonors="5" />
+        
+        <!-- Upcoming Deadlines -->
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">Upcoming Deadlines</h3>
@@ -216,6 +272,189 @@ else
     </div>
 }
 
+@* Delete Confirmation Modal *@
+@if (showDeleteConfirm && transactionToDelete != null)
+{
+    <ConfirmationModal 
+        Title="Delete Transaction"
+        Message="@($"Are you sure you want to delete the transaction \"{transactionToDelete.Description ?? transactionToDelete.Payee ?? "this transaction"}\" for {FormatCurrency(transactionToDelete.Amount)}? This action can be undone from the Recycle Bin.")"
+        ConfirmText="Delete"
+        ConfirmButtonClass="btn-danger"
+        OnConfirm="DeleteTransaction"
+        OnCancel="CancelDelete" />
+}
+
+<style>
+    .recent-transactions-card .card-body {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .recent-transactions-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .transaction-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .transaction-row:hover {
+        background-color: var(--bg-secondary);
+    }
+
+    .transaction-row.selected {
+        background-color: rgba(196, 30, 58, 0.05);
+        border-left: 3px solid var(--primary-color);
+    }
+
+    .transaction-row:last-child {
+        border-bottom: none;
+    }
+
+    .transaction-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .transaction-icon.income {
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+    }
+
+    .transaction-icon.expense {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .transaction-main {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .transaction-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .transaction-description {
+        font-weight: 500;
+        font-size: 0.9375rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .transaction-amount {
+        font-weight: 600;
+        font-size: 0.9375rem;
+        white-space: nowrap;
+    }
+
+    .transaction-amount.income {
+        color: #22c55e;
+    }
+
+    .transaction-amount.expense {
+        color: #ef4444;
+    }
+
+    .transaction-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .transaction-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .transaction-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    .transaction-row:hover .transaction-actions,
+    .transaction-row.selected .transaction-actions {
+        opacity: 1;
+    }
+
+    .btn-icon {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: transparent;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: var(--text-muted);
+        transition: all 0.15s ease;
+    }
+
+    .btn-icon:hover {
+        background: var(--bg-secondary);
+        color: var(--primary-color);
+    }
+
+    .btn-icon.danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .empty-transactions {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    .empty-transactions i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-transactions p {
+        margin-bottom: 1rem;
+    }
+
+    @@media (max-width: 640px) {
+        .transaction-actions {
+            opacity: 1;
+        }
+
+        .transaction-meta {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .transaction-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+
 @code {
 private DashboardMetricsDto? metrics;
 private List<TransactionDto> recentTransactions = new();
@@ -225,6 +464,9 @@ private List<ComplianceReminderDto> criticalReminders = new();
 private bool isLoading = true;
 private bool isApproachingThreshold = false;
 private bool showQuickAddModal = false;
+private bool showDeleteConfirm = false;
+private TransactionDto? transactionToDelete;
+private int? selectedTransactionId;
 private List<TrendDataDto> trendData = new();
 private List<CategorySummaryDto> expenseBreakdown = new();
 private int trendMonths = 12;
@@ -353,5 +595,96 @@ private async Task LoadDashboardData()
         showQuickAddModal = false;
         await LoadDashboardData();
         await RenderCharts();
+    }
+
+    // Transaction inline action methods
+    private void SelectTransaction(int id)
+    {
+        selectedTransactionId = selectedTransactionId == id ? null : id;
+    }
+
+    private void ViewTransaction(int id)
+    {
+        NavigationManager.NavigateTo($"/transactions/{id}");
+    }
+
+    private void EditTransaction(int id)
+    {
+        NavigationManager.NavigateTo($"/transactions/{id}/edit");
+    }
+
+    private async Task DuplicateTransaction(TransactionDto tx)
+    {
+        try
+        {
+            var duplicateRequest = new CreateTransactionRequest(
+                Date: DateTime.Today,
+                Amount: tx.Amount,
+                Description: tx.Description,
+                Type: tx.Type,
+                CategoryId: tx.CategoryId,
+                FundType: tx.FundType,
+                FundId: tx.FundId,
+                ToFundId: tx.ToFundId,
+                DonorId: tx.DonorId,
+                GrantId: tx.GrantId,
+                Payee: tx.Payee,
+                Tags: tx.Tags,
+                ReferenceNumber: tx.ReferenceNumber,
+                PONumber: tx.PONumber,
+                IsRecurring: false
+            );
+
+            await TransactionService.CreateAsync(duplicateRequest);
+            ToastService.ShowSuccess("Transaction duplicated successfully");
+            await LoadDashboardData();
+            await RenderCharts();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to duplicate: {ex.Message}");
+        }
+    }
+
+    private void ConfirmDeleteTransaction(TransactionDto tx)
+    {
+        transactionToDelete = tx;
+        showDeleteConfirm = true;
+    }
+
+    private async Task DeleteTransaction()
+    {
+        if (transactionToDelete == null) return;
+
+        try
+        {
+            await TransactionService.DeleteAsync(transactionToDelete.Id);
+            ToastService.ShowSuccess("Transaction deleted");
+            showDeleteConfirm = false;
+            transactionToDelete = null;
+            await LoadDashboardData();
+            await RenderCharts();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to delete: {ex.Message}");
+        }
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        transactionToDelete = null;
+    }
+
+    private static string GetTransactionIcon(TransactionType type)
+    {
+        return type switch
+        {
+            TransactionType.Income => "fa-arrow-down",
+            TransactionType.Expense => "fa-arrow-up",
+            TransactionType.Transfer => "fa-exchange-alt",
+            _ => "fa-receipt"
+        };
     }
 }

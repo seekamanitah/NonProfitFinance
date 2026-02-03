@@ -1,0 +1,462 @@
+@page "/transactions/duplicates"
+@namespace NonProfitFinance.Components.Pages.Transactions
+@inject IDuplicateDetectionService DuplicateService
+@inject IToastService ToastService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Duplicate Review - NonProfit Finance</PageTitle>
+
+<PageHeader Title="Duplicate Transaction Review">
+    <a href="/transactions" class="btn btn-outline">
+        <i class="fas fa-arrow-left"></i> Back to Transactions
+    </a>
+</PageHeader>
+
+<!-- Search Criteria -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-filter"></i> Search Criteria
+        </h3>
+        <button class="btn btn-sm btn-outline" @onclick="ToggleCriteria">
+            <i class="fas @(showCriteria ? "fa-chevron-up" : "fa-chevron-down")"></i>
+            @(showCriteria ? "Hide" : "Show") Options
+        </button>
+    </div>
+    @if (showCriteria)
+    {
+        <div class="card-body">
+            <div class="criteria-grid">
+                <div class="form-group">
+                    <label>Date Range (days apart)</label>
+                    <select class="form-control" @bind="dateRangeDays">
+                        <option value="1">Same day or 1 day apart</option>
+                        <option value="3">Within 3 days</option>
+                        <option value="7">Within 1 week</option>
+                        <option value="14">Within 2 weeks</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Minimum Match Type</label>
+                    <select class="form-control" @bind="minMatchType">
+                        <option value="@DuplicateMatchType.Exact">Exact matches only</option>
+                        <option value="@DuplicateMatchType.Likely">Likely and above</option>
+                        <option value="@DuplicateMatchType.Possible">All potential matches</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" class="form-control" @bind="startDate" />
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" class="form-control" @bind="endDate" />
+                </div>
+            </div>
+            <div class="criteria-options mt-3">
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="matchPayee" /> Match Payee
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="matchDescription" /> Match Description
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="matchAccount" /> Match Account
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="matchCategory" /> Match Category
+                </label>
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary" @onclick="SearchDuplicates" disabled="@isLoading">
+                    <i class="fas @(isLoading ? "fa-spinner fa-spin" : "fa-search")"></i>
+                    Search for Duplicates
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Results -->
+@if (isLoading)
+{
+    <LoadingSpinner Text="Scanning for duplicates..." Centered="true" />
+}
+else if (hasSearched && duplicates.Count == 0)
+{
+    <div class="card">
+        <div class="card-body">
+            <EmptyState 
+                Icon="fa-check-circle"
+                Title="No Duplicates Found"
+                Message="No potential duplicate transactions were found matching your criteria." />
+        </div>
+    </div>
+}
+else if (duplicates.Count > 0)
+{
+    <div class="results-summary mb-3">
+        <Badge Variant="@(duplicates.Count > 10 ? Badge.BadgeVariant.Warning : Badge.BadgeVariant.Info)">
+            @duplicates.Count potential duplicate@(duplicates.Count != 1 ? "s" : "") found
+        </Badge>
+        <span class="text-muted ml-2">Review each pair and choose how to resolve them.</span>
+    </div>
+
+    <div class="duplicate-list">
+        @foreach (var match in duplicates)
+        {
+            <div class="duplicate-card card mb-3">
+                <div class="card-header duplicate-header">
+                    <div class="match-info">
+                        <Badge Variant="@GetBadgeVariant(match.MatchType)">@match.MatchType</Badge>
+                        <span class="similarity-score">@match.SimilarityScore.ToString("N0")% match</span>
+                    </div>
+                    <div class="match-criteria">
+                        @foreach (var criterion in match.MatchingCriteria.Take(3))
+                        {
+                            <span class="criterion-tag">@criterion</span>
+                        }
+                        @if (match.MatchingCriteria.Count > 3)
+                        {
+                            <span class="criterion-more">+@(match.MatchingCriteria.Count - 3) more</span>
+                        }
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="transaction-comparison">
+                        <!-- Transaction 1 -->
+                        <div class="transaction-side">
+                            <div class="transaction-label">Transaction #@match.Transaction1.Id</div>
+                            <div class="transaction-detail">
+                                <div class="detail-row">
+                                    <span class="detail-label">Date</span>
+                                    <span class="detail-value">@match.Transaction1.Date.ToString("MMM dd, yyyy")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Amount</span>
+                                    <span class="detail-value @(match.Transaction1.Type == TransactionType.Income ? "income" : "expense")">
+                                        @(match.Transaction1.Type == TransactionType.Income ? "+" : "-")@match.Transaction1.Amount.ToString("C")
+                                    </span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Payee</span>
+                                    <span class="detail-value">@(match.Transaction1.Payee ?? "—")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Description</span>
+                                    <span class="detail-value">@(match.Transaction1.Description ?? "—")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Category</span>
+                                    <span class="detail-value">@match.Transaction1.CategoryName</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Fund</span>
+                                    <span class="detail-value">@(match.Transaction1.FundName ?? "—")</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-danger mt-2" @onclick="() => ResolveMatch(match, DuplicateResolution.Delete1)">
+                                <i class="fas fa-trash"></i> Delete This
+                            </button>
+                        </div>
+
+                        <div class="comparison-divider">
+                            <i class="fas fa-arrows-alt-h"></i>
+                        </div>
+
+                        <!-- Transaction 2 -->
+                        <div class="transaction-side">
+                            <div class="transaction-label">Transaction #@match.Transaction2.Id</div>
+                            <div class="transaction-detail">
+                                <div class="detail-row">
+                                    <span class="detail-label">Date</span>
+                                    <span class="detail-value">@match.Transaction2.Date.ToString("MMM dd, yyyy")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Amount</span>
+                                    <span class="detail-value @(match.Transaction2.Type == TransactionType.Income ? "income" : "expense")">
+                                        @(match.Transaction2.Type == TransactionType.Income ? "+" : "-")@match.Transaction2.Amount.ToString("C")
+                                    </span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Payee</span>
+                                    <span class="detail-value">@(match.Transaction2.Payee ?? "—")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Description</span>
+                                    <span class="detail-value">@(match.Transaction2.Description ?? "—")</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Category</span>
+                                    <span class="detail-value">@match.Transaction2.CategoryName</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Fund</span>
+                                    <span class="detail-value">@(match.Transaction2.FundName ?? "—")</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-danger mt-2" @onclick="() => ResolveMatch(match, DuplicateResolution.Delete2)">
+                                <i class="fas fa-trash"></i> Delete This
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer duplicate-actions">
+                    <button class="btn btn-outline" @onclick="() => ResolveMatch(match, DuplicateResolution.Keep)">
+                        <i class="fas fa-check-double"></i> Keep Both
+                    </button>
+                    <button class="btn btn-outline" @onclick="() => ResolveMatch(match, DuplicateResolution.Dismiss)">
+                        <i class="fas fa-eye-slash"></i> Not Duplicates
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .criteria-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .criteria-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+
+    .results-summary {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .duplicate-card {
+        border-left: 4px solid var(--primary-color);
+    }
+
+    .duplicate-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .match-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .similarity-score {
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .match-criteria {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .criterion-tag {
+        background: var(--bg-secondary);
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius);
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .criterion-more {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .transaction-comparison {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .transaction-side {
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius);
+    }
+
+    .transaction-label {
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: var(--text-primary);
+    }
+
+    .transaction-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.875rem;
+    }
+
+    .detail-label {
+        color: var(--text-muted);
+    }
+
+    .detail-value {
+        font-weight: 500;
+        text-align: right;
+        max-width: 60%;
+        word-break: break-word;
+    }
+
+    .detail-value.income {
+        color: #22c55e;
+    }
+
+    .detail-value.expense {
+        color: #ef4444;
+    }
+
+    .comparison-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-size: 1.25rem;
+    }
+
+    .duplicate-actions {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    @@media (max-width: 768px) {
+        .transaction-comparison {
+            grid-template-columns: 1fr;
+        }
+
+        .comparison-divider {
+            transform: rotate(90deg);
+            padding: 0.5rem 0;
+        }
+
+        .duplicate-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+
+@code {
+    private List<DuplicateTransactionMatch> duplicates = new();
+    private bool isLoading = false;
+    private bool hasSearched = false;
+    private bool showCriteria = true;
+
+    // Search criteria
+    private int dateRangeDays = 3;
+    private DuplicateMatchType minMatchType = DuplicateMatchType.Likely;
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private bool matchPayee = true;
+    private bool matchDescription = true;
+    private bool matchAccount = true;
+    private bool matchCategory = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Default to last 90 days
+        endDate = DateTime.Today;
+        startDate = DateTime.Today.AddDays(-90);
+        
+        await SearchDuplicates();
+    }
+
+    private async Task SearchDuplicates()
+    {
+        isLoading = true;
+        hasSearched = true;
+        StateHasChanged();
+
+        try
+        {
+            var criteria = new DuplicateSearchCriteria(
+                DateRangeDays: dateRangeDays,
+                AmountTolerancePercent: 0,
+                MatchPayee: matchPayee,
+                MatchDescription: matchDescription,
+                MatchCategory: matchCategory,
+                MatchAccount: matchAccount,
+                StartDate: startDate,
+                EndDate: endDate,
+                MinimumMatchType: minMatchType
+            );
+
+            duplicates = await DuplicateService.FindDuplicatesAsync(criteria);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error searching for duplicates: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResolveMatch(DuplicateTransactionMatch match, DuplicateResolution resolution)
+    {
+        try
+        {
+            await DuplicateService.ResolveDuplicateAsync(match, resolution);
+            duplicates.Remove(match);
+
+            var message = resolution switch
+            {
+                DuplicateResolution.Delete1 => $"Transaction #{match.Transaction1Id} deleted",
+                DuplicateResolution.Delete2 => $"Transaction #{match.Transaction2Id} deleted",
+                DuplicateResolution.Keep => "Both transactions kept",
+                DuplicateResolution.Dismiss => "Marked as not duplicates",
+                _ => "Resolved"
+            };
+
+            ToastService.ShowSuccess(message);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error resolving duplicate: {ex.Message}");
+        }
+    }
+
+    private void ToggleCriteria()
+    {
+        showCriteria = !showCriteria;
+    }
+
+    private static Badge.BadgeVariant GetBadgeVariant(DuplicateMatchType matchType) => matchType switch
+    {
+        DuplicateMatchType.Exact => Badge.BadgeVariant.Danger,
+        DuplicateMatchType.Likely => Badge.BadgeVariant.Warning,
+        DuplicateMatchType.Possible => Badge.BadgeVariant.Info,
+        _ => Badge.BadgeVariant.Secondary
+    };
+}

@@ -12,19 +12,22 @@ public class PdfExportService : IPdfExportService
     private readonly IDonorService _donorService;
     private readonly IGrantService _grantService;
     private readonly ICategoryService _categoryService;
+    private readonly IDataIntegrityService _dataIntegrityService;
 
     public PdfExportService(
         IReportService reportService,
         ITransactionService transactionService,
         IDonorService donorService,
         IGrantService grantService,
-        ICategoryService categoryService)
+        ICategoryService categoryService,
+        IDataIntegrityService dataIntegrityService)
     {
         _reportService = reportService;
         _transactionService = transactionService;
         _donorService = donorService;
         _grantService = grantService;
         _categoryService = categoryService;
+        _dataIntegrityService = dataIntegrityService;
         
         // Configure QuestPDF license (Community license for open source)
         QuestPDF.Settings.License = LicenseType.Community;
@@ -597,6 +600,32 @@ public class PdfExportService : IPdfExportService
         ReportTheme.FireDepartment => new ThemeColors("#C41E3A", "#1A1A1A", "#FFFFFF"),
         _ => new ThemeColors("#C41E3A", "#1A1A1A", "#FFFFFF")
     };
+
+    /// <summary>
+    /// Composes a verification block for data integrity verification in PDF exports.
+    /// </summary>
+    private void ComposeVerificationBlock(IContainer container, string reportName, int recordCount, decimal? totalAmount)
+    {
+        var verification = _dataIntegrityService.CreateVerificationBlock(
+            reportName, 
+            recordCount, 
+            totalAmount, 
+            DateTime.UtcNow);
+        
+        container.Background(Colors.Grey.Lighten4).Border(1).BorderColor(Colors.Grey.Lighten2).Padding(10).Column(col =>
+        {
+            col.Item().Text("VERIFICATION BLOCK").FontSize(8).Bold().FontColor(Colors.Grey.Darken2);
+            col.Item().PaddingTop(5).Row(row =>
+            {
+                row.RelativeItem().Text($"Records: {verification.RecordCount:N0}").FontSize(7).FontColor(Colors.Grey.Darken1);
+                if (verification.TotalAmount.HasValue)
+                {
+                    row.RelativeItem().Text($"Total: {verification.TotalAmount:C}").FontSize(7).FontColor(Colors.Grey.Darken1);
+                }
+                row.RelativeItem().Text($"Hash: {verification.VerificationHash}").FontSize(7).FontColor(Colors.Grey.Darken1);
+            });
+        });
+    }
 
     private record ThemeColors(string PrimaryColor, string TextColor, string BackgroundColor);
 }

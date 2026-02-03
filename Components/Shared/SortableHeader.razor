@@ -1,0 +1,94 @@
+@*
+    SortableHeader - Sortable column header for DataTable
+    Usage: <SortableHeader Column="Name" CurrentSort="sortColumn" CurrentDirection="sortDirection" OnSort="HandleSort">
+               Name
+           </SortableHeader>
+*@
+
+<th class="sortable @(IsSorted ? "sorted" : "")" @onclick="HandleClick">
+    <div class="d-flex align-center gap-1">
+        @ChildContent
+        <i class="fas @SortIcon sort-icon"></i>
+    </div>
+</th>
+
+<style>
+    th.sortable {
+        cursor: pointer;
+        user-select: none;
+    }
+    
+    th.sortable:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    th .sort-icon {
+        font-size: 0.75rem;
+        opacity: 0.3;
+        transition: opacity 0.15s, transform 0.15s;
+    }
+    
+    th.sorted .sort-icon {
+        opacity: 1;
+        color: var(--accent-color);
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Column identifier
+    /// </summary>
+    [Parameter, EditorRequired] public string Column { get; set; } = "";
+    
+    /// <summary>
+    /// Currently sorted column
+    /// </summary>
+    [Parameter] public string? CurrentSort { get; set; }
+    
+    /// <summary>
+    /// Current sort direction
+    /// </summary>
+    [Parameter] public SortDirection CurrentDirection { get; set; } = SortDirection.Ascending;
+    
+    /// <summary>
+    /// Callback when sort is requested
+    /// </summary>
+    [Parameter] public EventCallback<(string Column, SortDirection Direction)> OnSort { get; set; }
+    
+    /// <summary>
+    /// Header content
+    /// </summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    
+    private bool IsSorted => CurrentSort == Column;
+    
+    private string SortIcon
+    {
+        get
+        {
+            if (!IsSorted) return "fa-sort";
+            return CurrentDirection == SortDirection.Ascending ? "fa-sort-up" : "fa-sort-down";
+        }
+    }
+    
+    private async Task HandleClick()
+    {
+        var newDirection = SortDirection.Ascending;
+        
+        if (IsSorted)
+        {
+            // Toggle direction
+            newDirection = CurrentDirection == SortDirection.Ascending 
+                ? SortDirection.Descending 
+                : SortDirection.Ascending;
+        }
+        
+        await OnSort.InvokeAsync((Column, newDirection));
+    }
+    
+    public enum SortDirection
+    {
+        Ascending,
+        Descending
+    }
+}

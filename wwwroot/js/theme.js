@@ -5,10 +5,6 @@ const themeManager = {
     listeners: [],
 
     init: function() {
-        if (this.initialized) {
-            return this.currentTheme;
-        }
-        
         // Check saved theme or system preference
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
@@ -20,12 +16,25 @@ const themeManager = {
             }
         }
         
+        // Always apply theme
         this.applyTheme(this.currentTheme);
-        this.initialized = true;
         
-        // Dispatch custom event for components to listen to
-        window.dispatchEvent(new CustomEvent('themeInitialized', { detail: { theme: this.currentTheme } }));
+        if (!this.initialized) {
+            this.initialized = true;
+            // Dispatch custom event only on first init
+            window.dispatchEvent(new CustomEvent('themeInitialized', { detail: { theme: this.currentTheme } }));
+        }
         
+        return this.currentTheme;
+    },
+
+    // Called on Blazor navigation to ensure theme is reapplied
+    reapply: function() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            this.currentTheme = savedTheme;
+        }
+        this.applyTheme(this.currentTheme);
         return this.currentTheme;
     },
 

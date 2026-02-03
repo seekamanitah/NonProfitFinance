@@ -68,6 +68,9 @@ builder.Services.AddScoped<IDonorService, DonorService>();
 builder.Services.AddScoped<IGrantService, GrantService>();
 builder.Services.AddScoped<IFundService, FundService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IReportCustomizationService, ReportCustomizationService>();
+builder.Services.AddScoped<IReportPresetService, ReportPresetService>();
+builder.Services.AddScoped<IScheduledReportService, ScheduledReportService>();
 builder.Services.AddScoped<IImportExportService, ImportExportService>();
 builder.Services.AddScoped<IImportPresetService, ImportPresetService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
@@ -87,6 +90,9 @@ builder.Services.AddScoped<IAccessibilityService, AccessibilityService>();
 builder.Services.AddScoped<ISpellCheckService, SpellCheckService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IDatabaseResetService, DatabaseResetService>();
+builder.Services.AddScoped<IDataIntegrityService, DataIntegrityService>();
+builder.Services.AddScoped<IToastService, ToastService>();
+builder.Services.AddScoped<IDuplicateDetectionService, DuplicateDetectionService>();
 builder.Services.AddHttpContextAccessor();
 
 // Add HttpClient for Blazor Server components (needed for API calls from components)

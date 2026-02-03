@@ -155,6 +155,31 @@ public class TransactionService : ITransactionService
         _logger.LogInformation("Creating transaction: Type={Type}, Amount={Amount}, Category={CategoryId}", 
             request.Type, request.Amount, request.CategoryId);
 
+        // Auto-assign to "General" fund if no fund specified (ensures transaction is visible in dashboard)
+        int? fundId = request.FundId;
+        if (!fundId.HasValue && request.Type != TransactionType.Transfer)
+        {
+            // Find or create "General" fund as fallback
+            var generalFund = await _context.Funds.FirstOrDefaultAsync(f => f.Name == "General");
+            if (generalFund == null)
+            {
+                generalFund = new Fund
+                {
+                    Name = "General",
+                    Type = FundType.Unrestricted,
+                    Description = "Default account for transactions without a specific account",
+                    StartingBalance = 0,
+                    Balance = 0,
+                    IsActive = true
+                };
+                _context.Funds.Add(generalFund);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Created default 'General' fund for transaction assignment");
+            }
+            fundId = generalFund.Id;
+            _logger.LogDebug("Auto-assigned transaction to General fund {FundId}", fundId);
+        }
+
         // Handle transfers specially - create paired transactions
         if (request.Type == TransactionType.Transfer)
         {
@@ -180,14 +205,14 @@ public class TransactionService : ITransactionService
         }
 
         // Validate fund balance for expenses
-        if (request.FundId.HasValue && request.Type == TransactionType.Expense)
+        if (fundId.HasValue && request.Type == TransactionType.Expense)
         {
-            var fund = await _context.Funds.FindAsync(request.FundId.Value);
+            var fund = await _context.Funds.FindAsync(fundId.Value);
             if (fund != null && fund.Balance < request.Amount)
             {
                 // Warning only - don't prevent, but log
                 // Organizations may allow temporary negative balances
-                _logger.LogWarning("Transaction may cause negative balance for Fund {FundId}", request.FundId);
+                _logger.LogWarning("Transaction may cause negative balance for Fund {FundId}", fundId);
             }
         }
 
@@ -204,7 +229,7 @@ public class TransactionService : ITransactionService
                 Type = request.Type,
                 CategoryId = request.CategoryId,
                 FundType = request.FundType,
-                FundId = request.FundId,
+                FundId = fundId, // Use auto-assigned or specified fund
                 DonorId = request.DonorId,
                 GrantId = request.GrantId,
                 Payee = request.Payee,
@@ -262,9 +287,9 @@ public class TransactionService : ITransactionService
             }
 
             // Update fund balance
-            if (request.FundId.HasValue)
+            if (fundId.HasValue)
             {
-                await UpdateFundBalanceAsync(request.FundId.Value);
+                await UpdateFundBalanceAsync(fundId.Value);
             }
 
             // Commit the transaction
@@ -276,7 +301,7 @@ public class TransactionService : ITransactionService
                 "Transaction",
                 transaction.Id,
                 $"Created {request.Type} transaction for ${request.Amount:N2}",
-                newValues: new { request.Amount, request.Type, request.CategoryId, request.FundId, request.Description }
+                newValues: new { request.Amount, request.Type, request.CategoryId, FundId = fundId, request.Description }
             );
 
             return (await GetByIdAsync(transaction.Id))!;
@@ -393,6 +418,8 @@ public class TransactionService : ITransactionService
         var oldDonorId = transaction.DonorId;
         var oldGrantId = transaction.GrantId;
         var oldFundId = transaction.FundId;
+        var oldAmount = transaction.Amount;
+        var oldDate = transaction.Date;
 
         transaction.Date = request.Date;
         transaction.Amount = request.Amount;
@@ -409,6 +436,24 @@ public class TransactionService : ITransactionService
         transaction.PONumber = request.PONumber;
         transaction.IsReconciled = request.IsReconciled;
         transaction.UpdatedAt = DateTime.UtcNow;
+
+        // If this is a transfer, update the paired transaction to keep them in sync
+        Transaction? pairedTransaction = null;
+        if (transaction.TransferPairId.HasValue)
+        {
+            pairedTransaction = await _context.Transactions
+                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+            
+            if (pairedTransaction != null)
+            {
+                // Keep amount and date in sync
+                pairedTransaction.Amount = request.Amount;
+                pairedTransaction.Date = request.Date;
+                pairedTransaction.ReferenceNumber = request.ReferenceNumber;
+                pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                _logger.LogInformation("Paired transfer transaction {PairedId} updated to match", pairedTransaction.Id);
+            }
+        }
 
         // Update splits
         _context.TransactionSplits.RemoveRange(transaction.Splits);
@@ -437,6 +482,12 @@ public class TransactionService : ITransactionService
 
         if (oldFundId.HasValue) await UpdateFundBalanceAsync(oldFundId.Value);
         if (request.FundId.HasValue && request.FundId != oldFundId) await UpdateFundBalanceAsync(request.FundId.Value);
+        
+        // Update paired transaction's fund balance if amount changed
+        if (pairedTransaction?.FundId != null && (oldAmount != request.Amount))
+        {
+            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+        }
 
         return await GetByIdAsync(id);
     }
@@ -454,10 +505,27 @@ public class TransactionService : ITransactionService
         var donorId = transaction.DonorId;
         var grantId = transaction.GrantId;
         var fundId = transaction.FundId;
+        var toFundId = transaction.ToFundId;
 
         // Soft delete instead of hard delete
         transaction.SoftDelete();
         transaction.UpdatedAt = DateTime.UtcNow;
+        
+        // If this is a transfer, also delete the paired transaction
+        Transaction? pairedTransaction = null;
+        if (transaction.TransferPairId.HasValue)
+        {
+            pairedTransaction = await _context.Transactions
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+            
+            if (pairedTransaction != null)
+            {
+                pairedTransaction.SoftDelete();
+                pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                _logger.LogInformation("Paired transfer transaction {PairedId} also soft-deleted", pairedTransaction.Id);
+            }
+        }
         
         await _context.SaveChangesAsync();
 
@@ -465,6 +533,12 @@ public class TransactionService : ITransactionService
         if (donorId.HasValue) await UpdateDonorTotalsAsync(donorId.Value);
         if (grantId.HasValue) await UpdateGrantUsageAsync(grantId.Value);
         if (fundId.HasValue) await UpdateFundBalanceAsync(fundId.Value);
+        
+        // Update paired transaction's fund balance if it was a transfer
+        if (pairedTransaction?.FundId != null && pairedTransaction.FundId != fundId)
+        {
+            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+        }
 
         _logger.LogInformation("Transaction {Id} soft-deleted", id);
         
@@ -473,7 +547,7 @@ public class TransactionService : ITransactionService
             AuditAction.Delete,
             "Transaction",
             id,
-            $"Soft-deleted transaction #{id}",
+            $"Soft-deleted transaction #{id}" + (pairedTransaction != null ? $" and paired transfer #{pairedTransaction.Id}" : ""),
             oldValues: new { transaction.Amount, transaction.Type, transaction.Description }
         );
         
@@ -491,12 +565,34 @@ public class TransactionService : ITransactionService
         transaction.Restore();
         transaction.UpdatedAt = DateTime.UtcNow;
         
+        // If this is a transfer, also restore the paired transaction
+        Transaction? pairedTransaction = null;
+        if (transaction.TransferPairId.HasValue)
+        {
+            pairedTransaction = await _context.Transactions
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id && t.IsDeleted);
+            
+            if (pairedTransaction != null)
+            {
+                pairedTransaction.Restore();
+                pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                _logger.LogInformation("Paired transfer transaction {PairedId} also restored", pairedTransaction.Id);
+            }
+        }
+        
         await _context.SaveChangesAsync();
 
         // Recalculate affected totals
         if (transaction.DonorId.HasValue) await UpdateDonorTotalsAsync(transaction.DonorId.Value);
         if (transaction.GrantId.HasValue) await UpdateGrantUsageAsync(transaction.GrantId.Value);
         if (transaction.FundId.HasValue) await UpdateFundBalanceAsync(transaction.FundId.Value);
+        
+        // Update paired transaction's fund balance if it was a transfer
+        if (pairedTransaction?.FundId != null && pairedTransaction.FundId != transaction.FundId)
+        {
+            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+        }
 
         _logger.LogInformation("Transaction {Id} restored from soft-delete", id);
         return true;
@@ -524,6 +620,22 @@ public class TransactionService : ITransactionService
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (transaction == null) return false;
+
+        // If this is a transfer, also permanently delete the paired transaction
+        if (transaction.TransferPairId.HasValue)
+        {
+            var pairedTransaction = await _context.Transactions
+                .IgnoreQueryFilters()
+                .Include(t => t.Splits)
+                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+            
+            if (pairedTransaction != null)
+            {
+                _context.TransactionSplits.RemoveRange(pairedTransaction.Splits);
+                _context.Transactions.Remove(pairedTransaction);
+                _logger.LogWarning("Paired transfer transaction {PairedId} also permanently deleted", pairedTransaction.Id);
+            }
+        }
 
         _context.TransactionSplits.RemoveRange(transaction.Splits);
         _context.Transactions.Remove(transaction);

@@ -60,9 +60,9 @@ public class BudgetService : IBudgetService
             .ThenBy(c => c.Name)
             .ToListAsync();
 
-        // Get actual spending by category
+        // Get actual spending by category (exclude transfer transactions)
         var actualByCategory = await _context.Transactions
-            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Type == TransactionType.Expense && t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .GroupBy(t => t.CategoryId)
             .Select(g => new { CategoryId = g.Key, Amount = g.Sum(t => t.Amount) })
             .ToDictionaryAsync(x => x.CategoryId, x => x.Amount);

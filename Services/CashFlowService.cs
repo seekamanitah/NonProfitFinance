@@ -137,12 +137,12 @@ public class CashFlowService : ICashFlowService
 
     private async Task AddHistoricalProjectionsAsync(List<ProjectedTransaction> projections, DateTime startDate, DateTime endDate)
     {
-        // Get last 6 months of transactions to calculate patterns
+        // Get last 6 months of transactions to calculate patterns (exclude transfers)
         var historicalStartDate = DateTime.Today.AddMonths(-6);
         
         var transactions = await _context.Transactions
             .Include(t => t.Category)
-            .Where(t => t.Date >= historicalStartDate && t.Date < DateTime.Today)
+            .Where(t => t.Date >= historicalStartDate && t.Date < DateTime.Today && t.TransferPairId == null)
             .ToListAsync();
 
         if (!transactions.Any()) return;

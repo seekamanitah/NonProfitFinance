@@ -1,0 +1,351 @@
+@*
+    DataTable - Reusable data table with sorting, selection, and responsive design
+    Usage: <DataTable Items="items" TItem="MyModel">
+               <HeaderTemplate>...</HeaderTemplate>
+               <RowTemplate>...</RowTemplate>
+           </DataTable>
+*@
+
+@typeparam TItem
+
+<div class="data-table-container @(IsLoading ? "loading" : "")">
+    @if (IsLoading)
+    {
+        <div class="data-table-loading-overlay">
+            <LoadingSpinner Size="LoadingSpinner.SpinnerSize.Medium" />
+        </div>
+    }
+    
+    <table class="data-table @(Striped ? "striped" : "") @(Hoverable ? "hoverable" : "") @(Compact ? "compact" : "")">
+        <thead>
+            <tr>
+                @if (Selectable)
+                {
+                    <th class="select-column">
+                        <input type="checkbox" 
+                               checked="@IsAllSelected" 
+                               @onchange="ToggleSelectAll"
+                               title="Select all" />
+                    </th>
+                }
+                @HeaderTemplate
+            </tr>
+        </thead>
+        <tbody>
+            @if (Items == null || !Items.Any())
+            {
+                <tr>
+                    <td colspan="100" class="empty-row">
+                        @if (EmptyTemplate != null)
+                        {
+                            @EmptyTemplate
+                        }
+                        else
+                        {
+                            <EmptyState 
+                                Icon="@EmptyIcon" 
+                                Title="@EmptyTitle" 
+                                Message="@EmptyMessage" />
+                        }
+                    </td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in Items)
+                {
+                    <tr class="@(IsSelected(item) ? "selected" : "") @(GetRowClass?.Invoke(item) ?? "")"
+                        @onclick="() => HandleRowClick(item)"
+                        @ondblclick="() => HandleRowDoubleClick(item)">
+                        @if (Selectable)
+                        {
+                            <td class="select-column" @onclick:stopPropagation="true">
+                                <input type="checkbox" 
+                                       checked="@IsSelected(item)"
+                                       @onchange="() => ToggleSelection(item)" />
+                            </td>
+                        }
+                        @RowTemplate(item)
+                    </tr>
+                }
+            }
+        </tbody>
+        @if (FooterTemplate != null)
+        {
+            <tfoot>
+                <tr>
+                    @FooterTemplate
+                </tr>
+            </tfoot>
+        }
+    </table>
+</div>
+
+<style>
+    .data-table-container {
+        position: relative;
+        overflow-x: auto;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+    }
+    
+    .data-table-container.loading {
+        min-height: 200px;
+    }
+    
+    .data-table-loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+    
+    :root[data-theme="dark"] .data-table-loading-overlay {
+        background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+    
+    .data-table thead {
+        background: var(--bg-secondary);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+    
+    .data-table th {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-primary);
+        border-bottom: 2px solid var(--border-color);
+        white-space: nowrap;
+    }
+    
+    .data-table th.sortable {
+        cursor: pointer;
+        user-select: none;
+    }
+    
+    .data-table th.sortable:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    .data-table th .sort-icon {
+        margin-left: 0.5rem;
+        opacity: 0.3;
+    }
+    
+    .data-table th.sorted .sort-icon {
+        opacity: 1;
+        color: var(--accent-color);
+    }
+    
+    .data-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-primary);
+    }
+    
+    .data-table.compact th,
+    .data-table.compact td {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .data-table.striped tbody tr:nth-child(even) {
+        background: var(--bg-secondary);
+    }
+    
+    .data-table.hoverable tbody tr:hover {
+        background: var(--bg-tertiary);
+    }
+    
+    .data-table tbody tr.selected {
+        background: rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    .data-table tbody tr {
+        transition: background-color 0.15s;
+    }
+    
+    .select-column {
+        width: 40px;
+        text-align: center;
+    }
+    
+    .select-column input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+        cursor: pointer;
+    }
+    
+    .empty-row {
+        text-align: center;
+        padding: 3rem 1rem !important;
+    }
+    
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .data-table th,
+        .data-table td {
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Items to display in the table
+    /// </summary>
+    [Parameter] public IEnumerable<TItem>? Items { get; set; }
+    
+    /// <summary>
+    /// Whether the table is currently loading data
+    /// </summary>
+    [Parameter] public bool IsLoading { get; set; }
+    
+    /// <summary>
+    /// Enable row selection with checkboxes
+    /// </summary>
+    [Parameter] public bool Selectable { get; set; }
+    
+    /// <summary>
+    /// Currently selected items
+    /// </summary>
+    [Parameter] public HashSet<TItem> SelectedItems { get; set; } = [];
+    
+    /// <summary>
+    /// Callback when selection changes
+    /// </summary>
+    [Parameter] public EventCallback<HashSet<TItem>> SelectedItemsChanged { get; set; }
+    
+    /// <summary>
+    /// Enable striped rows
+    /// </summary>
+    [Parameter] public bool Striped { get; set; } = true;
+    
+    /// <summary>
+    /// Enable hover effect on rows
+    /// </summary>
+    [Parameter] public bool Hoverable { get; set; } = true;
+    
+    /// <summary>
+    /// Use compact padding
+    /// </summary>
+    [Parameter] public bool Compact { get; set; }
+    
+    /// <summary>
+    /// Header row template
+    /// </summary>
+    [Parameter] public RenderFragment? HeaderTemplate { get; set; }
+    
+    /// <summary>
+    /// Row template for each item
+    /// </summary>
+    [Parameter] public RenderFragment<TItem>? RowTemplate { get; set; }
+    
+    /// <summary>
+    /// Footer row template
+    /// </summary>
+    [Parameter] public RenderFragment? FooterTemplate { get; set; }
+    
+    /// <summary>
+    /// Custom empty state template
+    /// </summary>
+    [Parameter] public RenderFragment? EmptyTemplate { get; set; }
+    
+    /// <summary>
+    /// Empty state icon
+    /// </summary>
+    [Parameter] public string EmptyIcon { get; set; } = "fas fa-inbox";
+    
+    /// <summary>
+    /// Empty state title
+    /// </summary>
+    [Parameter] public string EmptyTitle { get; set; } = "No data";
+    
+    /// <summary>
+    /// Empty state message
+    /// </summary>
+    [Parameter] public string EmptyMessage { get; set; } = "There are no items to display.";
+    
+    /// <summary>
+    /// Callback when row is clicked
+    /// </summary>
+    [Parameter] public EventCallback<TItem> OnRowClick { get; set; }
+    
+    /// <summary>
+    /// Callback when row is double-clicked
+    /// </summary>
+    [Parameter] public EventCallback<TItem> OnRowDoubleClick { get; set; }
+    
+    /// <summary>
+    /// Function to get custom CSS class for a row
+    /// </summary>
+    [Parameter] public Func<TItem, string>? GetRowClass { get; set; }
+    
+    private bool IsAllSelected => Items != null && Items.Any() && Items.All(i => SelectedItems.Contains(i));
+    
+    private bool IsSelected(TItem item) => SelectedItems.Contains(item);
+    
+    private async Task ToggleSelection(TItem item)
+    {
+        if (SelectedItems.Contains(item))
+        {
+            SelectedItems.Remove(item);
+        }
+        else
+        {
+            SelectedItems.Add(item);
+        }
+        
+        await SelectedItemsChanged.InvokeAsync(SelectedItems);
+    }
+    
+    private async Task ToggleSelectAll()
+    {
+        if (Items == null) return;
+        
+        if (IsAllSelected)
+        {
+            SelectedItems.Clear();
+        }
+        else
+        {
+            foreach (var item in Items)
+            {
+                SelectedItems.Add(item);
+            }
+        }
+        
+        await SelectedItemsChanged.InvokeAsync(SelectedItems);
+    }
+    
+    private async Task HandleRowClick(TItem item)
+    {
+        if (OnRowClick.HasDelegate)
+        {
+            await OnRowClick.InvokeAsync(item);
+        }
+    }
+    
+    private async Task HandleRowDoubleClick(TItem item)
+    {
+        if (OnRowDoubleClick.HasDelegate)
+        {
+            await OnRowDoubleClick.InvokeAsync(item);
+        }
+    }
+}

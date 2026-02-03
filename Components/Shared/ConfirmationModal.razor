@@ -1,0 +1,214 @@
+@*
+    ConfirmationModal - Standardized confirmation dialog
+    Usage: <ConfirmationModal 
+               Show="showConfirm" 
+               Title="Delete Item?"
+               Message="This action cannot be undone."
+               ConfirmText="Delete"
+               ConfirmStyle="danger"
+               OnConfirm="HandleDelete"
+               OnCancel="CancelDelete" />
+*@
+
+@if (Show)
+{
+    <div class="modal-backdrop" @onclick="HandleCancel">
+        <div class="modal confirmation-modal @ConfirmStyle" style="max-width: 400px;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <div class="confirmation-icon @ConfirmStyle">
+                    <i class="fas @Icon"></i>
+                </div>
+                <h3 class="modal-title">@Title</h3>
+            </div>
+            <div class="modal-body">
+                <p class="confirmation-message">@Message</p>
+                @if (ChildContent != null)
+                {
+                    @ChildContent
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HandleCancel" disabled="@IsProcessing">
+                    <i class="fas fa-times"></i> @CancelText
+                </button>
+                <button class="btn @ButtonClass" @onclick="HandleConfirm" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span class="btn-spinner"></span>
+                        <span>@ProcessingText</span>
+                    }
+                    else
+                    {
+                        <i class="fas @ConfirmIcon"></i>
+                        <span>@ConfirmText</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .confirmation-modal {
+        text-align: center;
+    }
+    
+    .confirmation-modal .modal-header {
+        flex-direction: column;
+        gap: 1rem;
+        padding-bottom: 0;
+    }
+    
+    .confirmation-icon {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin: 0 auto;
+    }
+    
+    .confirmation-icon.danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+    
+    .confirmation-icon.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+    
+    .confirmation-icon.info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+    
+    .confirmation-icon.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    
+    .confirmation-message {
+        color: var(--text-secondary);
+        margin: 0;
+        line-height: 1.6;
+    }
+    
+    .confirmation-modal .modal-footer {
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .btn-spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Whether to show the modal
+    /// </summary>
+    [Parameter] public bool Show { get; set; }
+    
+    /// <summary>
+    /// Modal title
+    /// </summary>
+    [Parameter] public string Title { get; set; } = "Confirm Action";
+    
+    /// <summary>
+    /// Confirmation message
+    /// </summary>
+    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+    
+    /// <summary>
+    /// Style/type of confirmation (danger, warning, info, success)
+    /// </summary>
+    [Parameter] public string ConfirmStyle { get; set; } = "danger";
+    
+    /// <summary>
+    /// Text for confirm button
+    /// </summary>
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    
+    /// <summary>
+    /// Text for cancel button
+    /// </summary>
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    
+    /// <summary>
+    /// Text to show while processing
+    /// </summary>
+    [Parameter] public string ProcessingText { get; set; } = "Processing...";
+    
+    /// <summary>
+    /// Whether the action is currently processing
+    /// </summary>
+    [Parameter] public bool IsProcessing { get; set; }
+    
+    /// <summary>
+    /// Callback when confirmed
+    /// </summary>
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    
+    /// <summary>
+    /// Callback when cancelled
+    /// </summary>
+    [Parameter] public EventCallback OnCancel { get; set; }
+    
+    /// <summary>
+    /// Additional content
+    /// </summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    
+    private string Icon => ConfirmStyle switch
+    {
+        "danger" => "fa-exclamation-triangle",
+        "warning" => "fa-exclamation-circle",
+        "success" => "fa-check-circle",
+        "info" => "fa-info-circle",
+        _ => "fa-question-circle"
+    };
+    
+    private string ConfirmIcon => ConfirmStyle switch
+    {
+        "danger" => "fa-trash",
+        "warning" => "fa-exclamation",
+        "success" => "fa-check",
+        _ => "fa-check"
+    };
+    
+    private string ButtonClass => ConfirmStyle switch
+    {
+        "danger" => "btn-danger",
+        "warning" => "btn-warning",
+        "success" => "btn-success",
+        "info" => "btn-primary",
+        _ => "btn-primary"
+    };
+    
+    private async Task HandleConfirm()
+    {
+        await OnConfirm.InvokeAsync();
+    }
+    
+    private async Task HandleCancel()
+    {
+        if (!IsProcessing)
+        {
+            await OnCancel.InvokeAsync();
+        }
+    }
+}

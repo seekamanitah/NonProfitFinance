@@ -1,0 +1,278 @@
+@namespace NonProfitFinance.Components.Shared
+
+<div class="search-input-container @(Compact ? "search-input-compact" : "") @(IsFocused ? "focused" : "")">
+    @if (ShowIcon)
+    {
+        <span class="search-icon">
+            <i class="fas @(IsSearching ? "fa-spinner fa-spin" : "fa-search")"></i>
+        </span>
+    }
+
+    <input type="text"
+           class="search-input"
+           placeholder="@Placeholder"
+           value="@Value"
+           @oninput="HandleInput"
+           @onfocus="HandleFocus"
+           @onblur="HandleBlur"
+           @onkeydown="HandleKeyDown"
+           aria-label="@AriaLabel"
+           disabled="@Disabled" />
+
+    @if (ShowClearButton && !string.IsNullOrEmpty(Value))
+    {
+        <button type="button"
+                class="search-clear-btn"
+                @onclick="ClearSearch"
+                title="Clear search"
+                tabindex="-1">
+            <i class="fas fa-times"></i>
+        </button>
+    }
+
+    @if (ShowShortcutHint && !IsFocused && string.IsNullOrEmpty(Value))
+    {
+        <span class="search-shortcut-hint">@ShortcutHint</span>
+    }
+</div>
+
+<style>
+    .search-input-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        transition: all 0.2s ease;
+    }
+
+    .search-input-container:hover:not(:focus-within) {
+        border-color: var(--text-muted);
+    }
+
+    .search-input-container.focused {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 59, 130, 246), 0.15);
+    }
+
+    .search-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0.75rem;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .search-input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 0.625rem 0.75rem;
+        padding-left: 0;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        outline: none;
+        min-width: 0;
+    }
+
+    .search-input-container:not(:has(.search-icon)) .search-input {
+        padding-left: 0.75rem;
+    }
+
+    .search-input::placeholder {
+        color: var(--text-muted);
+    }
+
+    .search-input:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .search-clear-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        margin-right: 0.5rem;
+        padding: 0;
+        border: none;
+        background: var(--bg-secondary);
+        color: var(--text-muted);
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        font-size: 0.75rem;
+    }
+
+    .search-clear-btn:hover {
+        background: var(--bg-tertiary, var(--border-color));
+        color: var(--text-primary);
+    }
+
+    .search-shortcut-hint {
+        margin-right: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 0.25rem;
+        font-size: 0.6875rem;
+        color: var(--text-muted);
+        font-family: monospace;
+        white-space: nowrap;
+    }
+
+    /* Compact variant */
+    .search-input-compact {
+        font-size: 0.8125rem;
+    }
+
+    .search-input-compact .search-input {
+        padding: 0.5rem 0.625rem;
+        padding-left: 0;
+        font-size: 0.8125rem;
+    }
+
+    .search-input-compact .search-icon {
+        padding: 0 0.625rem;
+        font-size: 0.8125rem;
+    }
+
+    .search-input-compact .search-clear-btn {
+        width: 1.25rem;
+        height: 1.25rem;
+        font-size: 0.625rem;
+    }
+
+    /* Full width variant */
+    .search-input-container.full-width {
+        width: 100%;
+    }
+
+    @@media (max-width: 640px) {
+        .search-shortcut-hint {
+            display: none;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Search...";
+    [Parameter] public string AriaLabel { get; set; } = "Search";
+    [Parameter] public int DebounceMs { get; set; } = 300;
+    [Parameter] public bool ShowIcon { get; set; } = true;
+    [Parameter] public bool ShowClearButton { get; set; } = true;
+    [Parameter] public bool ShowShortcutHint { get; set; } = false;
+    [Parameter] public string ShortcutHint { get; set; } = "Ctrl+K";
+    [Parameter] public bool Compact { get; set; } = false;
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public bool SearchOnEnter { get; set; } = false;
+    [Parameter] public int MinSearchLength { get; set; } = 0;
+
+    private bool IsFocused { get; set; }
+    private bool IsSearching { get; set; }
+    private System.Timers.Timer? _debounceTimer;
+    private string? _lastSearchValue;
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        var newValue = e.Value?.ToString() ?? string.Empty;
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+
+        if (!SearchOnEnter)
+        {
+            ScheduleSearch(newValue);
+        }
+    }
+
+    private void ScheduleSearch(string searchValue)
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+
+        if (DebounceMs <= 0)
+        {
+            _ = ExecuteSearch(searchValue);
+            return;
+        }
+
+        IsSearching = true;
+        StateHasChanged();
+
+        _debounceTimer = new System.Timers.Timer(DebounceMs);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            _debounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                await ExecuteSearch(searchValue);
+            });
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    private async Task ExecuteSearch(string searchValue)
+    {
+        if (searchValue == _lastSearchValue)
+        {
+            IsSearching = false;
+            StateHasChanged();
+            return;
+        }
+
+        if (searchValue.Length < MinSearchLength && !string.IsNullOrEmpty(searchValue))
+        {
+            IsSearching = false;
+            StateHasChanged();
+            return;
+        }
+
+        _lastSearchValue = searchValue;
+        await OnSearch.InvokeAsync(searchValue);
+        IsSearching = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && SearchOnEnter)
+        {
+            await ExecuteSearch(Value ?? string.Empty);
+        }
+        else if (e.Key == "Escape")
+        {
+            await ClearSearch();
+        }
+    }
+
+    private async Task ClearSearch()
+    {
+        Value = string.Empty;
+        _lastSearchValue = null;
+        await ValueChanged.InvokeAsync(string.Empty);
+        await OnSearch.InvokeAsync(string.Empty);
+    }
+
+    private void HandleFocus()
+    {
+        IsFocused = true;
+    }
+
+    private void HandleBlur()
+    {
+        IsFocused = false;
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+    }
+}

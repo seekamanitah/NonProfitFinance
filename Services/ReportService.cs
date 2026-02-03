@@ -24,8 +24,9 @@ public class ReportService : IReportService
         var startOfYear = new DateTime(now.Year, 1, 1);
 
         // Batch transaction calculations in single query
+        // Exclude transfer transactions (TransferPairId != null) as they inflate income/expense totals
         var transactionSummary = await _context.Transactions
-            .Where(t => t.Date >= startOfYear)
+            .Where(t => t.Date >= startOfYear && t.TransferPairId == null) // Exclude transfers
             .GroupBy(t => new { IsCurrentMonth = t.Date >= startOfMonth, t.Type })
             .Select(g => new
             {
@@ -52,6 +53,7 @@ public class ReportService : IReportService
         var restrictedBalance = await _fundService.GetTotalRestrictedBalanceAsync();
         var unrestrictedBalance = await _fundService.GetTotalUnrestrictedBalanceAsync();
         var totalBalance = restrictedBalance + unrestrictedBalance;
+
 
         var restrictedPercentage = totalBalance > 0
             ? (restrictedBalance / totalBalance) * 100
@@ -144,9 +146,10 @@ public class ReportService : IReportService
         // Convert CategoryType to TransactionType for filtering
         var transactionType = type == CategoryType.Income ? TransactionType.Income : TransactionType.Expense;
         
+        // Exclude transfer transactions as they don't represent actual income/expense
         var query = _context.Transactions
             .Include(t => t.Category)
-            .Where(t => t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .Where(t => t.Type == transactionType); // Filter by Transaction.Type, not Category.Type
 
         if (fundId.HasValue)
@@ -302,8 +305,9 @@ public class ReportService : IReportService
 
     public async Task<List<TrendDataDto>> GetTrendDataAsync(DateTime startDate, DateTime endDate, string interval = "monthly")
     {
+        // Exclude transfer transactions to prevent inflation of income/expense totals
         var transactions = await _context.Transactions
-            .Where(t => t.Date >= startDate && t.Date <= endDate)
+            .Where(t => t.Date >= startDate && t.Date <= endDate && t.TransferPairId == null)
             .ToListAsync();
 
         var periods = GeneratePeriods(startDate, endDate, interval);

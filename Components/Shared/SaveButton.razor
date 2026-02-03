@@ -1,0 +1,163 @@
+@*
+    SaveButton - Enhanced save button with loading state and feedback
+    Usage: <SaveButton OnSave="HandleSave" IsSaving="isSaving" HasChanges="hasChanges" />
+*@
+
+<button type="@(Type)" 
+        class="btn @ButtonClass @(IsSaving ? "saving" : "") @(ShowSuccess ? "success" : "")"
+        disabled="@IsDisabled"
+        @onclick="HandleClick"
+        @attributes="AdditionalAttributes">
+    @if (IsSaving)
+    {
+        <span class="btn-spinner"></span>
+        <span>@SavingText</span>
+    }
+    else if (ShowSuccess)
+    {
+        <i class="fas fa-check"></i>
+        <span>@SuccessText</span>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <i class="@Icon"></i>
+        }
+        <span>@Text</span>
+        @if (HasChanges)
+        {
+            <span class="unsaved-indicator" title="Unsaved changes"></span>
+        }
+    }
+</button>
+
+<style>
+    .btn-spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: btn-spin 0.6s linear infinite;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    
+    @@keyframes btn-spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .btn.saving {
+        opacity: 0.8;
+        cursor: wait;
+    }
+    
+    .btn.success {
+        background-color: #10b981 !important;
+        border-color: #10b981 !important;
+    }
+    
+    .unsaved-indicator {
+        width: 0.5rem;
+        height: 0.5rem;
+        background: #f59e0b;
+        border-radius: 50%;
+        margin-left: 0.5rem;
+        display: inline-block;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Button text
+    /// </summary>
+    [Parameter] public string Text { get; set; } = "Save";
+    
+    /// <summary>
+    /// Text to show while saving
+    /// </summary>
+    [Parameter] public string SavingText { get; set; } = "Saving...";
+    
+    /// <summary>
+    /// Text to show after successful save
+    /// </summary>
+    [Parameter] public string SuccessText { get; set; } = "Saved!";
+    
+    /// <summary>
+    /// Icon class (FontAwesome)
+    /// </summary>
+    [Parameter] public string Icon { get; set; } = "fas fa-save";
+    
+    /// <summary>
+    /// Button type (button or submit)
+    /// </summary>
+    [Parameter] public string Type { get; set; } = "button";
+    
+    /// <summary>
+    /// CSS class for the button
+    /// </summary>
+    [Parameter] public string ButtonClass { get; set; } = "btn-primary";
+    
+    /// <summary>
+    /// Whether the button is currently saving
+    /// </summary>
+    [Parameter] public bool IsSaving { get; set; }
+    
+    /// <summary>
+    /// Whether there are unsaved changes
+    /// </summary>
+    [Parameter] public bool HasChanges { get; set; }
+    
+    /// <summary>
+    /// Whether the button is disabled
+    /// </summary>
+    [Parameter] public bool Disabled { get; set; }
+    
+    /// <summary>
+    /// Callback when button is clicked
+    /// </summary>
+    [Parameter] public EventCallback OnSave { get; set; }
+    
+    /// <summary>
+    /// Duration to show success state (ms)
+    /// </summary>
+    [Parameter] public int SuccessDuration { get; set; } = 2000;
+    
+    /// <summary>
+    /// Additional attributes
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)] 
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+    
+    private bool ShowSuccess { get; set; }
+    
+    private bool IsDisabled => Disabled || IsSaving;
+    
+    private async Task HandleClick()
+    {
+        if (IsDisabled) return;
+        
+        await OnSave.InvokeAsync();
+    }
+    
+    /// <summary>
+    /// Call this to show success state after save completes
+    /// </summary>
+    public async Task ShowSuccessAsync()
+    {
+        ShowSuccess = true;
+        StateHasChanged();
+        
+        await Task.Delay(SuccessDuration);
+        
+        ShowSuccess = false;
+        StateHasChanged();
+    }
+}

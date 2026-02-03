@@ -1,0 +1,190 @@
+@*
+    PageWrapper - Unified loading, error, and empty state handling for pages
+    Usage: 
+        <PageWrapper IsLoading="isLoading" Error="errorMessage" IsEmpty="items.Count == 0">
+            <Content>Your page content here</Content>
+        </PageWrapper>
+*@
+
+@if (IsLoading)
+{
+    @if (LoadingContent != null)
+    {
+        @LoadingContent
+    }
+    else if (UseSkeletonLoader)
+    {
+        <SkeletonLoader Type="@SkeletonType" Rows="@SkeletonRows" Columns="@SkeletonColumns" />
+    }
+    else
+    {
+        <LoadingSpinner Centered="true" Size="LoadingSpinner.SpinnerSize.Large" Text="@LoadingText" />
+    }
+}
+else if (HasError)
+{
+    <div class="page-error">
+        <div class="error-container">
+            <div class="error-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 class="error-title">@(ErrorTitle ?? "Something went wrong")</h3>
+            <p class="error-message">@Error</p>
+            @if (OnRetry.HasDelegate)
+            {
+                <button class="btn btn-primary" @onclick="HandleRetry">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            }
+            @if (ErrorContent != null)
+            {
+                @ErrorContent
+            }
+        </div>
+    </div>
+}
+else if (IsEmpty)
+{
+    @if (EmptyContent != null)
+    {
+        @EmptyContent
+    }
+    else
+    {
+        <EmptyState 
+            Icon="@(EmptyIcon ?? "fas fa-inbox")"
+            Title="@(EmptyTitle ?? "No data found")"
+            Message="@(EmptyMessage ?? "There's nothing here yet.")" />
+    }
+}
+else
+{
+    @Content
+}
+
+<style>
+    .page-error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+        padding: 2rem;
+    }
+    
+    .error-container {
+        text-align: center;
+        max-width: 400px;
+    }
+    
+    .error-icon {
+        font-size: 3rem;
+        color: #ef4444;
+        margin-bottom: 1rem;
+    }
+    
+    .error-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+    
+    .error-message {
+        color: var(--text-secondary);
+        margin-bottom: 1.5rem;
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Whether data is currently loading
+    /// </summary>
+    [Parameter] public bool IsLoading { get; set; }
+    
+    /// <summary>
+    /// Error message to display (null if no error)
+    /// </summary>
+    [Parameter] public string? Error { get; set; }
+    
+    /// <summary>
+    /// Error title for the error state
+    /// </summary>
+    [Parameter] public string? ErrorTitle { get; set; }
+    
+    /// <summary>
+    /// Whether the data is empty (no items)
+    /// </summary>
+    [Parameter] public bool IsEmpty { get; set; }
+    
+    /// <summary>
+    /// Icon for empty state (FontAwesome class)
+    /// </summary>
+    [Parameter] public string? EmptyIcon { get; set; }
+    
+    /// <summary>
+    /// Title for empty state
+    /// </summary>
+    [Parameter] public string? EmptyTitle { get; set; }
+    
+    /// <summary>
+    /// Message for empty state
+    /// </summary>
+    [Parameter] public string? EmptyMessage { get; set; }
+    
+    /// <summary>
+    /// Text to show while loading
+    /// </summary>
+    [Parameter] public string? LoadingText { get; set; } = "Loading...";
+    
+    /// <summary>
+    /// Use skeleton loader instead of spinner
+    /// </summary>
+    [Parameter] public bool UseSkeletonLoader { get; set; }
+    
+    /// <summary>
+    /// Type of skeleton to display
+    /// </summary>
+    [Parameter] public SkeletonLoader.SkeletonType SkeletonType { get; set; } = SkeletonLoader.SkeletonType.Table;
+    
+    /// <summary>
+    /// Number of rows for skeleton
+    /// </summary>
+    [Parameter] public int SkeletonRows { get; set; } = 5;
+    
+    /// <summary>
+    /// Number of columns for skeleton table
+    /// </summary>
+    [Parameter] public int SkeletonColumns { get; set; } = 5;
+    
+    /// <summary>
+    /// Callback when retry button is clicked
+    /// </summary>
+    [Parameter] public EventCallback OnRetry { get; set; }
+    
+    /// <summary>
+    /// Main content to display when not loading, error, or empty
+    /// </summary>
+    [Parameter] public RenderFragment? Content { get; set; }
+    
+    /// <summary>
+    /// Custom loading content (overrides skeleton/spinner)
+    /// </summary>
+    [Parameter] public RenderFragment? LoadingContent { get; set; }
+    
+    /// <summary>
+    /// Custom error content (appended to default)
+    /// </summary>
+    [Parameter] public RenderFragment? ErrorContent { get; set; }
+    
+    /// <summary>
+    /// Custom empty state content (overrides default)
+    /// </summary>
+    [Parameter] public RenderFragment? EmptyContent { get; set; }
+    
+    private bool HasError => !string.IsNullOrEmpty(Error);
+    
+    private async Task HandleRetry()
+    {
+        await OnRetry.InvokeAsync();
+    }
+}

@@ -82,14 +82,39 @@ public class ImportExportService : IImportExportService
                 }
             }
 
-            // Parse amount
+            // Parse amount with sign detection
             decimal? amount = null;
+            string? detectedType = null;
             if (mapping.AmountColumn < columns.Length)
             {
-                var amountStr = columns[mapping.AmountColumn].Replace("$", "").Replace(",", "").Trim();
-                if (decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedAmount))
+                var rawAmountStr = columns[mapping.AmountColumn].Trim();
+                var (parsedAmount, isNegativeFromFormat) = ParseAmountWithSign(rawAmountStr);
+                
+                if (parsedAmount.HasValue)
                 {
-                    amount = parsedAmount;
+                    amount = Math.Abs(parsedAmount.Value); // Normalize for display
+                    
+                    // Determine type from TypeColumn or amount sign
+                    if (mapping.TypeColumn.HasValue && mapping.TypeColumn.Value < columns.Length)
+                    {
+                        var typeStr = columns[mapping.TypeColumn.Value].Trim().ToLower();
+                        if (!string.IsNullOrEmpty(typeStr))
+                        {
+                            detectedType = typeStr switch
+                            {
+                                "income" or "deposit" or "credit" or "i" or "cr" => "Income",
+                                "expense" or "withdrawal" or "debit" or "e" or "dr" => "Expense",
+                                "transfer" or "t" or "xfer" => "Transfer",
+                                _ => null
+                            };
+                        }
+                    }
+                    
+                    // Fall back to amount sign if type not determined
+                    if (detectedType == null)
+                    {
+                        detectedType = (isNegativeFromFormat || parsedAmount.Value < 0) ? "Expense" : "Income";
+                    }
                 }
                 else
                 {
@@ -119,6 +144,7 @@ public class ImportExportService : IImportExportService
                 category,
                 fund,
                 donor,
+                detectedType,
                 rowErrors.Count == 0 && date.HasValue && amount.HasValue,
                 rowErrors
             ));
@@ -145,6 +171,34 @@ public class ImportExportService : IImportExportService
         var existingFunds = (await _context.Funds.ToListAsync())
             .GroupBy(f => f.Name.ToLower())
             .ToDictionary(g => g.Key, g => g.First().Id);
+        
+        // Get or create default fund for transactions without fund assignment
+        int? defaultFundFallback = null;
+        if (!mapping.DefaultFundId.HasValue && !mapping.FundColumn.HasValue)
+        {
+            var generalFund = await _context.Funds
+                .FirstOrDefaultAsync(f => f.Name == "General" || f.Name == "Operating" || f.Name == "Main");
+            
+            if (generalFund == null)
+            {
+                generalFund = new Fund
+                {
+                    Name = "General",
+                    Type = FundType.Unrestricted,
+                    StartingBalance = 0,
+                    Balance = 0,
+                    IsActive = true,
+                    Description = "Default operating fund for imported transactions",
+                    RowVersion = 1
+                };
+                _context.Funds.Add(generalFund);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Created default 'General' fund for import");
+            }
+            
+            defaultFundFallback = generalFund.Id;
+            _logger.LogInformation("Using fund '{FundName}' (ID: {FundId}) as default for import", generalFund.Name, generalFund.Id);
+        }
         
         var existingDonors = (await _context.Donors.ToListAsync())
             .GroupBy(d => d.Name.ToLower())
@@ -358,6 +412,12 @@ public class ImportExportService : IImportExportService
                             }
                         }
                     }
+                }
+                
+                // Fallback to default fund if no fund was assigned
+                if (!fundId.HasValue && defaultFundFallback.HasValue)
+                {
+                    fundId = defaultFundFallback;
                 }
                 
                 // Handle balance column (optional - for informational/validation purposes)

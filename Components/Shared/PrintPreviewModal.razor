@@ -1,0 +1,253 @@
+@inject IJSRuntime JS
+
+<div class="modal-backdrop print-preview-backdrop" @onclick="Close">
+    <div class="modal print-preview-modal" style="max-width: 95vw; max-height: 95vh;" @onclick:stopPropagation="true">
+        <div class="modal-header no-print">
+            <h3 class="modal-title">
+                <i class="fas fa-print"></i> Print Preview
+            </h3>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="Print">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button class="modal-close" @onclick="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="modal-body print-preview-content">
+            <div class="print-preview-controls no-print">
+                <div class="d-flex gap-3 align-center flex-wrap">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Paper Size</label>
+                        <select class="form-control form-control-sm" @bind="paperSize" style="width: 120px;">
+                            <option value="Letter">Letter</option>
+                            <option value="Legal">Legal</option>
+                            <option value="A4">A4</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Orientation</label>
+                        <select class="form-control form-control-sm" @bind="orientation" style="width: 120px;">
+                            <option value="Portrait">Portrait</option>
+                            <option value="Landscape">Landscape</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>Scale</label>
+                        <select class="form-control form-control-sm" @bind="scale" style="width: 100px;">
+                            <option value="100">100%</option>
+                            <option value="90">90%</option>
+                            <option value="80">80%</option>
+                            <option value="75">75%</option>
+                            <option value="50">50%</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" @bind="includeHeader" id="includeHeader" class="form-check-input" />
+                        <label for="includeHeader" class="form-check-label">Include Header</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" @bind="includeFooter" id="includeFooter" class="form-check-input" />
+                        <label for="includeFooter" class="form-check-label">Include Footer</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="print-paper @(orientation == "Landscape" ? "landscape" : "portrait")" style="transform: scale(@(int.Parse(scale) / 100.0));">
+                @if (includeHeader)
+                {
+                    <div class="print-header">
+                        <div class="organization-name">@OrganizationName</div>
+                        <div class="report-title">@Title</div>
+                        <div class="report-date">@(DateRange ?? $"Generated: {DateTime.Now:MMMM dd, yyyy}")</div>
+                    </div>
+                }
+                
+                <div class="print-body">
+                    @ChildContent
+                </div>
+                
+                @if (includeFooter)
+                {
+                    <div class="print-footer">
+                        <div class="footer-left">@OrganizationName</div>
+                        <div class="footer-center">Page 1 of 1</div>
+                        <div class="footer-right">@DateTime.Now:MM/dd/yyyy HH:mm</div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .print-preview-backdrop {
+        z-index: 1100;
+    }
+    
+    .print-preview-modal {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .print-preview-controls {
+        background: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .print-preview-content {
+        overflow: auto;
+        padding: 1rem;
+        background: var(--bg-tertiary);
+    }
+    
+    .print-paper {
+        background: white;
+        color: black;
+        margin: 0 auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform-origin: top center;
+        padding: 1in;
+    }
+    
+    .print-paper.portrait {
+        width: 8.5in;
+        min-height: 11in;
+    }
+    
+    .print-paper.landscape {
+        width: 11in;
+        min-height: 8.5in;
+    }
+    
+    .print-header {
+        text-align: center;
+        border-bottom: 2px solid #333;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .organization-name {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #1a365d;
+    }
+    
+    .report-title {
+        font-size: 1.25rem;
+        margin-top: 0.25rem;
+        color: #333;
+    }
+    
+    .report-date {
+        font-size: 0.9rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+    
+    .print-body {
+        font-size: 10pt;
+        line-height: 1.4;
+    }
+    
+    .print-body table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+    }
+    
+    .print-body th,
+    .print-body td {
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+        text-align: left;
+    }
+    
+    .print-body th {
+        background: #f0f0f0;
+        font-weight: 600;
+    }
+    
+    .print-body tr:nth-child(even) {
+        background: #fafafa;
+    }
+    
+    .print-footer {
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid #ccc;
+        padding-top: 0.5rem;
+        margin-top: 2rem;
+        font-size: 0.8rem;
+        color: #666;
+    }
+    
+    .footer-center {
+        text-align: center;
+    }
+    
+    .footer-right {
+        text-align: right;
+    }
+    
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+        
+        .print-preview-backdrop {
+            position: static;
+            background: none;
+        }
+        
+        .print-preview-modal {
+            position: static;
+            box-shadow: none;
+            border: none;
+            max-width: none;
+            max-height: none;
+        }
+        
+        .print-preview-content {
+            overflow: visible;
+            background: none;
+            padding: 0;
+        }
+        
+        .print-paper {
+            box-shadow: none;
+            transform: none !important;
+            width: 100% !important;
+            min-height: auto;
+            padding: 0.5in;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Report";
+    [Parameter] public string? OrganizationName { get; set; } = "Organization";
+    [Parameter] public string? DateRange { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    
+    private string paperSize = "Letter";
+    private string orientation = "Portrait";
+    private string scale = "100";
+    private bool includeHeader = true;
+    private bool includeFooter = true;
+    
+    private async Task Print()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+    
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

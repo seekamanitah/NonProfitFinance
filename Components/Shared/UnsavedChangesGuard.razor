@@ -1,0 +1,151 @@
+@implements IDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@*
+    UnsavedChangesGuard - Warns users before leaving a page with unsaved changes
+    Usage: <UnsavedChangesGuard HasChanges="hasUnsavedChanges" />
+*@
+
+@if (showWarningModal)
+{
+    <div class="modal-backdrop">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i>
+                    Unsaved Changes
+                </h3>
+            </div>
+            <div class="modal-body">
+                <p>You have unsaved changes that will be lost if you leave this page.</p>
+                <p>Are you sure you want to leave?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="StayOnPage">
+                    <i class="fas fa-times"></i> Stay
+                </button>
+                <button class="btn btn-danger" @onclick="ConfirmLeave">
+                    <i class="fas fa-sign-out-alt"></i> Leave Anyway
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// Whether there are unsaved changes to protect
+    /// </summary>
+    [Parameter] public bool HasChanges { get; set; }
+    
+    /// <summary>
+    /// Custom message for the warning
+    /// </summary>
+    [Parameter] public string? Message { get; set; }
+    
+    /// <summary>
+    /// Callback before navigation is confirmed (for cleanup)
+    /// </summary>
+    [Parameter] public EventCallback OnBeforeLeave { get; set; }
+    
+    private bool showWarningModal = false;
+    private string? pendingLocation = null;
+    private IDisposable? locationChangingHandler;
+    
+    protected override void OnInitialized()
+    {
+        // Register for navigation interception
+        locationChangingHandler = Navigation.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+    
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (HasChanges && !showWarningModal)
+        {
+            // Store the pending location and prevent navigation
+            pendingLocation = context.TargetLocation;
+            showWarningModal = true;
+            await InvokeAsync(StateHasChanged);
+            
+            // Prevent the navigation
+            context.PreventNavigation();
+        }
+    }
+    
+    private void StayOnPage()
+    {
+        showWarningModal = false;
+        pendingLocation = null;
+    }
+    
+    private async Task ConfirmLeave()
+    {
+        if (OnBeforeLeave.HasDelegate)
+        {
+            await OnBeforeLeave.InvokeAsync();
+        }
+        
+        showWarningModal = false;
+        
+        if (!string.IsNullOrEmpty(pendingLocation))
+        {
+            // Use replace to avoid adding to history
+            Navigation.NavigateTo(pendingLocation, forceLoad: false, replace: true);
+        }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Set up browser beforeunload warning
+            await UpdateBrowserWarning();
+        }
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
+        await UpdateBrowserWarning();
+    }
+    
+    private async Task UpdateBrowserWarning()
+    {
+        try
+        {
+            if (HasChanges)
+            {
+                await JS.InvokeVoidAsync("eval", @"
+                    window.onbeforeunload = function(e) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                        return '';
+                    };
+                ");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("eval", "window.onbeforeunload = null;");
+            }
+        }
+        catch
+        {
+            // JS interop not available
+        }
+    }
+    
+    public void Dispose()
+    {
+        locationChangingHandler?.Dispose();
+        
+        // Clear browser warning on dispose
+        try
+        {
+            _ = JS.InvokeVoidAsync("eval", "window.onbeforeunload = null;");
+        }
+        catch
+        {
+            // Component already disposed
+        }
+    }
+}

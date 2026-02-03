@@ -10,27 +10,41 @@
     Skip to main content
 </a>
 
-<div class="app-container">
-    <aside class="sidebar @(sidebarCollapsed ? "collapsed" : "")" aria-label="Navigation sidebar">
+<!-- Mobile overlay for sidebar -->
+@if (mobileMenuOpen)
+{
+    <div class="sidebar-overlay" @onclick="CloseMobileMenu"></div>
+}
+
+<div class="app-container @(mobileMenuOpen ? "mobile-menu-open" : "")">
+    <aside class="sidebar @(sidebarCollapsed ? "collapsed" : "") @(mobileMenuOpen ? "mobile-open" : "")" aria-label="Navigation sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">
                 <i class="fas fa-fire-extinguisher" aria-hidden="true"></i>
             </div>
             <span class="sidebar-title">NonProfit Finance</span>
+            <button class="btn-close-mobile d-mobile-only" @onclick="CloseMobileMenu" aria-label="Close menu">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         
-        <NavMenu />
+        <NavMenu OnNavigate="CloseMobileMenu" />
     </aside>
     
     <div class="main-content">
         <div class="main-header" role="banner">
+            <button class="btn btn-icon btn-hamburger d-mobile-only" @onclick="ToggleMobileMenu" aria-label="Toggle navigation menu">
+                <i class="fas fa-bars"></i>
+            </button>
             <GlobalSearch />
-            <button class="btn btn-icon" @onclick="ToggleTheme" title="Toggle Theme" aria-label="Toggle dark/light theme">
-                <i class="fas @(currentTheme == "dark" ? "fa-sun" : "fa-moon")" aria-hidden="true"></i>
-            </button>
-            <button class="btn btn-icon" @onclick="ShowKeyboardHelp" title="Keyboard Shortcuts (Shift+?)" aria-label="Show keyboard shortcuts">
-                <i class="fas fa-keyboard" aria-hidden="true"></i>
-            </button>
+            <div class="header-actions">
+                <button class="btn btn-icon" @onclick="ToggleTheme" title="Toggle Theme" aria-label="Toggle dark/light theme">
+                    <i class="fas @(currentTheme == "dark" ? "fa-sun" : "fa-moon")" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-icon d-desktop-only" @onclick="ShowKeyboardHelp" title="Keyboard Shortcuts (Shift+?)" aria-label="Show keyboard shortcuts">
+                    <i class="fas fa-keyboard" aria-hidden="true"></i>
+                </button>
+            </div>
         </div>
         <main class="page-content" id="main-content" role="main" tabindex="-1">
             @Body
@@ -38,13 +52,101 @@
     </div>
 </div>
 
+<!-- Toast notifications -->
+<ToastContainer />
+
 @if (showKeyboardHelp)
 {
     <KeyboardShortcutsHelp Show="@showKeyboardHelp" OnClose="CloseKeyboardHelp" />
 }
 
+<style>
+    /* Mobile responsive styles */
+    .d-mobile-only { display: none; }
+    .d-desktop-only { display: inline-flex; }
+    
+    .sidebar-overlay {
+        display: none;
+    }
+    
+    .btn-close-mobile {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        padding: 0.5rem;
+        cursor: pointer;
+        margin-left: auto;
+    }
+    
+    .btn-hamburger {
+        margin-right: 0.5rem;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+    }
+    
+    @@media (max-width: 768px) {
+        .d-mobile-only { display: inline-flex; }
+        .d-desktop-only { display: none; }
+        
+        .sidebar {
+            position: fixed;
+            left: -280px;
+            top: 0;
+            bottom: 0;
+            z-index: 1001;
+            transition: left 0.3s ease;
+            box-shadow: none;
+        }
+        
+        .sidebar.mobile-open {
+            left: 0;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .sidebar-overlay {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .main-content {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+        
+        .main-header {
+            padding: 0.75rem 1rem;
+        }
+        
+        .page-content {
+            padding: 1rem;
+        }
+        
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+        }
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>
+
 @code {
 private bool sidebarCollapsed = false;
+private bool mobileMenuOpen = false;
 private bool showKeyboardHelp = false;
 private string currentTheme = "light";
 
@@ -54,13 +156,22 @@ protected override void OnInitialized()
     Navigation.LocationChanged += OnLocationChanged;
 }
 
+private void ToggleMobileMenu()
+{
+    mobileMenuOpen = !mobileMenuOpen;
+}
+
+private void CloseMobileMenu()
+{
+    mobileMenuOpen = false;
+}
+
 private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
 {
-    // Re-apply theme on navigation
+    // Re-apply theme on navigation - use reapply to ensure it always applies
     try
     {
-        await JS.InvokeVoidAsync("themeManager.init");
-        currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+        currentTheme = await JS.InvokeAsync<string>("themeManager.reapply");
         await InvokeAsync(StateHasChanged);
     }
     catch
@@ -133,15 +244,24 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         try
         {
-            currentTheme = await JS.InvokeAsync<string>("eval", "themeManager.toggle()");
+            // Optimistically update UI first for immediate feedback
+            currentTheme = currentTheme == "dark" ? "light" : "dark";
             StateHasChanged();
+            
+            // Then sync with JS
+            var actualTheme = await JS.InvokeAsync<string>("themeManager.toggle");
+            
+            // Ensure we're in sync with actual theme
+            if (actualTheme != currentTheme)
+            {
+                currentTheme = actualTheme;
+                StateHasChanged();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Theme toggle error: {ex.Message}");
-            // Fallback: toggle locally
-            currentTheme = currentTheme == "light" ? "dark" : "light";
-            StateHasChanged();
+            // Already toggled optimistically, so leave as is
         }
     }
 

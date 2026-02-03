@@ -1,0 +1,378 @@
+@namespace NonProfitFinance.Components.Shared
+@inject IReportService ReportService
+@inject IJSRuntime JS
+
+<div class="report-widgets @CssClass">
+    @if (isLoading)
+    {
+        <SkeletonLoader Type="SkeletonLoader.SkeletonType.MetricCards" Count="4" />
+    }
+    else
+    {
+        <div class="widgets-header">
+            <h4 class="widgets-title">@Title</h4>
+            <div class="widgets-period">
+                <select class="form-control form-control-sm" @bind="selectedPeriod" @bind:after="OnPeriodChanged">
+                    <option value="month">This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="ytd">Year to Date</option>
+                    <option value="last12">Last 12 Months</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="widgets-grid">
+            <!-- Income Widget -->
+            <div class="widget widget-income">
+                <div class="widget-icon">
+                    <i class="fas fa-arrow-down"></i>
+                </div>
+                <div class="widget-content">
+                    <span class="widget-label">Total Income</span>
+                    <span class="widget-value">@summary?.TotalIncome.ToString("C0")</span>
+                    @if (comparison != null && comparison.TotalIncome != 0)
+                    {
+                        var change = CalculateChange(summary?.TotalIncome ?? 0, comparison.TotalIncome);
+                        <span class="widget-change @(change >= 0 ? "positive" : "negative")">
+                            <i class="fas @(change >= 0 ? "fa-arrow-up" : "fa-arrow-down")"></i>
+                            @Math.Abs(change).ToString("N1")%
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Expenses Widget -->
+            <div class="widget widget-expense">
+                <div class="widget-icon">
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+                <div class="widget-content">
+                    <span class="widget-label">Total Expenses</span>
+                    <span class="widget-value">@summary?.TotalExpenses.ToString("C0")</span>
+                    @if (comparison != null && comparison.TotalExpenses != 0)
+                    {
+                        var change = CalculateChange(summary?.TotalExpenses ?? 0, comparison.TotalExpenses);
+                        <span class="widget-change @(change <= 0 ? "positive" : "negative")">
+                            <i class="fas @(change >= 0 ? "fa-arrow-up" : "fa-arrow-down")"></i>
+                            @Math.Abs(change).ToString("N1")%
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Net Income Widget -->
+            <div class="widget widget-net">
+                <div class="widget-icon">
+                    <i class="fas fa-balance-scale"></i>
+                </div>
+                <div class="widget-content">
+                    <span class="widget-label">Net Income</span>
+                    <span class="widget-value @(summary?.NetIncome >= 0 ? "positive" : "negative")">
+                        @summary?.NetIncome.ToString("C0")
+                    </span>
+                    @if (comparison != null && comparison.NetIncome != 0)
+                    {
+                        var change = CalculateChange(summary?.NetIncome ?? 0, comparison.NetIncome);
+                        <span class="widget-change @(change >= 0 ? "positive" : "negative")">
+                            <i class="fas @(change >= 0 ? "fa-arrow-up" : "fa-arrow-down")"></i>
+                            @Math.Abs(change).ToString("N1")%
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Net Margin Widget -->
+            <div class="widget widget-margin">
+                <div class="widget-icon">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div class="widget-content">
+                    <span class="widget-label">Net Margin</span>
+                    <span class="widget-value">@GetNetMargin()</span>
+                </div>
+            </div>
+        </div>
+
+        @if (ShowMiniCharts)
+        {
+            <div class="mini-charts">
+                <div class="mini-chart">
+                    <h5>Income by Category</h5>
+                    <canvas id="@incomeChartId"></canvas>
+                </div>
+                <div class="mini-chart">
+                    <h5>Expenses by Category</h5>
+                    <canvas id="@expenseChartId"></canvas>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .report-widgets {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .widgets-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .widgets-title {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .widgets-period select {
+        font-size: 0.8125rem;
+        padding: 0.375rem 0.5rem;
+    }
+
+    .widgets-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .widget {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        transition: all 0.2s ease;
+    }
+
+    .widget:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .widget-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        font-size: 1.25rem;
+    }
+
+    .widget-income .widget-icon {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+    }
+
+    .widget-expense .widget-icon {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+    }
+
+    .widget-net .widget-icon {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+    }
+
+    .widget-margin .widget-icon {
+        background: rgba(168, 85, 247, 0.15);
+        color: #a855f7;
+    }
+
+    .widget-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .widget-label {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+    }
+
+    .widget-value {
+        font-size: 1.375rem;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .widget-value.positive {
+        color: #22c55e;
+    }
+
+    .widget-value.negative {
+        color: #ef4444;
+    }
+
+    .widget-change {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .widget-change.positive {
+        color: #22c55e;
+    }
+
+    .widget-change.negative {
+        color: #ef4444;
+    }
+
+    .mini-charts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .mini-chart {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 1rem;
+    }
+
+    .mini-chart h5 {
+        margin: 0 0 0.75rem 0;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .mini-chart canvas {
+        max-height: 150px;
+    }
+
+    @@media (max-width: 640px) {
+        .widgets-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .widget {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .widget-value {
+            font-size: 1.125rem;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Financial Summary";
+    [Parameter] public bool ShowMiniCharts { get; set; } = false;
+    [Parameter] public bool ShowComparison { get; set; } = true;
+    [Parameter] public int? FundId { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+
+    private IncomeExpenseSummaryDto? summary;
+    private IncomeExpenseSummaryDto? comparison;
+    private string selectedPeriod = "ytd";
+    private bool isLoading = true;
+    private string incomeChartId = $"income-mini-{Guid.NewGuid():N}";
+    private string expenseChartId = $"expense-mini-{Guid.NewGuid():N}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading && summary != null && ShowMiniCharts)
+        {
+            await RenderMiniCharts();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        var (start, end) = GetPeriodDates();
+        var filter = new ReportFilterRequest(start, end, null, FundId);
+        summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
+
+        if (ShowComparison)
+        {
+            var periodDays = (end - start).Days + 1;
+            var compStart = start.AddDays(-periodDays);
+            var compEnd = end.AddDays(-periodDays);
+            var compFilter = new ReportFilterRequest(compStart, compEnd, null, FundId);
+            comparison = await ReportService.GetIncomeExpenseSummaryAsync(compFilter);
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task OnPeriodChanged()
+    {
+        await LoadData();
+    }
+
+    private (DateTime Start, DateTime End) GetPeriodDates()
+    {
+        var today = DateTime.Today;
+        return selectedPeriod switch
+        {
+            "month" => (new DateTime(today.Year, today.Month, 1), today),
+            "quarter" => (new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1), today),
+            "ytd" => (new DateTime(today.Year, 1, 1), today),
+            "last12" => (today.AddMonths(-11).AddDays(1 - today.Day), today),
+            _ => (new DateTime(today.Year, 1, 1), today)
+        };
+    }
+
+    private string GetNetMargin()
+    {
+        if (summary == null || summary.TotalIncome == 0) return "0.0%";
+        return $"{(summary.NetIncome / summary.TotalIncome * 100):N1}%";
+    }
+
+    private decimal CalculateChange(decimal current, decimal previous)
+    {
+        if (previous == 0) return current > 0 ? 100 : 0;
+        return ((current - previous) / Math.Abs(previous)) * 100;
+    }
+
+    private async Task RenderMiniCharts()
+    {
+        if (summary == null) return;
+
+        try
+        {
+            if (summary.IncomeByCategory.Any())
+            {
+                await JS.InvokeVoidAsync("chartInterop.createPieChart", incomeChartId,
+                    summary.IncomeByCategory.Take(5).Select(c => c.CategoryName).ToArray(),
+                    summary.IncomeByCategory.Take(5).Select(c => c.Amount).ToArray(),
+                    summary.IncomeByCategory.Take(5).Select(c => c.Color ?? "#28a745").ToArray(),
+                    new { cutout = "60%", legend = false });
+            }
+
+            if (summary.ExpensesByCategory.Any())
+            {
+                await JS.InvokeVoidAsync("chartInterop.createPieChart", expenseChartId,
+                    summary.ExpensesByCategory.Take(5).Select(c => c.CategoryName).ToArray(),
+                    summary.ExpensesByCategory.Take(5).Select(c => c.Amount).ToArray(),
+                    summary.ExpensesByCategory.Take(5).Select(c => c.Color ?? "#dc3545").ToArray(),
+                    new { cutout = "60%", legend = false });
+            }
+        }
+        catch
+        {
+            // Chart JS may not be loaded yet
+        }
+    }
+}

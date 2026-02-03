@@ -1,0 +1,354 @@
+@*
+    SkeletonLoader - Placeholder content while data is loading
+    Usage: <SkeletonLoader Type="SkeletonType.Table" Rows="5" />
+*@
+
+@switch (Type)
+{
+    case SkeletonType.Table:
+        <div class="skeleton-table">
+            <div class="skeleton-header">
+                @for (var i = 0; i < Columns; i++)
+                {
+                    <div class="skeleton-cell header"></div>
+                }
+            </div>
+            @for (var row = 0; row < Rows; row++)
+            {
+                <div class="skeleton-row">
+                    @for (var col = 0; col < Columns; col++)
+                    {
+                        <div class="skeleton-cell"></div>
+                    }
+                </div>
+            }
+        </div>
+        break;
+        
+    case SkeletonType.Card:
+        <div class="skeleton-card">
+            <div class="skeleton-card-header"></div>
+            <div class="skeleton-card-body">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line short"></div>
+            </div>
+        </div>
+        break;
+        
+    case SkeletonType.CardGrid:
+        <div class="skeleton-card-grid">
+            @for (var i = 0; i < Count; i++)
+            {
+                <div class="skeleton-card">
+                    <div class="skeleton-card-header"></div>
+                    <div class="skeleton-card-body">
+                        <div class="skeleton-line long"></div>
+                        <div class="skeleton-line medium"></div>
+                    </div>
+                </div>
+            }
+        </div>
+        break;
+        
+    case SkeletonType.Form:
+        <div class="skeleton-form">
+            @for (var i = 0; i < Rows; i++)
+            {
+                <div class="skeleton-form-group">
+                    <div class="skeleton-label"></div>
+                    <div class="skeleton-input"></div>
+                </div>
+            }
+            <div class="skeleton-buttons">
+                <div class="skeleton-button"></div>
+                <div class="skeleton-button secondary"></div>
+            </div>
+        </div>
+        break;
+        
+    case SkeletonType.List:
+        <div class="skeleton-list">
+            @for (var i = 0; i < Rows; i++)
+            {
+                <div class="skeleton-list-item">
+                    @if (ShowAvatar)
+                    {
+                        <div class="skeleton-avatar"></div>
+                    }
+                    <div class="skeleton-list-content">
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line short"></div>
+                    </div>
+                </div>
+            }
+        </div>
+        break;
+        
+    case SkeletonType.MetricCards:
+        <div class="skeleton-metrics">
+            @for (var i = 0; i < Count; i++)
+            {
+                <div class="skeleton-metric">
+                    <div class="skeleton-metric-icon"></div>
+                    <div class="skeleton-metric-content">
+                        <div class="skeleton-line short"></div>
+                        <div class="skeleton-line medium"></div>
+                    </div>
+                </div>
+            }
+        </div>
+        break;
+        
+    case SkeletonType.Text:
+    default:
+        <div class="skeleton-text">
+            @for (var i = 0; i < Rows; i++)
+            {
+                <div class="skeleton-line @(i == Rows - 1 ? "short" : "long")"></div>
+            }
+        </div>
+        break;
+}
+
+<style>
+    /* Base skeleton animation */
+    .skeleton-cell,
+    .skeleton-line,
+    .skeleton-card-header,
+    .skeleton-label,
+    .skeleton-input,
+    .skeleton-button,
+    .skeleton-avatar,
+    .skeleton-metric-icon {
+        background: linear-gradient(90deg, 
+            var(--skeleton-base, #e5e7eb) 25%, 
+            var(--skeleton-highlight, #f3f4f6) 50%, 
+            var(--skeleton-base, #e5e7eb) 75%);
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.5s infinite;
+        border-radius: 0.25rem;
+    }
+    
+    @@keyframes skeleton-shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    
+    /* Table skeleton */
+    .skeleton-table {
+        width: 100%;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    
+    .skeleton-header {
+        display: flex;
+        background: var(--bg-secondary, #f9fafb);
+        padding: 0.75rem;
+        gap: 1rem;
+    }
+    
+    .skeleton-header .skeleton-cell {
+        height: 1rem;
+        flex: 1;
+        background: var(--skeleton-dark, #d1d5db);
+    }
+    
+    .skeleton-row {
+        display: flex;
+        padding: 0.75rem;
+        gap: 1rem;
+        border-top: 1px solid var(--border-color, #e5e7eb);
+    }
+    
+    .skeleton-cell {
+        height: 1rem;
+        flex: 1;
+    }
+    
+    /* Card skeleton */
+    .skeleton-card {
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        background: var(--bg-primary, white);
+    }
+    
+    .skeleton-card-header {
+        height: 2.5rem;
+        background: var(--bg-secondary, #f9fafb);
+    }
+    
+    .skeleton-card-body {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .skeleton-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+    
+    /* Lines */
+    .skeleton-line {
+        height: 0.875rem;
+    }
+    
+    .skeleton-line.long { width: 100%; }
+    .skeleton-line.medium { width: 70%; }
+    .skeleton-line.short { width: 40%; }
+    
+    /* Form skeleton */
+    .skeleton-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        max-width: 500px;
+    }
+    
+    .skeleton-form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .skeleton-label {
+        height: 0.875rem;
+        width: 30%;
+    }
+    
+    .skeleton-input {
+        height: 2.5rem;
+        width: 100%;
+    }
+    
+    .skeleton-buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 0.5rem;
+    }
+    
+    .skeleton-button {
+        height: 2.5rem;
+        width: 100px;
+    }
+    
+    .skeleton-button.secondary {
+        width: 80px;
+        opacity: 0.6;
+    }
+    
+    /* List skeleton */
+    .skeleton-list {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .skeleton-list-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+    
+    .skeleton-avatar {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    
+    .skeleton-list-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    /* Metric cards skeleton */
+    .skeleton-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .skeleton-metric {
+        display: flex;
+        gap: 1rem;
+        padding: 1.25rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        background: var(--bg-primary, white);
+    }
+    
+    .skeleton-metric-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.5rem;
+        flex-shrink: 0;
+    }
+    
+    .skeleton-metric-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    /* Text skeleton */
+    .skeleton-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    /* Dark mode support */
+    :root[data-theme="dark"] {
+        --skeleton-base: #374151;
+        --skeleton-highlight: #4b5563;
+        --skeleton-dark: #4b5563;
+    }
+</style>
+
+@code {
+    public enum SkeletonType
+    {
+        Text,
+        Table,
+        Card,
+        CardGrid,
+        Form,
+        List,
+        MetricCards
+    }
+    
+    /// <summary>
+    /// Type of skeleton to display
+    /// </summary>
+    [Parameter] public SkeletonType Type { get; set; } = SkeletonType.Text;
+    
+    /// <summary>
+    /// Number of rows for table/list/form/text skeletons
+    /// </summary>
+    [Parameter] public int Rows { get; set; } = 5;
+    
+    /// <summary>
+    /// Number of columns for table skeleton
+    /// </summary>
+    [Parameter] public int Columns { get; set; } = 5;
+    
+    /// <summary>
+    /// Number of items for card grid/metric cards
+    /// </summary>
+    [Parameter] public int Count { get; set; } = 4;
+    
+    /// <summary>
+    /// Whether to show avatar in list items
+    /// </summary>
+    [Parameter] public bool ShowAvatar { get; set; } = true;
+}

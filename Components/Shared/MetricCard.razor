@@ -5,6 +5,16 @@
     <div class="metric-content">
         <div class="metric-label">@Title</div>
         <div class="metric-value @ValueClass">@Value</div>
+        @if (!string.IsNullOrEmpty(Change))
+        {
+            <div class="metric-change @GetChangeClass()">
+                <i class="fas @GetChangeIcon()"></i> @Change
+                @if (!string.IsNullOrEmpty(ChangeLabel))
+                {
+                    <span class="change-label">@ChangeLabel</span>
+                }
+            </div>
+        }
         @if (!string.IsNullOrEmpty(Subtitle))
         {
             <div class="metric-trend">@Subtitle</div>
@@ -18,6 +28,31 @@
     </div>
 </div>
 
+<style>
+    .metric-change {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        margin-top: 0.25rem;
+    }
+
+    .metric-change.positive {
+        color: #22c55e;
+    }
+
+    .metric-change.negative {
+        color: #ef4444;
+    }
+
+    .metric-change .change-label {
+        font-weight: 400;
+        color: var(--text-muted);
+        margin-left: 0.25rem;
+    }
+</style>
+
 @code {
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public string Value { get; set; } = "";
@@ -27,7 +62,21 @@
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public string? TrendText { get; set; }
     [Parameter] public bool? TrendUp { get; set; }
+    [Parameter] public string? Change { get; set; }
+    [Parameter] public string? ChangeLabel { get; set; }
 
     private string TrendClass => TrendUp.HasValue ? (TrendUp.Value ? "up" : "down") : "";
     private string TrendIcon => TrendUp.HasValue ? (TrendUp.Value ? "fa-arrow-up" : "fa-arrow-down") : "";
+
+    private string GetChangeClass()
+    {
+        if (string.IsNullOrEmpty(Change)) return "";
+        return Change.StartsWith("+") ? "positive" : Change.StartsWith("-") ? "negative" : "";
+    }
+
+    private string GetChangeIcon()
+    {
+        if (string.IsNullOrEmpty(Change)) return "";
+        return Change.StartsWith("+") ? "fa-arrow-up" : Change.StartsWith("-") ? "fa-arrow-down" : "fa-minus";
+    }
 }
