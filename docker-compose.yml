@@ -14,9 +14,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: ${DB_CONNECTION_STRING:-Data Source=/app/data/NonProfitFinance.db}
     volumes:
-      - nonprofit-data:media/AppDatabases/data
-      - nonprofit-backups:media/AppDatabases/backups
-      - nonprofit-documents:media/AppDatabases/documents
+      - /media/AppDatabases/data:/app/data
+      - /media/AppDatabases/backups:/app/backups
+      - /media/AppDatabases/documents:/app/documents
       - nonprofit-keys:/root/.aspnet/DataProtection-Keys
     restart: unless-stopped
     healthcheck:
@@ -29,14 +29,8 @@ services:
       - nonprofit-network
 
 volumes:
-nonprofit-data:
-  driver: local
-nonprofit-backups:
-  driver: local
-nonprofit-documents:
-  driver: local
-nonprofit-keys:
-  driver: local
+  nonprofit-keys:
+    driver: local
 
 networks:
   nonprofit-network:
