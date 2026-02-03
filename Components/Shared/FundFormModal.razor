@@ -67,24 +67,18 @@
                             <label class="form-label">Starting Balance</label>
                             <div class="input-group" style="display: flex; align-items: stretch;">
                                 <span class="input-group-text" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-right: none; padding: 0.5rem 0.75rem; border-radius: 6px 0 0 6px; display: flex; align-items: center;">$</span>
-                                @if (IsEdit)
-                                {
-                                    <input type="number" class="form-control" value="@model.StartingBalance" 
-                                           style="border-radius: 0 6px 6px 0; flex: 1;"
-                                           placeholder="0.00" step="0.01" disabled />
-                                }
-                                else
-                                {
-                                    <input type="number" class="form-control" 
-                                           value="@model.StartingBalance"
-                                           @onchange="@(e => model.StartingBalance = decimal.TryParse(e.Value?.ToString(), out var v) ? v : 0)"
-                                           style="border-radius: 0 6px 6px 0; flex: 1;"
-                                           placeholder="0.00" step="0.01" />
-                                }
+                                <input type="number" class="form-control" 
+                                       value="@model.StartingBalance"
+                                       @onchange="@(e => model.StartingBalance = decimal.TryParse(e.Value?.ToString(), out var v) ? v : 0)"
+                                       style="border-radius: 0 6px 6px 0; flex: 1;"
+                                       placeholder="0.00" step="0.01" />
                             </div>
                             @if (IsEdit)
                             {
-                                <small class="text-muted">Cannot be changed after creation</small>
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> 
+                                    Changing will recalculate current balance from transactions
+                                </small>
                             }
                             else
                             {
@@ -203,17 +197,18 @@ private async Task HandleSubmit()
 
         try
         {
-            if (IsEdit)
-            {
-                await FundService.UpdateAsync(Fund!.Id, new UpdateFundRequest(
-                    model.Name!,
-                    model.Type,
-                    model.Description,
-                    model.TargetBalance,
-                    model.IsActive,
-                    null
-                ));
-            }
+        if (IsEdit)
+        {
+            await FundService.UpdateAsync(Fund!.Id, new UpdateFundRequest(
+                model.Name!,
+                model.Type,
+                model.Description,
+                model.StartingBalance ?? 0m, // Now editable - will trigger balance recalculation
+                model.TargetBalance,
+                model.IsActive,
+                model.RestrictionExpiryDate
+            ));
+        }
             else
             {
                 await FundService.CreateAsync(new CreateFundRequest(

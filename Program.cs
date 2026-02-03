@@ -86,7 +86,20 @@ builder.Services.AddScoped<IKeyboardShortcutService, KeyboardShortcutService>();
 builder.Services.AddScoped<IAccessibilityService, AccessibilityService>();
 builder.Services.AddScoped<ISpellCheckService, SpellCheckService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IDatabaseResetService, DatabaseResetService>();
 builder.Services.AddHttpContextAccessor();
+
+// Add HttpClient for Blazor Server components (needed for API calls from components)
+builder.Services.AddScoped(sp => 
+{
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var request = httpContextAccessor.HttpContext?.Request;
+    var baseUri = request != null 
+        ? $"{request.Scheme}://{request.Host}" 
+        : "http://localhost:5000"; // Fallback for background services
+    return new HttpClient { BaseAddress = new Uri(baseUri) };
+});
+
 builder.Services.AddSingleton<IBackupService, BackupService>();
 builder.Services.AddSingleton<IOcrService, OcrService>();
 builder.Services.AddScoped<ITextToSpeechService, TextToSpeechService>();
@@ -273,6 +286,19 @@ using (var scope = app.Services.CreateScope())
     try
     {
         await context.Database.ExecuteSqlRawAsync("ALTER TABLE Funds ADD COLUMN RestrictionExpiryDate TEXT;");
+    }
+    catch { /* Column already exists */ }
+    
+    // Add missing ImportPresets columns (for balance field and default fund selection)
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE ImportPresets ADD COLUMN BalanceColumn INTEGER;");
+    }
+    catch { /* Column already exists */ }
+    
+    try
+    {
+        await context.Database.ExecuteSqlRawAsync("ALTER TABLE ImportPresets ADD COLUMN DefaultFundId INTEGER;");
     }
     catch { /* Column already exists */ }
     

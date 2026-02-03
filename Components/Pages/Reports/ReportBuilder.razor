@@ -521,8 +521,10 @@ private async Task GenerateReport()
     try
     {
         // Build filter based on selected filter type
+        // Note: Always pass selectedFundId if set, regardless of filterType
+        // This ensures account filtering works even when filtering by category/donor/grant
         int? categoryId = filterType == "category" ? selectedCategoryId : null;
-        int? fundId = filterType == "fund" ? selectedFundId : null;
+        int? fundId = selectedFundId; // Always include selected fund
         int? donorId = filterType == "donor" ? selectedDonorId : null;
         int? grantId = filterType == "grant" ? selectedGrantId : null;
         

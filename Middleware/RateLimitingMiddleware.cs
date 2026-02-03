@@ -13,9 +13,9 @@ public class RateLimitingMiddleware
     private static readonly ConcurrentDictionary<string, RateLimitInfo> _requestCounts = new();
     
     // Configuration
-    private const int MaxRequestsPerWindow = 100; // Max requests per time window
+    private const int MaxRequestsPerWindow = 300; // Max requests per time window (increased for normal usage)
     private const int TimeWindowSeconds = 60; // Time window in seconds
-    private const int ImportMaxRequestsPerWindow = 5; // Stricter limit for imports
+    private const int ImportMaxRequestsPerWindow = 10; // Stricter limit for imports but more lenient
 
     public RateLimitingMiddleware(RequestDelegate next, ILogger<RateLimitingMiddleware> logger)
     {
@@ -28,6 +28,13 @@ public class RateLimitingMiddleware
         var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var path = context.Request.Path.Value ?? "";
         var isImportEndpoint = path.Contains("/api/import", StringComparison.OrdinalIgnoreCase);
+        
+        // Exclude navigation/shell requests from rate limiting (page reloads)
+        if (path == "/" || path == "/index.html" || path.Contains("/_framework/") || path.Contains("_blazor"))
+        {
+            await _next(context);
+            return;
+        }
         
         var key = $"{ipAddress}:{(isImportEndpoint ? "import" : "general")}";
         var maxRequests = isImportEndpoint ? ImportMaxRequestsPerWindow : MaxRequestsPerWindow;

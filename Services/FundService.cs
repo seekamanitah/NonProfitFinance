@@ -44,7 +44,8 @@ public class FundService : IFundService
             StartingBalance = request.StartingBalance,
             Balance = request.StartingBalance, // Initial balance = starting balance
             TargetBalance = request.TargetBalance,
-            RestrictionExpiryDate = request.RestrictionExpiryDate
+            RestrictionExpiryDate = request.RestrictionExpiryDate,
+            RowVersion = 1 // Initialize concurrency token
         };
 
         _context.Funds.Add(fund);
@@ -58,13 +59,32 @@ public class FundService : IFundService
         var fund = await _context.Funds.FindAsync(id);
         if (fund == null) return null;
 
+        // Check if starting balance changed
+        bool startingBalanceChanged = fund.StartingBalance != request.StartingBalance;
+
         fund.Name = request.Name;
         fund.Type = request.Type;
         fund.Description = request.Description;
+        fund.StartingBalance = request.StartingBalance;
         fund.TargetBalance = request.TargetBalance;
         fund.IsActive = request.IsActive;
         fund.RestrictionExpiryDate = request.RestrictionExpiryDate;
         fund.UpdatedAt = DateTime.UtcNow;
+
+        // If starting balance changed, recalculate current balance from transactions
+        if (startingBalanceChanged)
+        {
+            var income = await _context.Transactions
+                .Where(t => t.FundId == fund.Id && t.Type == TransactionType.Income)
+                .SumAsync(t => t.Amount);
+
+            var expenses = await _context.Transactions
+                .Where(t => t.FundId == fund.Id && t.Type == TransactionType.Expense)
+                .SumAsync(t => t.Amount);
+
+            // Balance = Starting Balance + Income - Expenses
+            fund.Balance = request.StartingBalance + income - expenses;
+        }
 
         await _context.SaveChangesAsync();
 

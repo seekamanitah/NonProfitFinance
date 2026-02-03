@@ -43,6 +43,8 @@ public record ImportMappingConfig(
     int? TypeColumn = null,
     int? PayeeColumn = null,
     int? TagsColumn = null,
+    int? BalanceColumn = null, // NEW: Map balance field from bank statements
+    int? DefaultFundId = null, // NEW: Import all transactions into specific account
     bool HasHeaderRow = true,
     string DateFormat = "yyyy-MM-dd"
 );

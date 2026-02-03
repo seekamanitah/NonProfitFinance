@@ -34,6 +34,13 @@ public class ImportPreset
     public int? GrantColumn { get; set; }
     public int? PayeeColumn { get; set; }
     public int? TagsColumn { get; set; }
+    public int? BalanceColumn { get; set; } // NEW: Map balance column from CSV
+
+    /// <summary>
+    /// Default fund/account ID to import all transactions into.
+    /// If set, overrides any fund specified in CSV.
+    /// </summary>
+    public int? DefaultFundId { get; set; } // NEW: Import into specific account
 
     /// <summary>
     /// Whether the CSV file has a header row.

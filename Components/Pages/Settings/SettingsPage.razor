@@ -1,5 +1,8 @@
 @page "/settings"
+@using System.Text.Json
+@using System.Text.Json.Serialization
 @inject IJSRuntime JS
+@inject HttpClient Http
 @inject IBackupService BackupService
 @inject IDemoDataService DemoDataService
 @inject IOrganizationService OrganizationService
@@ -664,9 +667,25 @@
                 <strong>Warning:</strong> These actions cannot be undone. Make sure you have a backup first.
             </div>
             
-            <button class="btn btn-danger" @onclick="ShowResetConfirm">
-                <i class="fas fa-trash-alt"></i> Reset All Data
+            <button class="btn btn-danger" @onclick="ShowResetConfirm" disabled="@isResetting">
+                @if (isResetting)
+                {
+                    <span class="spinner"></span>
+                }
+                else
+                {
+                    <i class="fas fa-trash-alt"></i>
+                }
+                Reset All Data
             </button>
+            
+            @if (!string.IsNullOrEmpty(backupMessage))
+            {
+                <div class="alert @(backupSuccess ? "alert-success" : "alert-danger") mt-3">
+                    <i class="fas @(backupSuccess ? "fa-check-circle" : "fa-exclamation-circle")"></i>
+                    @backupMessage
+                </div>
+            }
         </div>
     </div>
     
@@ -787,12 +806,28 @@ protected override async Task OnInitializedAsync()
         {
             try
             {
-                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+                // Get current theme with timeout
+                var timeoutTask = Task.Delay(500);
+                var getThemeTask = JS.InvokeAsync<string>("themeManager.getTheme").AsTask();
+                
+                var completedTask = await Task.WhenAny(getThemeTask, timeoutTask);
+                
+                if (completedTask == getThemeTask)
+                {
+                    currentTheme = getThemeTask.Result;
+                }
+                else
+                {
+                    // Fallback to light theme if timeout
+                    currentTheme = "light";
+                }
+                
                 StateHasChanged();
             }
-            catch
+            catch (Exception ex)
             {
-                // Theme manager not available
+                Console.WriteLine($"Theme initialization error: {ex.Message}");
+                currentTheme = "light";
             }
         }
     }
@@ -923,9 +958,29 @@ protected override async Task OnInitializedAsync()
 
     private async Task SetTheme(string theme)
     {
-        currentTheme = theme;
-        await JS.InvokeVoidAsync("themeManager.setTheme", theme);
-        StateHasChanged();
+        try
+        {
+            currentTheme = theme;
+            // Invoke with error handling
+            await JS.InvokeVoidAsync("themeManager.setTheme", theme);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error setting theme: {ex.Message}");
+            // Fallback: try to apply theme directly
+            try
+            {
+                await JS.InvokeVoidAsync("eval", theme == "dark" 
+                    ? "document.documentElement.setAttribute('data-theme', 'dark'); localStorage.setItem('theme', 'dark');"
+                    : "document.documentElement.removeAttribute('data-theme'); localStorage.setItem('theme', 'light');");
+                StateHasChanged();
+            }
+            catch (Exception fallbackEx)
+            {
+                Console.WriteLine($"Fallback theme setting failed: {fallbackEx.Message}");
+            }
+        }
     }
 
     private async Task SetLightTheme() => await SetTheme("light");
@@ -989,31 +1044,34 @@ protected override async Task OnInitializedAsync()
     private async Task ConfirmReset()
     {
         isResetting = true;
+        backupMessage = null;
         try
         {
-            // Create emergency backup before reset
-            backupMessage = "Creating emergency backup before reset...";
+            backupMessage = "Resetting database...";
             StateHasChanged();
             
-            var backupResult = await BackupService.CreateBackupAsync();
+            // Call the API endpoint to reset database
+            var response = await Http.PostAsync("/api/admin/reset-database", null);
             
-            if (!backupResult.Success)
+            if (response.IsSuccessStatusCode)
             {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var content = JsonSerializer.Deserialize<ResetDatabaseResponse>(jsonString, options);
+                
+                backupSuccess = true;
+                backupMessage = content?.Message ?? "Database reset successfully!";
+            }
+            else
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var errorContent = JsonSerializer.Deserialize<ResetDatabaseErrorResponse>(jsonString, options);
+                
                 backupSuccess = false;
-                backupMessage = "Failed to create backup. Reset cancelled for safety.";
-                showResetDialog = false;
-                return;
+                backupMessage = errorContent?.Message ?? "Failed to reset database";
             }
-
-            // Delete the database file
-            var dbPath = Path.Combine(Directory.GetCurrentDirectory(), "NonProfitFinance.db");
-            if (File.Exists(dbPath))
-            {
-                File.Delete(dbPath);
-            }
-
-            backupSuccess = true;
-            backupMessage = $"Database reset complete! Emergency backup saved to: {backupResult.FilePath}. Please restart the application.";
+            
             showResetDialog = false;
         }
         catch (Exception ex)
@@ -1025,6 +1083,7 @@ protected override async Task OnInitializedAsync()
         finally
         {
             isResetting = false;
+            StateHasChanged();
         }
     }
 
@@ -1115,5 +1174,23 @@ protected override async Task OnInitializedAsync()
             StateHasChanged();
         }
     }
+
+    // Response types for API calls
+    private class ResetDatabaseResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? BackupFilePath { get; set; }
+        public DateTime ResetTime { get; set; }
+    }
+
+    private class ResetDatabaseErrorResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? BackupFilePath { get; set; }
+    }
 }
+
+
 

@@ -1,6 +1,7 @@
 @page "/import-export"
 @inject IImportExportService ImportExportService
 @inject IImportPresetService ImportPresetService
+@inject IFundService FundService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -122,6 +123,25 @@
                         <label class="form-label">Payee Column (optional)</label>
                         <input type="number" class="form-control" @bind="payeeColumn" min="0" />
                         <small class="text-muted">Who received/paid the money</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Balance Column (optional)</label>
+                        <input type="number" class="form-control" @bind="balanceColumn" min="0" />
+                        <small class="text-muted">Running balance from bank statement</small>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Import to Account (optional)</label>
+                        <select class="form-control" @bind="defaultFundId">
+                            <option value="">Use account from CSV or create new</option>
+                            @foreach (var fund in funds)
+                            {
+                                <option value="@fund.Id">@fund.Name</option>
+                            }
+                        </select>
+                        <small class="text-muted">All transactions will go to this account</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Date Format</label>
@@ -438,6 +458,9 @@ private int? categoryColumn = 4; // Default to column 4 (Category in exported CS
 private int? fundColumn = 5; // Default to column 5 (Fund/Account in exported CSV)
 private int? donorColumn = null; // Donor column (optional)
 private int? payeeColumn = null; // Payee column (optional)
+private int? balanceColumn = null; // Balance column (optional, for bank statements)
+private int? defaultFundId = null; // Import all transactions into this account
+private List<FundDto> funds = new(); // List of accounts for dropdown
 private string dateFormat = "yyyy-MM-dd";
 private bool isProcessing = false;
 private ImportProgress? importProgress;
@@ -470,6 +493,7 @@ protected override async Task OnInitializedAsync()
 {
     await LoadPresetsAsync();
     await LoadDefaultPresetAsync();
+    funds = await FundService.GetAllAsync(); // Load accounts for dropdown
 }
 
 private void SetTransactionsTab() => importTab = "transactions";
@@ -500,7 +524,7 @@ private async Task PreviewImport()
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
                 categoryColumn, fundColumn, donorColumn, null, typeColumn,
-                payeeColumn, null, hasHeaderRow, dateFormat);
+                payeeColumn, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
 
             previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
         }
@@ -530,7 +554,7 @@ private async Task PreviewImport()
             var mapping = new ImportMappingConfig(
                 dateColumn, amountColumn, descriptionColumn,
                 categoryColumn, fundColumn, donorColumn, null, typeColumn,
-                payeeColumn, null, hasHeaderRow, dateFormat);
+                payeeColumn, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
 
             // Store mapping for error report generation
             lastMappingConfig = mapping;
@@ -690,6 +714,8 @@ private async Task PreviewImport()
         fundColumn = preset.FundColumn;
         donorColumn = preset.DonorColumn;
         payeeColumn = preset.PayeeColumn;
+        balanceColumn = preset.BalanceColumn; // NEW
+        defaultFundId = preset.DefaultFundId; // NEW
         hasHeaderRow = preset.HasHeaderRow;
         dateFormat = preset.DateFormat;
         StateHasChanged();
@@ -725,6 +751,8 @@ private async Task PreviewImport()
             FundColumn = fundColumn,
             DonorColumn = donorColumn,
             PayeeColumn = payeeColumn,
+            BalanceColumn = balanceColumn, // NEW
+            DefaultFundId = defaultFundId, // NEW
             HasHeaderRow = hasHeaderRow,
             DateFormat = dateFormat,
             IsDefault = newPresetIsDefault

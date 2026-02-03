@@ -279,6 +279,7 @@ public record UpdateFundRequest(
     string Name,
     FundType Type,
     string? Description,
+    decimal StartingBalance, // Now editable - triggers recalculation of current balance
     decimal? TargetBalance,
     bool IsActive,
     DateTime? RestrictionExpiryDate

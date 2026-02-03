@@ -307,7 +307,13 @@ public class ImportExportService : IImportExportService
 
                 // Handle fund - auto-create if doesn't exist
                 int? fundId = null;
-                if (mapping.FundColumn.HasValue && mapping.FundColumn.Value < columns.Length)
+                
+                // If DefaultFundId is set, use it instead of CSV fund column
+                if (mapping.DefaultFundId.HasValue)
+                {
+                    fundId = mapping.DefaultFundId.Value;
+                }
+                else if (mapping.FundColumn.HasValue && mapping.FundColumn.Value < columns.Length)
                 {
                     var fundName = columns[mapping.FundColumn.Value].Trim();
                     if (!string.IsNullOrEmpty(fundName))
@@ -328,7 +334,8 @@ public class ImportExportService : IImportExportService
                                     StartingBalance = 0,
                                     Balance = 0,
                                     IsActive = true,
-                                    Description = $"Auto-created during import on {DateTime.UtcNow:yyyy-MM-dd}"
+                                    Description = $"Auto-created during import on {DateTime.UtcNow:yyyy-MM-dd}",
+                                    RowVersion = 1 // Initialize concurrency token
                                 };
                                 _context.Funds.Add(newFund);
                                 await _context.SaveChangesAsync();
@@ -350,6 +357,20 @@ public class ImportExportService : IImportExportService
                                 }
                             }
                         }
+                    }
+                }
+                
+                // Handle balance column (optional - for informational/validation purposes)
+                decimal? balanceFromCsv = null;
+                if (mapping.BalanceColumn.HasValue && mapping.BalanceColumn.Value < columns.Length)
+                {
+                    var balanceStr = columns[mapping.BalanceColumn.Value].Trim();
+                    if (!string.IsNullOrEmpty(balanceStr))
+                    {
+                        var (parsedBalance, _) = ParseAmountWithSign(balanceStr);
+                        balanceFromCsv = parsedBalance;
+                        // Note: Balance is imported but not used in transaction creation
+                        // It's available for future reconciliation/validation features
                     }
                 }
 

@@ -53,7 +53,8 @@ public class GrantService : IGrantService
             ContactPerson = request.ContactPerson,
             ContactEmail = request.ContactEmail,
             ReportingRequirements = request.ReportingRequirements,
-            NextReportDueDate = request.NextReportDueDate
+            NextReportDueDate = request.NextReportDueDate,
+            RowVersion = 1 // Initialize concurrency token
         };
 
         _context.Grants.Add(grant);

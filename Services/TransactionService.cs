@@ -212,7 +212,8 @@ public class TransactionService : ITransactionService
                 ReferenceNumber = request.ReferenceNumber,
                 PONumber = request.PONumber,
                 IsRecurring = request.IsRecurring,
-                RecurrencePattern = request.RecurrencePattern
+                RecurrencePattern = request.RecurrencePattern,
+                RowVersion = 1 // Initialize concurrency token
             };
 
             // Calculate next recurrence date if recurring
@@ -341,7 +342,8 @@ public class TransactionService : ITransactionService
                 ToFundId = request.ToFundId,
                 TransferPairId = transferPairId,
                 ReferenceNumber = request.ReferenceNumber,
-                Tags = "Transfer"
+                Tags = "Transfer",
+                RowVersion = 1 // Initialize concurrency token
             };
 
             // Transaction 2: Credit to destination (Income)
@@ -357,7 +359,8 @@ public class TransactionService : ITransactionService
                 ToFundId = request.FundId,
                 TransferPairId = transferPairId,
                 ReferenceNumber = request.ReferenceNumber,
-                Tags = "Transfer"
+                Tags = "Transfer",
+                RowVersion = 1 // Initialize concurrency token
             };
 
             _context.Transactions.AddRange(expenseTransaction, incomeTransaction);

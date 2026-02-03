@@ -33,6 +33,8 @@ public class ImportExportController : ControllerBase
         [FromQuery] int? fundColumn = null,
         [FromQuery] int? donorColumn = null,
         [FromQuery] int? typeColumn = null,
+        [FromQuery] int? balanceColumn = null,
+        [FromQuery] int? defaultFundId = null,
         [FromQuery] bool hasHeaderRow = true,
         [FromQuery] string dateFormat = "yyyy-MM-dd")
     {
@@ -42,7 +44,7 @@ public class ImportExportController : ControllerBase
         var mapping = new ImportMappingConfig(
             dateColumn, amountColumn, descriptionColumn,
             categoryColumn, fundColumn, donorColumn, null, typeColumn,
-            null, null, hasHeaderRow, dateFormat);
+            null, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
 
         using var stream = file.OpenReadStream();
         var result = await _importExportService.PreviewImportAsync(stream, mapping);
@@ -66,6 +68,8 @@ public class ImportExportController : ControllerBase
         [FromQuery] int? typeColumn = null,
         [FromQuery] int? payeeColumn = null,
         [FromQuery] int? tagsColumn = null,
+        [FromQuery] int? balanceColumn = null,
+        [FromQuery] int? defaultFundId = null,
         [FromQuery] bool hasHeaderRow = true,
         [FromQuery] string dateFormat = "yyyy-MM-dd")
     {
@@ -75,7 +79,7 @@ public class ImportExportController : ControllerBase
         var mapping = new ImportMappingConfig(
             dateColumn, amountColumn, descriptionColumn,
             categoryColumn, fundColumn, donorColumn, grantColumn, typeColumn,
-            payeeColumn, tagsColumn, hasHeaderRow, dateFormat);
+            payeeColumn, tagsColumn, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
 
         using var stream = file.OpenReadStream();
         var result = await _importExportService.ImportTransactionsFromCsvAsync(stream, mapping);
