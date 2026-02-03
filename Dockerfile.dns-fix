@@ -1,0 +1,78 @@
+# ================================================================
+# NonProfit Finance - Multi-stage Docker Build (DNS Resilient)
+# ================================================================
+# This version handles DNS resolution issues and uses alternative mirrors
+
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy the entire project structure (including Components, Models, Services, DTOs)
+COPY [".", "./"]
+
+# Restore NuGet packages
+RUN dotnet restore "NonProfitFinance.csproj"
+
+# Build the project
+RUN dotnet build "NonProfitFinance.csproj" -c Release -o /app/build
+
+# ================================================================
+# Stage 2: Publish
+FROM build AS publish
+RUN dotnet publish "NonProfitFinance.csproj" \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false
+
+# ================================================================
+# Stage 3: Runtime (DNS Resilient)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+# Configure DNS and use alternative Ubuntu mirrors for resilience
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf && \
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+# Use kernel.org mirror as fallback (more reliable than archive.ubuntu.com)
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.kernel.org|g' /etc/apt/sources.list.d/ubuntu.sources || true
+
+# Install dependencies for OCR and health checks with retry logic
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends \
+        tesseract-ocr \
+        libtesseract-dev \
+        libleptonica-dev \
+        curl \
+        ca-certificates \
+    || (sleep 5 && apt-get update && apt-get install -y --no-install-recommends \
+        tesseract-ocr \
+        libtesseract-dev \
+        libleptonica-dev \
+        curl \
+        ca-certificates) && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy published application
+COPY --from=publish /app/publish .
+
+# Create directories for data persistence
+RUN mkdir -p /app/data /app/backups /app/documents && \
+    chmod 777 /app/data /app/backups /app/documents
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV TZ=America/New_York
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run as non-root user for security
+USER app
+
+ENTRYPOINT ["dotnet", "NonProfitFinance.dll"]
