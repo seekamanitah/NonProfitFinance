@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nonprofit-finance:
     build:
@@ -19,6 +17,7 @@ services:
       - nonprofit-data:media/AppDatabases/data
       - nonprofit-backups:media/AppDatabases/backups
       - nonprofit-documents:media/AppDatabases/documents
+      - nonprofit-keys:/root/.aspnet/DataProtection-Keys
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -30,12 +29,14 @@ services:
       - nonprofit-network
 
 volumes:
-  nonprofit-data:
-    driver: local
-  nonprofit-backups:
-    driver: local
-  nonprofit-documents:
-    driver: local
+nonprofit-data:
+  driver: local
+nonprofit-backups:
+  driver: local
+nonprofit-documents:
+  driver: local
+nonprofit-keys:
+  driver: local
 
 networks:
   nonprofit-network:

@@ -10,7 +10,7 @@ git add .
 Write-Host "`n📝 Creating commit..." -ForegroundColor Cyan
 
 # Multi-line commit message
-$commitMessage = "Fix critical bugs, enhance imports, and add Docker DNS fix`n`n" +
+$commitMessage = "Fix critical bugs, enhance imports, add Docker DNS fix, and improve Docker warnings`n`n" +
 "BUGS FIXED:`n" +
 "* HttpClient service registration missing in Blazor Server`n" +
 "* Report filtering not respecting selected account filter`n" +
@@ -23,6 +23,10 @@ $commitMessage = "Fix critical bugs, enhance imports, and add Docker DNS fix`n`n
 "AUTHORIZATION FIX:`n" +
 "* Removed Admin role requirement from reset database endpoint for development`n" +
 "* Base authentication still required (TODO: re-enable role check for production)`n`n" +
+"DOCKER IMPROVEMENTS:`n" +
+"* Removed obsolete 'version' attribute from docker-compose.yml`n" +
+"* Added persistent volume for DataProtection keys to prevent session loss`n" +
+"* Keys now persist across container restarts in 'nonprofit-keys' volume`n`n" +
 "DOCKER DNS FIX:`n" +
 "* Added fix-docker-dns.sh script to configure Docker DNS on remote servers`n" +
 "* Added Dockerfile.dns-fix with alternative Ubuntu mirrors and retry logic`n" +
@@ -50,7 +54,8 @@ $commitMessage = "Fix critical bugs, enhance imports, and add Docker DNS fix`n`n
 "* DOCKER_DNS_FIX_GUIDE.md: Complete DNS troubleshooting guide`n" +
 "* DOCKER_DNS_QUICK_FIX.md: Quick reference for DNS issues`n`n" +
 "All builds successful. Backward compatible changes.`n" +
-"Fixes remote server deployment DNS resolution issues."
+"Fixes remote server deployment DNS resolution issues.`n" +
+"Improves Docker container persistence and removes warnings."
 
 git commit -m $commitMessage
 
