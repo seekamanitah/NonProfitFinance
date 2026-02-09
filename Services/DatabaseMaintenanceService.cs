@@ -137,6 +137,47 @@ public class DatabaseMaintenanceService
 
         return result;
     }
+
+    public async Task<OrphanCheckResult> CheckForOrphansAsync()
+    {
+        var result = new OrphanCheckResult();
+
+        try
+        {
+            // TransactionSplits without a valid parent Transaction
+            result.OrphanedSplits = await _context.TransactionSplits
+                .Where(ts => !_context.Transactions.Any(t => t.Id == ts.TransactionId))
+                .CountAsync();
+
+            // BudgetLineItems without a valid parent Budget
+            result.OrphanedBudgetLineItems = await _context.BudgetLineItems
+                .Where(bl => !_context.Budgets.Any(b => b.Id == bl.BudgetId))
+                .CountAsync();
+
+            // Transactions with deleted Fund references (FundId set but Fund doesn't exist)
+            result.TransactionsWithMissingFund = await _context.Transactions
+                .Where(t => t.FundId.HasValue && !_context.Funds.Any(f => f.Id == t.FundId))
+                .CountAsync();
+
+            // Transactions with deleted Donor references
+            result.TransactionsWithMissingDonor = await _context.Transactions
+                .Where(t => t.DonorId.HasValue && !_context.Donors.Any(d => d.Id == t.DonorId))
+                .CountAsync();
+
+            result.Success = true;
+            _logger.LogInformation(
+                "Orphan check complete: {Splits} orphaned splits, {BudgetItems} orphaned budget items, {MissingFunds} missing fund refs, {MissingDonors} missing donor refs",
+                result.OrphanedSplits, result.OrphanedBudgetLineItems, result.TransactionsWithMissingFund, result.TransactionsWithMissingDonor);
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = $"Error checking for orphans: {ex.Message}";
+            _logger.LogError(ex, "Failed to check for orphaned records");
+        }
+
+        return result;
+    }
 }
 
 public class DuplicateCheckResult
@@ -164,4 +205,18 @@ public class FixResult
     public int UpdatedTransactions { get; set; }
     public int UpdatedBudgetItems { get; set; }
     public int UpdatedRules { get; set; }
+}
+
+public class OrphanCheckResult
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public int OrphanedSplits { get; set; }
+    public int OrphanedBudgetLineItems { get; set; }
+    public int TransactionsWithMissingFund { get; set; }
+    public int TransactionsWithMissingDonor { get; set; }
+
+    public bool HasOrphans =>
+        OrphanedSplits > 0 || OrphanedBudgetLineItems > 0 ||
+        TransactionsWithMissingFund > 0 || TransactionsWithMissingDonor > 0;
 }

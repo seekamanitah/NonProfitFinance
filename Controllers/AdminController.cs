@@ -65,8 +65,7 @@ public class AdminController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {
                 success = false,
-                message = "An unexpected error occurred during reset",
-                error = ex.Message
+                message = "An unexpected error occurred during reset. Check server logs for details."
             });
         }
     }

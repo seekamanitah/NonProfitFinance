@@ -29,7 +29,7 @@
                 </div>
                 <div class="widget-content">
                     <span class="widget-label">Total Income</span>
-                    <span class="widget-value">@summary?.TotalIncome.ToString("C0")</span>
+                    <span class="widget-value">@summary?.TotalIncome.ToString("C2")</span>
                     @if (comparison != null && comparison.TotalIncome != 0)
                     {
                         var change = CalculateChange(summary?.TotalIncome ?? 0, comparison.TotalIncome);
@@ -48,7 +48,7 @@
                 </div>
                 <div class="widget-content">
                     <span class="widget-label">Total Expenses</span>
-                    <span class="widget-value">@summary?.TotalExpenses.ToString("C0")</span>
+                    <span class="widget-value">@summary?.TotalExpenses.ToString("C2")</span>
                     @if (comparison != null && comparison.TotalExpenses != 0)
                     {
                         var change = CalculateChange(summary?.TotalExpenses ?? 0, comparison.TotalExpenses);
@@ -68,7 +68,7 @@
                 <div class="widget-content">
                     <span class="widget-label">Net Income</span>
                     <span class="widget-value @(summary?.NetIncome >= 0 ? "positive" : "negative")">
-                        @summary?.NetIncome.ToString("C0")
+                        @summary?.NetIncome.ToString("C2")
                     </span>
                     @if (comparison != null && comparison.NetIncome != 0)
                     {
@@ -290,7 +290,11 @@
     {
         if (!isLoading && summary != null && ShowMiniCharts)
         {
-            await RenderMiniCharts();
+            try
+            {
+                await RenderMiniCharts();
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -299,21 +303,32 @@
         isLoading = true;
         StateHasChanged();
 
-        var (start, end) = GetPeriodDates();
-        var filter = new ReportFilterRequest(start, end, null, FundId);
-        summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
-
-        if (ShowComparison)
+        try
         {
-            var periodDays = (end - start).Days + 1;
-            var compStart = start.AddDays(-periodDays);
-            var compEnd = end.AddDays(-periodDays);
-            var compFilter = new ReportFilterRequest(compStart, compEnd, null, FundId);
-            comparison = await ReportService.GetIncomeExpenseSummaryAsync(compFilter);
-        }
+            var (start, end) = GetPeriodDates();
+            var filter = new ReportFilterRequest(start, end, null, FundId);
+            summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
 
-        isLoading = false;
-        StateHasChanged();
+            if (ShowComparison)
+            {
+                var periodDays = (end - start).Days + 1;
+                var compStart = start.AddDays(-periodDays);
+                var compEnd = end.AddDays(-periodDays);
+                var compFilter = new ReportFilterRequest(compStart, compEnd, null, FundId);
+                comparison = await ReportService.GetIncomeExpenseSummaryAsync(compFilter);
+            }
+        }
+        catch (Exception ex)
+        {
+            summary = null;
+            comparison = null;
+            System.Diagnostics.Debug.WriteLine($"Error loading report widgets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task OnPeriodChanged()
@@ -370,7 +385,7 @@
                     new { cutout = "60%", legend = false });
             }
         }
-        catch
+        catch (Microsoft.JSInterop.JSException)
         {
             // Chart JS may not be loaded yet
         }

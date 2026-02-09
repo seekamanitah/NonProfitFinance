@@ -1,5 +1,6 @@
 @page "/compliance"
 @inject IComplianceService ComplianceService
+@inject IToastService ToastService
 @rendermode InteractiveServer
 
 <PageTitle>Compliance - NonProfit Finance</PageTitle>
@@ -33,8 +34,8 @@ else
                     <span class="ml-2">@auditStatus.Message</span>
                 </div>
                 <div>
-                    <strong>@auditStatus.CurrentYtdRevenue.ToString("C0")</strong>
-                    <span class="text-muted">/ @auditStatus.AuditThreshold.ToString("C0")</span>
+                    <strong>@auditStatus.CurrentYtdRevenue.ToString("C2")</strong>
+                    <span class="text-muted">/ @auditStatus.AuditThreshold.ToString("C2")</span>
                 </div>
             </div>
             <div class="progress mt-2" style="height: 8px;">
@@ -230,6 +231,10 @@ else
             reminders = await ComplianceService.GetUpcomingRemindersAsync(90);
             auditStatus = await ComplianceService.CheckAuditThresholdAsync();
         }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load compliance data: {ex.Message}");
+        }
         finally
         {
             isLoading = false;
@@ -238,8 +243,15 @@ else
 
     private async Task DismissReminder(ComplianceReminderDto reminder)
     {
-        await ComplianceService.DismissReminderAsync(reminder.Id);
-        reminders.Remove(reminder);
+        try
+        {
+            await ComplianceService.DismissReminderAsync(reminder.Id);
+            reminders.Remove(reminder);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to dismiss reminder: {ex.Message}");
+        }
     }
 
     private string GetPriorityIcon(ReminderPriority priority) => priority switch

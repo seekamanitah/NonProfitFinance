@@ -2,6 +2,7 @@
 @inject IImportExportService ImportExportService
 @inject IImportPresetService ImportPresetService
 @inject IFundService FundService
+@inject IToastService ToastService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -500,9 +501,16 @@ private ImportMappingConfig? lastMappingConfig; // Store for error report genera
 
 protected override async Task OnInitializedAsync()
 {
-    await LoadPresetsAsync();
-    await LoadDefaultPresetAsync();
-    funds = await FundService.GetAllAsync(); // Load accounts for dropdown
+    try
+    {
+        await LoadPresetsAsync();
+        await LoadDefaultPresetAsync();
+        funds = await FundService.GetAllAsync();
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError($"Failed to load import settings: {ex.Message}");
+    }
 }
 
 private void SetTransactionsTab() => importTab = "transactions";
@@ -536,6 +544,10 @@ private async Task PreviewImport()
                 payeeColumn, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
 
             previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Preview failed: {ex.Message}");
         }
         finally
         {
@@ -637,39 +649,74 @@ private async Task PreviewImport()
     {
         if (!CanExportExcel) return;
 
-        var excel = await ImportExportService.ExportToExcelAsync(
-            exportTransactions ? new TransactionFilterRequest(exportStartDate, exportEndDate) : null,
-            exportCategories,
-            exportDonors,
-            exportGrants,
-            exportFunds
-        );
-        await DownloadFile(excel, $"nonprofit_data_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        try
+        {
+            var excel = await ImportExportService.ExportToExcelAsync(
+                exportTransactions ? new TransactionFilterRequest(exportStartDate, exportEndDate) : null,
+                exportCategories,
+                exportDonors,
+                exportGrants,
+                exportFunds
+            );
+            await DownloadFile(excel, $"nonprofit_data_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export Excel: {ex.Message}");
+        }
     }
 
     private async Task ExportTransactionsCsv()
     {
-        var filter = new TransactionFilterRequest(exportStartDate, exportEndDate);
-        var csv = await ImportExportService.ExportTransactionsToCsvAsync(filter);
-        await DownloadFile(csv, $"transactions_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        try
+        {
+            var filter = new TransactionFilterRequest(exportStartDate, exportEndDate);
+            var csv = await ImportExportService.ExportTransactionsToCsvAsync(filter);
+            await DownloadFile(csv, $"transactions_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export transactions: {ex.Message}");
+        }
     }
 
     private async Task ExportCategoriesCsv()
     {
-        var csv = await ImportExportService.ExportCategoriesToCsvAsync();
-        await DownloadFile(csv, $"categories_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        try
+        {
+            var csv = await ImportExportService.ExportCategoriesToCsvAsync();
+            await DownloadFile(csv, $"categories_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export categories: {ex.Message}");
+        }
     }
 
     private async Task ExportDonorsCsv()
     {
-        var csv = await ImportExportService.ExportDonorsToCsvAsync();
-        await DownloadFile(csv, $"donors_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        try
+        {
+            var csv = await ImportExportService.ExportDonorsToCsvAsync();
+            await DownloadFile(csv, $"donors_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export donors: {ex.Message}");
+        }
     }
 
     private async Task ExportGrantsCsv()
     {
-        var csv = await ImportExportService.ExportGrantsToCsvAsync();
-        await DownloadFile(csv, $"grants_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        try
+        {
+            var csv = await ImportExportService.ExportGrantsToCsvAsync();
+            await DownloadFile(csv, $"grants_{DateTime.Now:yyyyMMdd}.csv", "text/csv");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export grants: {ex.Message}");
+        }
     }
 
     private async Task DownloadFile(byte[] content, string fileName, string contentType)
@@ -747,40 +794,53 @@ private async Task PreviewImport()
     {
         if (string.IsNullOrWhiteSpace(newPresetName)) return;
 
-        var preset = new ImportPreset
+        try
         {
-            Name = newPresetName.Trim(),
-            Description = string.IsNullOrWhiteSpace(newPresetDescription) ? null : newPresetDescription.Trim(),
-            ImportType = importTab,
-            DateColumn = dateColumn,
-            AmountColumn = amountColumn,
-            DescriptionColumn = descriptionColumn,
-            TypeColumn = typeColumn,
-            CategoryColumn = categoryColumn,
-            FundColumn = fundColumn,
-            DonorColumn = donorColumn,
-            PayeeColumn = payeeColumn,
-            BalanceColumn = balanceColumn, // NEW
-            DefaultFundId = defaultFundId, // NEW
-            HasHeaderRow = hasHeaderRow,
-            DateFormat = dateFormat,
-            IsDefault = newPresetIsDefault
-        };
+            var preset = new ImportPreset
+            {
+                Name = newPresetName.Trim(),
+                Description = string.IsNullOrWhiteSpace(newPresetDescription) ? null : newPresetDescription.Trim(),
+                ImportType = importTab,
+                DateColumn = dateColumn,
+                AmountColumn = amountColumn,
+                DescriptionColumn = descriptionColumn,
+                TypeColumn = typeColumn,
+                CategoryColumn = categoryColumn,
+                FundColumn = fundColumn,
+                DonorColumn = donorColumn,
+                PayeeColumn = payeeColumn,
+                BalanceColumn = balanceColumn,
+                DefaultFundId = defaultFundId,
+                HasHeaderRow = hasHeaderRow,
+                DateFormat = dateFormat,
+                IsDefault = newPresetIsDefault
+            };
 
-        await ImportPresetService.CreateAsync(preset);
-        await LoadPresetsAsync();
-        CloseSavePresetModal();
-        
-        // Show success message (optional - could add a toast)
-        StateHasChanged();
+            await ImportPresetService.CreateAsync(preset);
+            await LoadPresetsAsync();
+            CloseSavePresetModal();
+            ToastService.ShowSuccess($"Preset '{newPresetName}' saved successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to save preset: {ex.Message}");
+        }
     }
 
     private async Task DeleteSelectedPreset()
     {
         if (!selectedPresetId.HasValue) return;
 
-        await ImportPresetService.DeleteAsync(selectedPresetId.Value);
-        selectedPresetId = null;
-        await LoadPresetsAsync();
+        try
+        {
+            await ImportPresetService.DeleteAsync(selectedPresetId.Value);
+            ToastService.ShowSuccess("Preset deleted.");
+            selectedPresetId = null;
+            await LoadPresetsAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to delete preset: {ex.Message}");
+        }
     }
 }

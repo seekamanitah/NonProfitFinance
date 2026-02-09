@@ -29,15 +29,15 @@
                     <div class="stat-label">Active</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value income">@totalAwarded.ToString("C0")</div>
+                    <div class="stat-value income">@totalAwarded.ToString("C2")</div>
                     <div class="stat-label">Total Awarded</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value expense">@totalSpent.ToString("C0")</div>
+                    <div class="stat-value expense">@totalSpent.ToString("C2")</div>
                     <div class="stat-label">Spent</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">@totalRemaining.ToString("C0")</div>
+                    <div class="stat-value">@totalRemaining.ToString("C2")</div>
                     <div class="stat-label">Remaining</div>
                 </div>
             </div>
@@ -63,7 +63,7 @@
                         
                         <div class="grant-progress">
                             <div class="progress-info">
-                                <span>@grant.AmountUsed.ToString("C0") of @grant.Amount.ToString("C0")</span>
+                                <span>@grant.AmountUsed.ToString("C2") of @grant.Amount.ToString("C2")</span>
                                 <span class="@GetPercentClass(percentUsed)">@percentUsed.ToString("N0")%</span>
                             </div>
                             <div class="progress-bar-container">
@@ -263,8 +263,19 @@
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
-        grants = await GrantService.GetAllAsync(GrantStatus.Active);
-        isLoading = false;
+        try
+        {
+            grants = await GrantService.GetAllAsync(GrantStatus.Active);
+        }
+        catch (Exception ex)
+        {
+            grants = [];
+            System.Diagnostics.Debug.WriteLine($"Error loading grants: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private IEnumerable<GrantDto> GetDisplayGrants()

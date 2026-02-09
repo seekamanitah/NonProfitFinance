@@ -51,26 +51,26 @@
                                         <div class="fund-type text-muted">@fund.FundType</div>
                                     }
                                 </td>
-                                <td class="text-right">@fund.BeginningBalance.ToString("C0")</td>
-                                <td class="text-right amount income">@fund.TotalIncome.ToString("C0")</td>
-                                <td class="text-right amount expense">@fund.TotalExpenses.ToString("C0")</td>
+                            <td class="text-right">@fund.BeginningBalance.ToString("C2")</td>
+                                <td class="text-right amount income">@fund.TotalIncome.ToString("C2")</td>
+                                <td class="text-right amount expense">@fund.TotalExpenses.ToString("C2")</td>
                                 <td class="text-right amount @(fund.NetChange >= 0 ? "income" : "expense")">
-                                    @(fund.NetChange >= 0 ? "+" : "")@fund.NetChange.ToString("C0")
+                                    @(fund.NetChange >= 0 ? "+" : "")@fund.NetChange.ToString("C2")
                                 </td>
-                                <td class="text-right font-bold">@fund.EndingBalance.ToString("C0")</td>
+                                <td class="text-right font-bold">@fund.EndingBalance.ToString("C2")</td>
                             </tr>
                         }
                     </tbody>
                     <tfoot>
                         <tr class="totals-row">
                             <td><strong>Total All Funds</strong></td>
-                            <td class="text-right"><strong>@totalBeginning.ToString("C0")</strong></td>
-                            <td class="text-right amount income"><strong>@totalIncome.ToString("C0")</strong></td>
-                            <td class="text-right amount expense"><strong>@totalExpenses.ToString("C0")</strong></td>
+                            <td class="text-right"><strong>@totalBeginning.ToString("C2")</strong></td>
+                            <td class="text-right amount income"><strong>@totalIncome.ToString("C2")</strong></td>
+                            <td class="text-right amount expense"><strong>@totalExpenses.ToString("C2")</strong></td>
                             <td class="text-right amount @(totalNetChange >= 0 ? "income" : "expense")">
-                                <strong>@(totalNetChange >= 0 ? "+" : "")@totalNetChange.ToString("C0")</strong>
+                                <strong>@(totalNetChange >= 0 ? "+" : "")@totalNetChange.ToString("C2")</strong>
                             </td>
-                            <td class="text-right"><strong>@totalEnding.ToString("C0")</strong></td>
+                            <td class="text-right"><strong>@totalEnding.ToString("C2")</strong></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -86,7 +86,7 @@
                 <div class="card-body">
                     <div class="summary-stat">
                         <span class="stat-label">Total Restricted</span>
-                        <span class="stat-value">@restrictedTotal.ToString("C0")</span>
+                        <span class="stat-value">@restrictedTotal.ToString("C2")</span>
                     </div>
                     <div class="summary-stat">
                         <span class="stat-label">Funds Count</span>
@@ -106,7 +106,7 @@
                 <div class="card-body">
                     <div class="summary-stat">
                         <span class="stat-label">Total Unrestricted</span>
-                        <span class="stat-value">@unrestrictedTotal.ToString("C0")</span>
+                        <span class="stat-value">@unrestrictedTotal.ToString("C2")</span>
                     </div>
                     <div class="summary-stat">
                         <span class="stat-label">Funds Count</span>
@@ -347,44 +347,55 @@
         isLoading = true;
         StateHasChanged();
 
-        var funds = await FundService.GetAllAsync();
-        var summaries = new List<FundSummaryData>();
-
-        foreach (var fund in funds)
+        try
         {
-            // Get transactions for this fund in period
-            var filter = new TransactionFilterRequest(StartDate, EndDate, null, fund.Id);
-            var result = await TransactionService.GetAllAsync(filter);
-            var transactions = result.Items;
+            var funds = await FundService.GetAllAsync();
+            var summaries = new List<FundSummaryData>();
 
-            var income = transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-            var expenses = transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
-            var netChange = income - expenses;
+            foreach (var fund in funds)
+            {
+                // Get transactions for this fund in period
+                var filter = new TransactionFilterRequest(StartDate, EndDate, null, fund.Id);
+                var result = await TransactionService.GetAllAsync(filter);
+                var transactions = result.Items;
 
-            // Calculate beginning balance (balance before start date)
-            var beginningFilter = new TransactionFilterRequest(DateTime.MinValue, StartDate.AddDays(-1), null, fund.Id);
-            var beginningResult = await TransactionService.GetAllAsync(beginningFilter);
-            var beginningIncome = beginningResult.Items.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-            var beginningExpenses = beginningResult.Items.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
-            var beginningBalance = beginningIncome - beginningExpenses;
+                var income = transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+                var expenses = transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+                var netChange = income - expenses;
 
-            summaries.Add(new FundSummaryData(
-                fund.Id,
-                fund.Name,
-                fund.Type.ToString(),
-                fund.Type == FundType.Restricted || fund.Type == FundType.TemporarilyRestricted,
-                beginningBalance,
-                income,
-                expenses,
-                netChange,
-                beginningBalance + netChange,
-                transactions
-            ));
+                // Calculate beginning balance (balance before start date)
+                var beginningFilter = new TransactionFilterRequest(DateTime.MinValue, StartDate.AddDays(-1), null, fund.Id);
+                var beginningResult = await TransactionService.GetAllAsync(beginningFilter);
+                var beginningIncome = beginningResult.Items.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+                var beginningExpenses = beginningResult.Items.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+                var beginningBalance = beginningIncome - beginningExpenses;
+
+                summaries.Add(new FundSummaryData(
+                    fund.Id,
+                    fund.Name,
+                    fund.Type.ToString(),
+                    fund.Type == FundType.Restricted || fund.Type == FundType.TemporarilyRestricted,
+                    beginningBalance,
+                    income,
+                    expenses,
+                    netChange,
+                    beginningBalance + netChange,
+                    transactions
+                ));
+            }
+
+            fundSummaries = summaries.OrderBy(f => f.FundName).ToList();
         }
-
-        fundSummaries = summaries.OrderBy(f => f.FundName).ToList();
-        isLoading = false;
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            fundSummaries = [];
+            System.Diagnostics.Debug.WriteLine($"Error loading fund accounting report: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private void ToggleFundDetail(int fundId)

@@ -405,12 +405,25 @@ private void OnSplitAmountChanged(int index, ChangeEventArgs e)
                 CategoryId = Transaction.CategoryId,
                 FundType = Transaction.FundType,
                 FundId = Transaction.FundId,
+                ToFundId = Transaction.ToFundId,
                 DonorId = Transaction.DonorId,
                 GrantId = Transaction.GrantId,
                 Payee = Transaction.Payee,
                 Tags = Transaction.Tags,
                 ReferenceNumber = Transaction.ReferenceNumber
             };
+
+            // Restore split state when editing a split transaction
+            if (Transaction.Splits?.Any() == true)
+            {
+                isSplitTransaction = true;
+                splits = Transaction.Splits.Select(s => new SplitItem
+                {
+                    CategoryId = s.CategoryId,
+                    Amount = s.Amount,
+                    Description = s.Description
+                }).ToList();
+            }
         }
         else
         {

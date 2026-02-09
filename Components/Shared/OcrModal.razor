@@ -166,7 +166,7 @@
             {
                 await JSRuntime.InvokeVoidAsync("keyboardShortcuts.trapFocus", ".ocr-modal .modal-content");
             }
-            catch
+            catch (Microsoft.JSInterop.JSException)
             {
                 // JS interop may fail if script not loaded
             }
@@ -252,7 +252,7 @@
             await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
             await TextToSpeechService.AnnounceSuccessAsync("Text copied to clipboard");
         }
-        catch
+        catch (Microsoft.JSInterop.JSException)
         {
             // Clipboard API may not be available
             await TextToSpeechService.AnnounceErrorAsync("Could not copy to clipboard");

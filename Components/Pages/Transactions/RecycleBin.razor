@@ -1,5 +1,6 @@
 @page "/transactions/recycle-bin"
 @inject ITransactionService TransactionService
+@inject IToastService ToastService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -140,6 +141,10 @@ else
         {
             deletedTransactions = await TransactionService.GetDeletedAsync(100);
         }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load deleted transactions: {ex.Message}");
+        }
         finally
         {
             isLoading = false;
@@ -159,6 +164,10 @@ else
                 _ = ClearSuccessMessage();
             }
         }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to restore transaction: {ex.Message}");
+        }
         finally
         {
             isProcessing = false;
@@ -170,7 +179,7 @@ else
         transactionToDelete = transaction.Id;
         emptyBinMode = false;
         confirmTitle = "Permanently Delete";
-        confirmMessage = $"Are you sure you want to permanently delete this ${transaction.Amount:N2} transaction?";
+        confirmMessage = $"Are you sure you want to permanently delete this {transaction.Amount:C2} transaction?";
         showConfirmDialog = true;
     }
 
@@ -206,6 +215,10 @@ else
             showConfirmDialog = false;
             await LoadDeletedTransactions();
             _ = ClearSuccessMessage();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to delete transaction: {ex.Message}");
         }
         finally
         {

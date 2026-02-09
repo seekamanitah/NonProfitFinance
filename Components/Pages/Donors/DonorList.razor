@@ -29,7 +29,7 @@
         </div>
         
         <label class="d-flex align-center gap-2">
-            <input type="checkbox" @bind="showInactive" @bind:after="StateHasChanged" /> Show Inactive
+            <input type="checkbox" @bind="showInactive" /> Show Inactive
         </label>
     </div>
     
@@ -65,7 +65,7 @@ else
                     <div class="d-flex justify-between mb-2">
                         <span class="text-muted">Total Contributions</span>
                         <span class="amount income" style="font-size: 1.25rem; font-weight: 600;">
-                            @donor.TotalContributions.ToString("C0")
+                            @donor.TotalContributions.ToString("C2")
                         </span>
                     </div>
                     
@@ -128,7 +128,7 @@ else
                     </div>
                     <div class="form-group">
                         <label class="form-label">Total Contributions</label>
-                        <div class="metric-value positive">@selectedDonor.TotalContributions.ToString("C0")</div>
+                        <div class="metric-value positive">@selectedDonor.TotalContributions.ToString("C2")</div>
                     </div>
                 </div>
                 
@@ -259,14 +259,32 @@ protected override async Task OnInitializedAsync()
 private async Task LoadDonors()
 {
     isLoading = true;
-    donors = await DonorService.GetAllAsync(includeInactive: true);
+    try
+    {
+        donors = await DonorService.GetAllAsync(includeInactive: true);
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to load donors: {ex.Message}");
+    }
+    finally
+    {
         isLoading = false;
     }
+}
 
     private async Task SelectDonor(DonorDto donor)
     {
         selectedDonor = donor;
-        donorContributions = await DonorService.GetContributionHistoryAsync(donor.Id);
+        try
+        {
+            donorContributions = await DonorService.GetContributionHistoryAsync(donor.Id);
+        }
+        catch (Exception ex)
+        {
+            donorContributions = new();
+            Toast.ShowError($"Failed to load contributions: {ex.Message}");
+        }
     }
 
     private void CloseDetail()

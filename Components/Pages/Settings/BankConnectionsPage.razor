@@ -1,5 +1,6 @@
 @page "/bank-connections"
 @inject IBankConnectionService BankService
+@inject IToastService ToastService
 @rendermode InteractiveServer
 
 <PageTitle>Bank Connections - NonProfit Finance</PageTitle>
@@ -63,7 +64,7 @@
                                 <small class="text-muted">****@account.AccountMask</small>
                             </td>
                             <td>@account.AccountType</td>
-                            <td class="text-right">@(account.CurrentBalance?.ToString("C") ?? "—")</td>
+                            <td class="text-right">@(account.CurrentBalance?.ToString("C") ?? "â€”")</td>
                             <td>
                                 @if (account.LastSynced.HasValue)
                                 {
@@ -128,7 +129,7 @@
                     <div>
                         <strong>@tx.MerchantName</strong>
                         <br />
-                        <small class="text-muted">@tx.Date.ToString("MMM d") • @tx.AccountName</small>
+                        <small class="text-muted">@tx.Date.ToString("MMM d") â€¢ @tx.AccountName</small>
                     </div>
                     <div class="text-right">
                         <span class="amount @(tx.IsIncome ? "income" : "expense")">
@@ -198,8 +199,15 @@
 
     private async Task LoadData()
     {
-        accounts = await BankService.GetConnectedAccountsAsync();
-        pendingTransactions = await BankService.GetPendingTransactionsAsync();
+        try
+        {
+            accounts = await BankService.GetConnectedAccountsAsync();
+            pendingTransactions = await BankService.GetPendingTransactionsAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load bank data: {ex.Message}");
+        }
     }
 
     private async Task ConnectBank()
@@ -214,6 +222,10 @@
         {
             // Expected - feature not yet implemented
         }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to connect bank: {ex.Message}");
+        }
         finally
         {
             isConnecting = false;
@@ -222,13 +234,29 @@
 
     private async Task SyncAccount(BankAccountDto account)
     {
-        await BankService.SyncTransactionsAsync(account.Id);
-        await LoadData();
+        try
+        {
+            await BankService.SyncTransactionsAsync(account.Id);
+            await LoadData();
+            ToastService.ShowSuccess($"'{account.AccountName}' synced successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to sync account: {ex.Message}");
+        }
     }
 
     private async Task DisconnectAccount(BankAccountDto account)
     {
-        await BankService.DisconnectAccountAsync(account.Id);
-        await LoadData();
+        try
+        {
+            await BankService.DisconnectAccountAsync(account.Id);
+            await LoadData();
+            ToastService.ShowSuccess($"'{account.AccountName}' disconnected.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to disconnect account: {ex.Message}");
+        }
     }
 }

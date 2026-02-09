@@ -65,8 +65,12 @@
     {
         if (firstRender || !isRendered)
         {
-            await RenderChart();
-            isRendered = true;
+            try
+            {
+                await RenderChart();
+                isRendered = true;
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -74,7 +78,11 @@
     {
         if (isRendered && Labels.Any() && Data.Any())
         {
-            await RenderChart();
+            try
+            {
+                await RenderChart();
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -108,7 +116,7 @@
             .Take(3)
             .Select(x => $"{x.label} ({(total > 0 ? x.value / total * 100 : 0):N0}%)");
         
-        return $"Pie chart showing {Labels.Length} categories. Largest: {string.Join(", ", topItems)}. Total: {total:C0}";
+        return $"Pie chart showing {Labels.Length} categories. Largest: {string.Join(", ", topItems)}. Total: {total:C2}";
     }
 
     public async Task UpdateData(string[] labels, decimal[] data, string[]? colors = null)
@@ -125,6 +133,6 @@
         {
             await JS.InvokeVoidAsync("chartInterop.destroyChart", ChartId);
         }
-        catch { }
+        catch (Microsoft.JSInterop.JSException) { }
     }
 }

@@ -128,7 +128,7 @@
                 await JS.InvokeVoidAsync("eval", "window.onbeforeunload = null;");
             }
         }
-        catch
+        catch (Microsoft.JSInterop.JSException)
         {
             // JS interop not available
         }
@@ -143,7 +143,7 @@
         {
             _ = JS.InvokeVoidAsync("eval", "window.onbeforeunload = null;");
         }
-        catch
+        catch (Microsoft.JSInterop.JSException)
         {
             // Component already disposed
         }

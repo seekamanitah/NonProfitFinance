@@ -142,8 +142,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var allCategories = await CategoryService.GetAllAsync();
-        expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense && !c.IsArchived).ToList();
+        try
+        {
+            var allCategories = await CategoryService.GetAllAsync();
+            expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense && !c.IsArchived).ToList();
+        }
+        catch (Exception ex)
+        {
+            expenseCategories = [];
+            errorMessage = "Failed to load categories. Please try again.";
+            System.Diagnostics.Debug.WriteLine($"Error loading categories: {ex.Message}");
+        }
         
         if (IsEdit && Budget != null)
         {

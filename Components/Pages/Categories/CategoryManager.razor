@@ -1,6 +1,7 @@
 @page "/categories"
 @using System.Web
 @inject ICategoryService CategoryService
+@inject IToastService ToastService
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -181,9 +182,19 @@
     private async Task LoadCategories()
     {
         isLoading = true;
-        categoryTree = await CategoryService.GetTreeAsync(activeTab);
-        allCategories = await CategoryService.GetAllAsync(activeTab, includeArchived: true);
-        isLoading = false;
+        try
+        {
+            categoryTree = await CategoryService.GetTreeAsync(activeTab);
+            allCategories = await CategoryService.GetAllAsync(activeTab, includeArchived: true);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load categories: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task SwitchTab(CategoryType type)
@@ -221,21 +232,37 @@
 
     private async Task ArchiveCategory(CategoryDto category)
     {
-        await CategoryService.ArchiveAsync(category.Id);
-        await LoadCategories();
-        if (selectedCategory?.Id == category.Id)
+        try
         {
-            selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+            await CategoryService.ArchiveAsync(category.Id);
+            await LoadCategories();
+            if (selectedCategory?.Id == category.Id)
+            {
+                selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+            }
+            ToastService.ShowSuccess($"'{category.Name}' archived successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to archive category: {ex.Message}");
         }
     }
 
     private async Task RestoreCategory(CategoryDto category)
     {
-        await CategoryService.RestoreAsync(category.Id);
-        await LoadCategories();
-        if (selectedCategory?.Id == category.Id)
+        try
         {
-            selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+            await CategoryService.RestoreAsync(category.Id);
+            await LoadCategories();
+            if (selectedCategory?.Id == category.Id)
+            {
+                selectedCategory = await CategoryService.GetByIdAsync(category.Id);
+            }
+            ToastService.ShowSuccess($"'{category.Name}' restored successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to restore category: {ex.Message}");
         }
     }
 
@@ -243,6 +270,11 @@
     {
         showForm = false;
         await LoadCategories();
+        // Refresh selected category to reflect any edits
+        if (selectedCategory != null)
+        {
+            selectedCategory = allCategories.FirstOrDefault(c => c.Id == selectedCategory.Id);
+        }
     }
 
     private void CloseForm()

@@ -4,6 +4,7 @@
 @inject IGrantService GrantService
 @inject IDonorService DonorService
 @inject ITextToSpeechService TtsService
+@inject IToastService ToastService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @rendermode InteractiveServer
@@ -146,7 +147,7 @@ else
                                 title="@(doc.IsArchived ? "Restore" : "Archive")">
                             <i class="fas @(doc.IsArchived ? "fa-undo" : "fa-archive")"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline text-danger" @onclick="() => DeleteDocument(doc)" title="Delete">
+                        <button class="btn btn-sm btn-outline text-danger" @onclick="() => ConfirmDeleteDocument(doc)" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -310,6 +311,18 @@ else
     </div>
 }
 
+<!-- Delete Confirmation -->
+@if (documentToDelete != null)
+{
+    <ConfirmDialog 
+        Title="Delete Document"
+        Message="@($"Are you sure you want to permanently delete '{documentToDelete.OriginalFileName}'? This will also remove the file from storage and cannot be undone.")"
+        ConfirmText="Delete"
+        ConfirmCssClass="btn-danger"
+        OnConfirm="DeleteDocumentConfirmed"
+        OnCancel="() => documentToDelete = null" />
+}
+
 <!-- OCR Modal -->
 <OcrModal DocumentId="selectedDocumentForOcr" 
           IsVisible="showOcrModal" 
@@ -345,6 +358,9 @@ else
     private DocumentType editType;
     private string editDescription = "";
     private string editTags = "";
+    
+    // Delete confirmation
+    private DocumentDto? documentToDelete;
 
     // OCR
     private bool showOcrModal = false;
@@ -357,24 +373,41 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        grants = await GrantService.GetAllAsync();
-        donors = await DonorService.GetAllAsync();
+        try
+        {
+            grants = await GrantService.GetAllAsync();
+            donors = await DonorService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load filter options: {ex.Message}");
+        }
         await LoadDocuments();
     }
 
     private async Task LoadDocuments()
     {
         isLoading = true;
-        var filter = new DocumentFilterRequest(
-            typeFilter,
-            grantFilter,
-            donorFilter,
-            null,
-            includeArchived,
-            null
-        );
-        documents = await DocumentService.GetAllAsync(filter);
-        isLoading = false;
+        try
+        {
+            var filter = new DocumentFilterRequest(
+                typeFilter,
+                grantFilter,
+                donorFilter,
+                null,
+                includeArchived,
+                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
+            );
+            documents = await DocumentService.GetAllAsync(filter);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load documents: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     // Upload methods
@@ -442,11 +475,22 @@ else
     // Download
     private async Task DownloadDocument(DocumentDto doc)
     {
-        var result = await DocumentService.DownloadAsync(doc.Id);
-        if (result.HasValue)
+        try
         {
-            var base64 = Convert.ToBase64String(result.Value.Content);
-            await JS.InvokeVoidAsync("downloadFile", result.Value.FileName, result.Value.ContentType, base64);
+            var result = await DocumentService.DownloadAsync(doc.Id);
+            if (result.HasValue)
+            {
+                var base64 = Convert.ToBase64String(result.Value.Content);
+                await JS.InvokeVoidAsync("downloadFile", result.Value.FileName, result.Value.ContentType, base64);
+            }
+            else
+            {
+                ToastService.ShowError("Document file not found.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to download document: {ex.Message}");
         }
     }
 
@@ -468,33 +512,67 @@ else
     {
         if (editingDocument == null) return;
 
-        await DocumentService.UpdateAsync(editingDocument.Id, new UpdateDocumentRequest(
-            string.IsNullOrWhiteSpace(editDescription) ? null : editDescription,
-            editType,
-            string.IsNullOrWhiteSpace(editTags) ? null : editTags,
-            editingDocument.IsArchived
-        ));
+        try
+        {
+            await DocumentService.UpdateAsync(editingDocument.Id, new UpdateDocumentRequest(
+                string.IsNullOrWhiteSpace(editDescription) ? null : editDescription,
+                editType,
+                string.IsNullOrWhiteSpace(editTags) ? null : editTags,
+                editingDocument.IsArchived
+            ));
 
-        editingDocument = null;
-        await LoadDocuments();
+            ToastService.ShowSuccess("Document updated successfully.");
+            editingDocument = null;
+            await LoadDocuments();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to update document: {ex.Message}");
+        }
     }
 
     // Archive/Delete
     private async Task ToggleArchive(DocumentDto doc)
     {
-        await DocumentService.UpdateAsync(doc.Id, new UpdateDocumentRequest(
-            doc.Description,
-            doc.Type,
-            doc.Tags,
-            !doc.IsArchived
-        ));
-        await LoadDocuments();
+        try
+        {
+            var newState = !doc.IsArchived;
+            await DocumentService.UpdateAsync(doc.Id, new UpdateDocumentRequest(
+                doc.Description,
+                doc.Type,
+                doc.Tags,
+                newState
+            ));
+            ToastService.ShowSuccess($"'{doc.OriginalFileName}' {(newState ? "archived" : "restored")} successfully.");
+            await LoadDocuments();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to update document: {ex.Message}");
+        }
     }
 
-    private async Task DeleteDocument(DocumentDto doc)
+    private void ConfirmDeleteDocument(DocumentDto doc)
     {
-        await DocumentService.DeleteAsync(doc.Id);
-        await LoadDocuments();
+        documentToDelete = doc;
+    }
+
+    private async Task DeleteDocumentConfirmed()
+    {
+        if (documentToDelete == null) return;
+
+        try
+        {
+            await DocumentService.DeleteAsync(documentToDelete.Id);
+            ToastService.ShowSuccess($"'{documentToDelete.OriginalFileName}' deleted successfully.");
+            documentToDelete = null;
+            await LoadDocuments();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to delete document: {ex.Message}");
+            documentToDelete = null;
+        }
     }
 
     // Helpers
@@ -543,7 +621,7 @@ else
         selectedDocumentForOcr = 0;
     }
 
-    private void HandleReceiptDetected(ReceiptData receiptData)
+    private async Task HandleReceiptDetected(ReceiptData receiptData)
     {
         // Navigate to transaction form with pre-filled data from receipt
         var queryParams = new Dictionary<string, string?>
@@ -560,7 +638,7 @@ else
             .Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value!)}"));
 
         // Announce with TTS
-        TtsService.AnnounceSuccessAsync($"Receipt processed. Creating transaction for {receiptData.Merchant}");
+        await TtsService.AnnounceSuccessAsync($"Receipt processed. Creating transaction for {receiptData.Merchant}");
 
         CloseOcrModal();
         Navigation.NavigateTo($"/transactions?{query}");

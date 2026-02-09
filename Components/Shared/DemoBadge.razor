@@ -12,6 +12,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        hasDemoData = await DemoDataService.HasDemoDataAsync();
+        try
+        {
+            hasDemoData = await DemoDataService.HasDemoDataAsync();
+        }
+        catch
+        {
+            hasDemoData = false;
+        }
     }
 }

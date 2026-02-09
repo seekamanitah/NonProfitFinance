@@ -43,7 +43,7 @@ else
             </div>
             <div class="metric-content">
                 <div class="metric-label">Unrestricted Accounts</div>
-                <div class="metric-value positive">@unrestrictedTotal.ToString("C0")</div>
+                <div class="metric-value positive">@unrestrictedTotal.ToString("C2")</div>
             </div>
         </div>
         
@@ -53,7 +53,7 @@ else
             </div>
             <div class="metric-content">
                 <div class="metric-label">Restricted Accounts</div>
-                <div class="metric-value">@restrictedTotal.ToString("C0")</div>
+                <div class="metric-value">@restrictedTotal.ToString("C2")</div>
             </div>
         </div>
         
@@ -63,7 +63,7 @@ else
             </div>
             <div class="metric-content">
                 <div class="metric-label">Temporarily Restricted</div>
-                <div class="metric-value">@tempRestrictedTotal.ToString("C0")</div>
+                <div class="metric-value">@tempRestrictedTotal.ToString("C2")</div>
             </div>
         </div>
         
@@ -73,7 +73,7 @@ else
             </div>
             <div class="metric-content">
                 <div class="metric-label">Permanently Restricted</div>
-                <div class="metric-value">@permRestrictedTotal.ToString("C0")</div>
+                <div class="metric-value">@permRestrictedTotal.ToString("C2")</div>
             </div>
         </div>
     </div>
@@ -111,8 +111,8 @@ else
                     {
                         <div class="mb-2">
                             <div class="d-flex justify-between mb-1">
-                                <span class="text-muted">Target: @fund.TargetBalance.Value.ToString("C0")</span>
-                                <span class="text-muted">@GetPercentage(fund)%</span>
+                                <span class="text-muted">Target: @fund.TargetBalance.Value.ToString("C2")</span>
+                                <span class="text-muted">@GetPercentage(fund).ToString("N1")%</span>
                             </div>
                             <div class="progress">
                                 <div class="progress-bar @GetProgressClass(fund)" 
@@ -141,6 +141,20 @@ else
     </Content>
 </PageWrapper>
 
+<!-- Delete Confirmation Dialog -->
+<ConfirmDialog 
+    IsVisible="showDeleteConfirm"
+    Title="Delete Account"
+    Message="Are you sure you want to delete this account?"
+    ItemName="@fundToDelete?.Name"
+    Type="ConfirmDialog.ConfirmationType.Delete"
+    ConfirmText="Delete"
+    ShowWarning="true"
+    WarningMessage="This will permanently remove the account. Accounts with transactions cannot be deleted."
+    IsProcessing="isDeleting"
+    OnConfirmClicked="ConfirmDelete"
+    OnCancelClicked="CancelDelete" />
+
 <!-- Add/Edit Form Modal -->
 @if (showForm)
 {
@@ -153,9 +167,12 @@ else
 @code {
 private List<FundDto> funds = new();
 private FundDto? editingFund;
+private FundDto? fundToDelete;
 private bool isLoading = true;
 private bool isRecalculating = false;
+private bool isDeleting = false;
 private bool showForm = false;
+private bool showDeleteConfirm = false;
     
 // Calculated summaries
 private decimal unrestrictedTotal = 0;
@@ -171,28 +188,46 @@ protected override async Task OnInitializedAsync()
 private async Task LoadFunds()
 {
     isLoading = true;
-    funds = await FundService.GetAllAsync(true);
+    try
+    {
+        funds = await FundService.GetAllAsync(true);
         
-    // Calculate totals from ACTIVE funds only (matches Dashboard calculation)
-    var activeFunds = funds.Where(f => f.IsActive).ToList();
-    unrestrictedTotal = activeFunds.Where(f => f.Type == FundType.Unrestricted).Sum(f => f.Balance);
-    restrictedTotal = activeFunds.Where(f => f.Type == FundType.Restricted).Sum(f => f.Balance);
-    tempRestrictedTotal = activeFunds.Where(f => f.Type == FundType.TemporarilyRestricted).Sum(f => f.Balance);
-    permRestrictedTotal = activeFunds.Where(f => f.Type == FundType.PermanentlyRestricted).Sum(f => f.Balance);
-        
-    isLoading = false;
+        // Calculate totals from ACTIVE funds only (matches Dashboard calculation)
+        var activeFunds = funds.Where(f => f.IsActive).ToList();
+        unrestrictedTotal = activeFunds.Where(f => f.Type == FundType.Unrestricted).Sum(f => f.Balance);
+        restrictedTotal = activeFunds.Where(f => f.Type == FundType.Restricted).Sum(f => f.Balance);
+        tempRestrictedTotal = activeFunds.Where(f => f.Type == FundType.TemporarilyRestricted).Sum(f => f.Balance);
+        permRestrictedTotal = activeFunds.Where(f => f.Type == FundType.PermanentlyRestricted).Sum(f => f.Balance);
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to load accounts: {ex.Message}");
+    }
+    finally
+    {
+        isLoading = false;
+    }
 }
 
 private async Task RecalculateBalances()
 {
     isRecalculating = true;
-    StateHasChanged(); // Show recalculating state
+    StateHasChanged();
     
-    await FundService.RecalculateAllBalancesAsync();
-    await LoadFunds();
-    
-    isRecalculating = false;
-    StateHasChanged(); // Update UI after recalculation
+    try
+    {
+        await FundService.RecalculateAllBalancesAsync();
+        await LoadFunds();
+        Toast.ShowSuccess("All account balances recalculated successfully.");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to recalculate balances: {ex.Message}");
+    }
+    finally
+    {
+        isRecalculating = false;
+    }
 }
 
     private void ShowAddForm()
@@ -207,10 +242,42 @@ private async Task RecalculateBalances()
         showForm = true;
     }
 
-    private async Task DeleteFund(FundDto fund)
+    private void DeleteFund(FundDto fund)
     {
-        await FundService.DeleteAsync(fund.Id);
-        await LoadFunds();
+        fundToDelete = fund;
+        showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (fundToDelete == null) return;
+        isDeleting = true;
+        try
+        {
+            await FundService.DeleteAsync(fundToDelete.Id);
+            Toast.ShowSuccess($"Account '{fundToDelete.Name}' deleted.");
+            await LoadFunds();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Toast.ShowError(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to delete account: {ex.Message}");
+        }
+        finally
+        {
+            isDeleting = false;
+            showDeleteConfirm = false;
+            fundToDelete = null;
+        }
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        fundToDelete = null;
     }
 
     private async Task OnFundSaved()

@@ -784,20 +784,27 @@ private bool isResetting = false;
 
 protected override async Task OnInitializedAsync()
 {
-    // Load organization settings
-    orgSettings = await OrganizationService.GetSettingsAsync();
-    
-    // Load backup settings
-    backupSettings = BackupService.GetSettings();
-        
-    // Load spell check settings
-    if (SpellCheckService != null)
+    try
     {
-        spellCheckSettings = SpellCheckService.GetSettings();
-    }
+        // Load organization settings
+        orgSettings = await OrganizationService.GetSettingsAsync();
         
-    await LoadBackups();
-    hasDemoData = await DemoDataService.HasDemoDataAsync();
+        // Load backup settings
+        backupSettings = BackupService.GetSettings();
+            
+        // Load spell check settings
+        if (SpellCheckService != null)
+        {
+            spellCheckSettings = SpellCheckService.GetSettings();
+        }
+            
+        await LoadBackups();
+        hasDemoData = await DemoDataService.HasDemoDataAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Settings initialization error: {ex.Message}");
+    }
 }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -835,8 +842,18 @@ protected override async Task OnInitializedAsync()
     private async Task LoadBackups()
     {
         isLoadingBackups = true;
-        existingBackups = await BackupService.GetBackupsAsync();
-        isLoadingBackups = false;
+        try
+        {
+            existingBackups = await BackupService.GetBackupsAsync();
+        }
+        catch
+        {
+            existingBackups = new();
+        }
+        finally
+        {
+            isLoadingBackups = false;
+        }
     }
 
     private async Task CreateBackupNow()
@@ -910,20 +927,28 @@ protected override async Task OnInitializedAsync()
 
     private async Task RestoreBackup(BackupInfo backup)
     {
-        // Create a backup before restoring
-        backupMessage = "Creating safety backup before restore...";
-        StateHasChanged();
-        
-        var result = await BackupService.RestoreFromBackupAsync(backup.FullPath);
-        backupSuccess = result.Success;
-        
-        if (result.Success)
+        try
         {
-            backupMessage = "Database restored successfully! Please refresh the application.";
+            // Create a backup before restoring
+            backupMessage = "Creating safety backup before restore...";
+            StateHasChanged();
+            
+            var result = await BackupService.RestoreFromBackupAsync(backup.FullPath);
+            backupSuccess = result.Success;
+            
+            if (result.Success)
+            {
+                backupMessage = "Database restored successfully! Please refresh the application.";
+            }
+            else
+            {
+                backupMessage = $"Restore failed: {result.Error}";
+            }
         }
-        else
+        catch (Exception ex)
         {
-            backupMessage = $"Restore failed: {result.Error}";
+            backupSuccess = false;
+            backupMessage = $"Restore failed: {ex.Message}";
         }
     }
 

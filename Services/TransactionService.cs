@@ -337,13 +337,13 @@ public class TransactionService : ITransactionService
 
             // Find or create Transfer category
             var transferCategory = await _context.Categories
-                .FirstOrDefaultAsync(c => c.Name == "Transfer" && c.Type == CategoryType.Expense);
+                .FirstOrDefaultAsync(c => c.Name == AppConstants.CategoryNames.Transfer && c.Type == CategoryType.Expense);
 
             if (transferCategory == null)
             {
                 transferCategory = new Category
                 {
-                    Name = "Transfer",
+                    Name = AppConstants.CategoryNames.Transfer,
                     Type = CategoryType.Expense,
                     Description = "Internal transfers between accounts",
                     Color = "#6B7280"
@@ -421,75 +421,118 @@ public class TransactionService : ITransactionService
         var oldAmount = transaction.Amount;
         var oldDate = transaction.Date;
 
-        transaction.Date = request.Date;
-        transaction.Amount = request.Amount;
-        transaction.Description = request.Description;
-        transaction.Type = request.Type;
-        transaction.CategoryId = request.CategoryId;
-        transaction.FundType = request.FundType;
-        transaction.FundId = request.FundId;
-        transaction.DonorId = request.DonorId;
-        transaction.GrantId = request.GrantId;
-        transaction.Payee = request.Payee;
-        transaction.Tags = request.Tags;
-        transaction.ReferenceNumber = request.ReferenceNumber;
-        transaction.PONumber = request.PONumber;
-        transaction.IsReconciled = request.IsReconciled;
-        transaction.UpdatedAt = DateTime.UtcNow;
-
-        // If this is a transfer, update the paired transaction to keep them in sync
-        Transaction? pairedTransaction = null;
-        if (transaction.TransferPairId.HasValue)
+        // Validate grant spending doesn't exceed remaining balance
+        if (request.GrantId.HasValue && request.Type == TransactionType.Expense)
         {
-            pairedTransaction = await _context.Transactions
-                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
-            
-            if (pairedTransaction != null)
+            var grant = await _context.Grants.FindAsync(request.GrantId.Value);
+            if (grant != null)
             {
-                // Keep amount and date in sync
-                pairedTransaction.Amount = request.Amount;
-                pairedTransaction.Date = request.Date;
-                pairedTransaction.ReferenceNumber = request.ReferenceNumber;
-                pairedTransaction.UpdatedAt = DateTime.UtcNow;
-                _logger.LogInformation("Paired transfer transaction {PairedId} updated to match", pairedTransaction.Id);
-            }
-        }
-
-        // Update splits
-        _context.TransactionSplits.RemoveRange(transaction.Splits);
-        if (request.Splits?.Any() == true)
-        {
-            foreach (var split in request.Splits)
-            {
-                _context.TransactionSplits.Add(new TransactionSplit
+                // When updating, exclude the current transaction's existing amount from "used"
+                var currentGrantUsage = (transaction.GrantId == request.GrantId.Value)
+                    ? grant.AmountUsed - transaction.Amount
+                    : grant.AmountUsed;
+                var remainingBalance = grant.Amount - currentGrantUsage;
+                if (request.Amount > remainingBalance)
                 {
-                    TransactionId = transaction.Id,
-                    CategoryId = split.CategoryId,
-                    Amount = split.Amount,
-                    Description = split.Description
-                });
+                    throw new InvalidOperationException(
+                        $"Expense amount (${request.Amount:N2}) exceeds grant remaining balance (${remainingBalance:N2}). " +
+                        $"Grant '{grant.Name}' has ${currentGrantUsage:N2} used of ${grant.Amount:N2} total.");
+                }
             }
         }
 
-        await _context.SaveChangesAsync();
+        // Use explicit transaction for atomicity
+        await using var dbTransaction = await _context.Database.BeginTransactionAsync();
 
-        // Update affected totals
-        if (oldDonorId.HasValue) await UpdateDonorTotalsAsync(oldDonorId.Value);
-        if (request.DonorId.HasValue && request.DonorId != oldDonorId) await UpdateDonorTotalsAsync(request.DonorId.Value);
-
-        if (oldGrantId.HasValue) await UpdateGrantUsageAsync(oldGrantId.Value);
-        if (request.GrantId.HasValue && request.GrantId != oldGrantId) await UpdateGrantUsageAsync(request.GrantId.Value);
-
-        if (oldFundId.HasValue) await UpdateFundBalanceAsync(oldFundId.Value);
-        if (request.FundId.HasValue && request.FundId != oldFundId) await UpdateFundBalanceAsync(request.FundId.Value);
-        
-        // Update paired transaction's fund balance if amount changed
-        if (pairedTransaction?.FundId != null && (oldAmount != request.Amount))
+        try
         {
-            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
-        }
+            transaction.Date = request.Date;
+            transaction.Amount = request.Amount;
+            transaction.Description = request.Description;
+            transaction.Type = request.Type;
+            transaction.CategoryId = request.CategoryId;
+            transaction.FundType = request.FundType;
+            transaction.FundId = request.FundId;
+            transaction.DonorId = request.DonorId;
+            transaction.GrantId = request.GrantId;
+            transaction.Payee = request.Payee;
+            transaction.Tags = request.Tags;
+            transaction.ReferenceNumber = request.ReferenceNumber;
+            transaction.PONumber = request.PONumber;
+            transaction.IsReconciled = request.IsReconciled;
+            transaction.UpdatedAt = DateTime.UtcNow;
 
-        return await GetByIdAsync(id);
+            // If this is a transfer, update the paired transaction to keep them in sync
+            Transaction? pairedTransaction = null;
+            if (transaction.TransferPairId.HasValue)
+            {
+                pairedTransaction = await _context.Transactions
+                    .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+                
+                if (pairedTransaction != null)
+                {
+                    // Keep amount and date in sync
+                    pairedTransaction.Amount = request.Amount;
+                    pairedTransaction.Date = request.Date;
+                    pairedTransaction.ReferenceNumber = request.ReferenceNumber;
+                    pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Paired transfer transaction {PairedId} updated to match", pairedTransaction.Id);
+                }
+            }
+
+            // Update splits
+            _context.TransactionSplits.RemoveRange(transaction.Splits);
+            if (request.Splits?.Any() == true)
+            {
+                foreach (var split in request.Splits)
+                {
+                    _context.TransactionSplits.Add(new TransactionSplit
+                    {
+                        TransactionId = transaction.Id,
+                        CategoryId = split.CategoryId,
+                        Amount = split.Amount,
+                        Description = split.Description
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Update affected totals
+            if (oldDonorId.HasValue) await UpdateDonorTotalsAsync(oldDonorId.Value);
+            if (request.DonorId.HasValue && request.DonorId != oldDonorId) await UpdateDonorTotalsAsync(request.DonorId.Value);
+
+            if (oldGrantId.HasValue) await UpdateGrantUsageAsync(oldGrantId.Value);
+            if (request.GrantId.HasValue && request.GrantId != oldGrantId) await UpdateGrantUsageAsync(request.GrantId.Value);
+
+            if (oldFundId.HasValue) await UpdateFundBalanceAsync(oldFundId.Value);
+            if (request.FundId.HasValue && request.FundId != oldFundId) await UpdateFundBalanceAsync(request.FundId.Value);
+            
+            // Update paired transaction's fund balance if amount changed
+            if (pairedTransaction?.FundId != null && (oldAmount != request.Amount))
+            {
+                await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+            }
+
+            await dbTransaction.CommitAsync();
+
+            // Audit log (outside transaction - non-critical)
+            await _auditService.LogAsync(
+                AuditAction.Update,
+                "Transaction",
+                id,
+                $"Updated {request.Type} transaction for ${request.Amount:N2}",
+                oldValues: new { OldAmount = oldAmount, OldFundId = oldFundId, OldDonorId = oldDonorId },
+                newValues: new { request.Amount, request.FundId, request.DonorId, request.Description }
+            );
+
+            return await GetByIdAsync(id);
+        }
+        catch
+        {
+            await dbTransaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> DeleteAsync(int id)
@@ -507,51 +550,64 @@ public class TransactionService : ITransactionService
         var fundId = transaction.FundId;
         var toFundId = transaction.ToFundId;
 
-        // Soft delete instead of hard delete
-        transaction.SoftDelete();
-        transaction.UpdatedAt = DateTime.UtcNow;
-        
-        // If this is a transfer, also delete the paired transaction
-        Transaction? pairedTransaction = null;
-        if (transaction.TransferPairId.HasValue)
+        // Use explicit transaction for atomicity
+        await using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+        try
         {
-            pairedTransaction = await _context.Transactions
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+            // Soft delete instead of hard delete
+            transaction.SoftDelete();
+            transaction.UpdatedAt = DateTime.UtcNow;
             
-            if (pairedTransaction != null)
+            // If this is a transfer, also delete the paired transaction
+            Transaction? pairedTransaction = null;
+            if (transaction.TransferPairId.HasValue)
             {
-                pairedTransaction.SoftDelete();
-                pairedTransaction.UpdatedAt = DateTime.UtcNow;
-                _logger.LogInformation("Paired transfer transaction {PairedId} also soft-deleted", pairedTransaction.Id);
+                pairedTransaction = await _context.Transactions
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id);
+                
+                if (pairedTransaction != null)
+                {
+                    pairedTransaction.SoftDelete();
+                    pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Paired transfer transaction {PairedId} also soft-deleted", pairedTransaction.Id);
+                }
             }
-        }
-        
-        await _context.SaveChangesAsync();
+            
+            await _context.SaveChangesAsync();
 
-        // Update affected totals
-        if (donorId.HasValue) await UpdateDonorTotalsAsync(donorId.Value);
-        if (grantId.HasValue) await UpdateGrantUsageAsync(grantId.Value);
-        if (fundId.HasValue) await UpdateFundBalanceAsync(fundId.Value);
-        
-        // Update paired transaction's fund balance if it was a transfer
-        if (pairedTransaction?.FundId != null && pairedTransaction.FundId != fundId)
+            // Update affected totals
+            if (donorId.HasValue) await UpdateDonorTotalsAsync(donorId.Value);
+            if (grantId.HasValue) await UpdateGrantUsageAsync(grantId.Value);
+            if (fundId.HasValue) await UpdateFundBalanceAsync(fundId.Value);
+            
+            // Update paired transaction's fund balance if it was a transfer
+            if (pairedTransaction?.FundId != null && pairedTransaction.FundId != fundId)
+            {
+                await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+            }
+
+            await dbTransaction.CommitAsync();
+
+            _logger.LogInformation("Transaction {Id} soft-deleted", id);
+            
+            // Audit log (outside transaction - non-critical)
+            await _auditService.LogAsync(
+                AuditAction.Delete,
+                "Transaction",
+                id,
+                $"Soft-deleted transaction #{id}" + (pairedTransaction != null ? $" and paired transfer #{pairedTransaction.Id}" : ""),
+                oldValues: new { transaction.Amount, transaction.Type, transaction.Description }
+            );
+            
+            return true;
+        }
+        catch
         {
-            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+            await dbTransaction.RollbackAsync();
+            throw;
         }
-
-        _logger.LogInformation("Transaction {Id} soft-deleted", id);
-        
-        // Audit log
-        await _auditService.LogAsync(
-            AuditAction.Delete,
-            "Transaction",
-            id,
-            $"Soft-deleted transaction #{id}" + (pairedTransaction != null ? $" and paired transfer #{pairedTransaction.Id}" : ""),
-            oldValues: new { transaction.Amount, transaction.Type, transaction.Description }
-        );
-        
-        return true;
     }
 
     public async Task<bool> RestoreAsync(int id)
@@ -562,40 +618,53 @@ public class TransactionService : ITransactionService
 
         if (transaction == null) return false;
 
-        transaction.Restore();
-        transaction.UpdatedAt = DateTime.UtcNow;
-        
-        // If this is a transfer, also restore the paired transaction
-        Transaction? pairedTransaction = null;
-        if (transaction.TransferPairId.HasValue)
+        // Use explicit transaction for atomicity
+        await using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+        try
         {
-            pairedTransaction = await _context.Transactions
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id && t.IsDeleted);
+            transaction.Restore();
+            transaction.UpdatedAt = DateTime.UtcNow;
             
-            if (pairedTransaction != null)
+            // If this is a transfer, also restore the paired transaction
+            Transaction? pairedTransaction = null;
+            if (transaction.TransferPairId.HasValue)
             {
-                pairedTransaction.Restore();
-                pairedTransaction.UpdatedAt = DateTime.UtcNow;
-                _logger.LogInformation("Paired transfer transaction {PairedId} also restored", pairedTransaction.Id);
+                pairedTransaction = await _context.Transactions
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(t => t.TransferPairId == transaction.TransferPairId && t.Id != id && t.IsDeleted);
+                
+                if (pairedTransaction != null)
+                {
+                    pairedTransaction.Restore();
+                    pairedTransaction.UpdatedAt = DateTime.UtcNow;
+                    _logger.LogInformation("Paired transfer transaction {PairedId} also restored", pairedTransaction.Id);
+                }
             }
-        }
-        
-        await _context.SaveChangesAsync();
+            
+            await _context.SaveChangesAsync();
 
-        // Recalculate affected totals
-        if (transaction.DonorId.HasValue) await UpdateDonorTotalsAsync(transaction.DonorId.Value);
-        if (transaction.GrantId.HasValue) await UpdateGrantUsageAsync(transaction.GrantId.Value);
-        if (transaction.FundId.HasValue) await UpdateFundBalanceAsync(transaction.FundId.Value);
-        
-        // Update paired transaction's fund balance if it was a transfer
-        if (pairedTransaction?.FundId != null && pairedTransaction.FundId != transaction.FundId)
+            // Recalculate affected totals
+            if (transaction.DonorId.HasValue) await UpdateDonorTotalsAsync(transaction.DonorId.Value);
+            if (transaction.GrantId.HasValue) await UpdateGrantUsageAsync(transaction.GrantId.Value);
+            if (transaction.FundId.HasValue) await UpdateFundBalanceAsync(transaction.FundId.Value);
+            
+            // Update paired transaction's fund balance if it was a transfer
+            if (pairedTransaction?.FundId != null && pairedTransaction.FundId != transaction.FundId)
+            {
+                await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+            }
+
+            await dbTransaction.CommitAsync();
+
+            _logger.LogInformation("Transaction {Id} restored from soft-delete", id);
+            return true;
+        }
+        catch
         {
-            await UpdateFundBalanceAsync(pairedTransaction.FundId.Value);
+            await dbTransaction.RollbackAsync();
+            throw;
         }
-
-        _logger.LogInformation("Transaction {Id} restored from soft-delete", id);
-        return true;
     }
 
     public async Task<List<TransactionDto>> GetDeletedAsync(int maxCount = 50)
@@ -652,6 +721,7 @@ public class TransactionService : ITransactionService
             .Include(t => t.Fund)
             .Include(t => t.Donor)
             .Include(t => t.Grant)
+            .Where(t => t.TransferPairId == null || t.Type == TransactionType.Expense) // Show only one side of transfers
             .OrderByDescending(t => t.Date)
             .ThenByDescending(t => t.Id)
             .Take(count)
@@ -693,6 +763,11 @@ public class TransactionService : ITransactionService
                         t.NextRecurrenceDate.Value.Date <= today)
             .ToListAsync();
 
+        // Track affected entities for balance recalculation
+        var affectedFundIds = new HashSet<int>();
+        var affectedDonorIds = new HashSet<int>();
+        var affectedGrantIds = new HashSet<int>();
+
         foreach (var template in recurringTransactions)
         {
             // Create new transaction from template
@@ -708,10 +783,15 @@ public class TransactionService : ITransactionService
                 DonorId = template.DonorId,
                 GrantId = template.GrantId,
                 Payee = template.Payee,
-                Tags = template.Tags
+                Tags = template.Tags,
+                RowVersion = 1
             };
 
             _context.Transactions.Add(newTransaction);
+
+            if (template.FundId.HasValue) affectedFundIds.Add(template.FundId.Value);
+            if (template.DonorId.HasValue && template.Type == TransactionType.Income) affectedDonorIds.Add(template.DonorId.Value);
+            if (template.GrantId.HasValue) affectedGrantIds.Add(template.GrantId.Value);
 
             // Update next recurrence date
             template.NextRecurrenceDate = CalculateNextRecurrence(
@@ -720,20 +800,33 @@ public class TransactionService : ITransactionService
         }
 
         await _context.SaveChangesAsync();
+
+        // Recalculate affected balances
+        foreach (var fundId in affectedFundIds)
+            await UpdateFundBalanceAsync(fundId);
+        foreach (var donorId in affectedDonorIds)
+            await UpdateDonorTotalsAsync(donorId);
+        foreach (var grantId in affectedGrantIds)
+            await UpdateGrantUsageAsync(grantId);
     }
 
     private static DateTime CalculateNextRecurrence(DateTime currentDate, string pattern)
     {
-        return pattern.ToLower() switch
-        {
-            "daily" => currentDate.AddDays(1),
-            "weekly" => currentDate.AddDays(7),
-            "biweekly" => currentDate.AddDays(14),
-            "monthly" => currentDate.AddMonths(1),
-            "quarterly" => currentDate.AddMonths(3),
-            "yearly" => currentDate.AddYears(1),
-            _ => currentDate.AddMonths(1)
-        };
+        if (pattern.Equals(AppConstants.RecurrencePatterns.Daily, StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddDays(1);
+        if (pattern.Equals(AppConstants.RecurrencePatterns.Weekly, StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddDays(7);
+        if (pattern.Equals(AppConstants.RecurrencePatterns.BiWeekly, StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddDays(14);
+        if (pattern.Equals(AppConstants.RecurrencePatterns.Monthly, StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddMonths(1);
+        if (pattern.Equals(AppConstants.RecurrencePatterns.Quarterly, StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddMonths(3);
+        if (pattern.Equals(AppConstants.RecurrencePatterns.Annually, StringComparison.OrdinalIgnoreCase)
+            || pattern.Equals("Yearly", StringComparison.OrdinalIgnoreCase))
+            return currentDate.AddYears(1);
+
+        return currentDate.AddMonths(1); // Default fallback
     }
 
     private async Task UpdateDonorTotalsAsync(int donorId)

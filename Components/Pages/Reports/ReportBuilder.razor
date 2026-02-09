@@ -196,7 +196,7 @@ else if (summary != null)
     <div class="metric-cards">
         <MetricCard 
             Title="Total Income" 
-            Value="@summary.TotalIncome.ToString("C0")"
+            Value="@summary.TotalIncome.ToString("C2")"
             Icon="fa-arrow-down"
             IconType="income"
             Change="@GetComparisonChange(summary.TotalIncome, comparisonSummary?.TotalIncome)"
@@ -204,7 +204,7 @@ else if (summary != null)
         
         <MetricCard 
             Title="Total Expenses" 
-            Value="@summary.TotalExpenses.ToString("C0")"
+            Value="@summary.TotalExpenses.ToString("C2")"
             Icon="fa-arrow-up"
             IconType="expense"
             Change="@GetComparisonChange(summary.TotalExpenses, comparisonSummary?.TotalExpenses, true)"
@@ -212,7 +212,7 @@ else if (summary != null)
         
         <MetricCard 
             Title="Net Income" 
-            Value="@summary.NetIncome.ToString("C0")"
+            Value="@summary.NetIncome.ToString("C2")"
             Icon="fa-balance-scale"
             IconType="@(summary.NetIncome >= 0 ? "income" : "expense")"
             ValueClass="@(summary.NetIncome >= 0 ? "positive" : "negative")"
@@ -295,13 +295,13 @@ else if (summary != null)
                                     <span class="tree-color" style="background: @(cat.Color ?? "#28a745");"></span>
                                     @cat.CategoryName
                                 </td>
-                                <td class="text-right amount income">@cat.Amount.ToString("C0")</td>
+                                <td class="text-right amount income">@cat.Amount.ToString("C2")</td>
                                 <td class="text-right">@cat.Percentage.ToString("N1")%</td>
                             </tr>
                         }
                         <tr style="font-weight: 600; background: var(--bg-primary);">
                             <td>Total</td>
-                            <td class="text-right amount income">@summary.TotalIncome.ToString("C0")</td>
+                            <td class="text-right amount income">@summary.TotalIncome.ToString("C2")</td>
                             <td class="text-right">100%</td>
                         </tr>
                     </tbody>
@@ -331,13 +331,13 @@ else if (summary != null)
                                     <span class="tree-color" style="background: @(cat.Color ?? "#dc3545");"></span>
                                     @cat.CategoryName
                                 </td>
-                                <td class="text-right amount expense">@cat.Amount.ToString("C0")</td>
+                                <td class="text-right amount expense">@cat.Amount.ToString("C2")</td>
                                 <td class="text-right">@cat.Percentage.ToString("N1")%</td>
                             </tr>
                         }
                         <tr style="font-weight: 600; background: var(--bg-primary);">
                             <td>Total</td>
-                            <td class="text-right amount expense">@summary.TotalExpenses.ToString("C0")</td>
+                            <td class="text-right amount expense">@summary.TotalExpenses.ToString("C2")</td>
                             <td class="text-right">100%</td>
                         </tr>
                     </tbody>
@@ -425,12 +425,19 @@ private ReportColumnSettings? columnSettings;
 
 protected override async Task OnInitializedAsync()
 {
-    funds = await FundService.GetAllAsync();
-    categories = await CategoryService.GetAllAsync();
-    donors = await DonorService.GetAllAsync();
-    grants = await GrantService.GetAllAsync(null);
-    await LoadSavedPresets();
-    columnSettings = await ReportCustomizationService.GetSettingsAsync(currentReportType);
+    try
+    {
+        funds = await FundService.GetAllAsync();
+        categories = await CategoryService.GetAllAsync();
+        donors = await DonorService.GetAllAsync();
+        grants = await GrantService.GetAllAsync(null);
+        await LoadSavedPresets();
+        columnSettings = await ReportCustomizationService.GetSettingsAsync(currentReportType);
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to load report settings: {ex.Message}");
+    }
     await GenerateReport();
 }
 
@@ -460,12 +467,20 @@ private async Task OnComparisonChanged((DateTime Start, DateTime End)? compariso
 
 private async Task LoadComparisonData()
 {
-    var filter = new ReportFilterRequest(comparisonStartDate, comparisonEndDate, 
-        filterType == "category" ? selectedCategoryId : null,
-        selectedFundId,
-        filterType == "donor" ? selectedDonorId : null,
-        filterType == "grant" ? selectedGrantId : null);
-    comparisonSummary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
+    try
+    {
+        var filter = new ReportFilterRequest(comparisonStartDate, comparisonEndDate, 
+            filterType == "category" ? selectedCategoryId : null,
+            selectedFundId,
+            filterType == "donor" ? selectedDonorId : null,
+            filterType == "grant" ? selectedGrantId : null);
+        comparisonSummary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to load comparison data: {ex.Message}");
+        comparisonSummary = null;
+    }
 }
 
 private string? GetComparisonChange(decimal current, decimal? previous, bool invertPositive = false)
@@ -505,6 +520,10 @@ private async Task ExportToPdf()
         var pdfBytes = await PdfExportService.GenerateFinancialReportAsync(request);
         await DownloadFile(pdfBytes, $"financial_report_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export PDF: {ex.Message}");
+    }
     finally
     {
         isExporting = false;
@@ -522,6 +541,10 @@ private async Task ExportToExcel()
         var excelBytes = await ImportExportService.ExportFinancialReportToExcelAsync(startDate, endDate);
         await DownloadFile(excelBytes, $"financial_report_{DateTime.Now:yyyyMMdd}.xlsx", 
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export Excel: {ex.Message}");
     }
     finally
     {
@@ -541,6 +564,10 @@ private async Task ExportTransactionsPdf()
         var pdfBytes = await PdfExportService.GenerateTransactionReportAsync(filter);
         await DownloadFile(pdfBytes, $"transactions_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export transaction report: {ex.Message}");
+    }
     finally
     {
         isExporting = false;
@@ -558,6 +585,10 @@ private async Task ExportDonorsPdf()
         var pdfBytes = await PdfExportService.GenerateDonorReportAsync();
         await DownloadFile(pdfBytes, $"donors_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export donor report: {ex.Message}");
+    }
     finally
     {
         isExporting = false;
@@ -574,6 +605,10 @@ private async Task ExportGrantsPdf()
     {
         var pdfBytes = await PdfExportService.GenerateGrantReportAsync();
         await DownloadFile(pdfBytes, $"grants_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export grant report: {ex.Message}");
     }
     finally
     {
@@ -608,6 +643,10 @@ private async Task GenerateReport()
         trendData = await ReportService.GetTrendDataAsync(startDate, endDate, "monthly");
         hasGeneratedReport = true;
     }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to generate report: {ex.Message}");
+    }
     finally
     {
         isLoading = false;
@@ -618,6 +657,8 @@ private async Task RenderCharts()
 {
     if (summary == null) return;
 
+    try
+    {
         // Income pie chart
         if (summary.IncomeByCategory.Any())
         {
@@ -651,6 +692,11 @@ private async Task RenderCharts()
                 new { });
         }
     }
+    catch (JSException)
+    {
+        // Chart rendering can fail during prerender or disposal — safe to ignore
+    }
+}
 
     private string GetNetMargin()
     {

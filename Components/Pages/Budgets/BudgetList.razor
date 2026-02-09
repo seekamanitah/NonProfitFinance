@@ -1,6 +1,7 @@
 @page "/budgets"
 @inject IBudgetService BudgetService
 @inject ICategoryService CategoryService
+@inject IToastService ToastService
 @rendermode InteractiveServer
 
 <PageTitle>Budgets - NonProfit Finance</PageTitle>
@@ -42,7 +43,7 @@ else if (budget != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Total Budget</div>
-                <div class="metric-value">@budget.TotalBudget.ToString("C0")</div>
+                <div class="metric-value">@budget.TotalBudget.ToString("C2")</div>
             </div>
         </div>
         
@@ -52,7 +53,7 @@ else if (budget != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Total Spent</div>
-                <div class="metric-value negative">@budget.TotalSpent.ToString("C0")</div>
+                <div class="metric-value negative">@budget.TotalSpent.ToString("C2")</div>
             </div>
         </div>
         
@@ -62,7 +63,7 @@ else if (budget != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Remaining</div>
-                <div class="metric-value @(budget.Remaining >= 0 ? "positive" : "negative")">@budget.Remaining.ToString("C0")</div>
+                <div class="metric-value @(budget.Remaining >= 0 ? "positive" : "negative")">@budget.Remaining.ToString("C2")</div>
             </div>
         </div>
         
@@ -83,7 +84,7 @@ else if (budget != null)
             <div class="d-flex justify-between mb-2">
                 <strong>Overall Budget Progress</strong>
                 <span>
-                    @budget.TotalSpent.ToString("C0") / @budget.TotalBudget.ToString("C0")
+                    @budget.TotalSpent.ToString("C2") / @budget.TotalBudget.ToString("C2")
                     @if (budget.PercentageUsed > 100)
                     {
                         <span class="text-danger ml-2">
@@ -143,10 +144,10 @@ else if (budget != null)
                                     <span class="tree-color" style="background: @(item.CategoryColor ?? "#6c757d");"></span>
                                     @item.CategoryName
                                 </td>
-                                <td class="text-right">@item.BudgetAmount.ToString("C0")</td>
-                                <td class="text-right amount expense">@item.ActualAmount.ToString("C0")</td>
+                                <td class="text-right">@item.BudgetAmount.ToString("C2")</td>
+                                <td class="text-right amount expense">@item.ActualAmount.ToString("C2")</td>
                                 <td class="text-right @(isOverBudget ? "text-danger" : "text-success")">
-                                    @(isOverBudget ? "-" : "+")@Math.Abs(item.Variance).ToString("C0")
+                                    @(isOverBudget ? "-" : "+")@Math.Abs(item.Variance).ToString("C2")
                                 </td>
                                 <td>
                                     <div class="progress" style="height: 16px;">
@@ -166,10 +167,10 @@ else if (budget != null)
                     <tfoot>
                         <tr style="font-weight: bold; background: var(--bg-secondary);">
                             <td>Total</td>
-                            <td class="text-right">@budget.TotalBudget.ToString("C0")</td>
-                            <td class="text-right amount expense">@budget.TotalSpent.ToString("C0")</td>
+                            <td class="text-right">@budget.TotalBudget.ToString("C2")</td>
+                            <td class="text-right amount expense">@budget.TotalSpent.ToString("C2")</td>
                             <td class="text-right @(budget.Remaining >= 0 ? "text-success" : "text-danger")">
-                                @(budget.Remaining >= 0 ? "+" : "-")@Math.Abs(budget.Remaining).ToString("C0")
+                                @(budget.Remaining >= 0 ? "+" : "-")@Math.Abs(budget.Remaining).ToString("C2")
                             </td>
                             <td></td>
                             <td class="text-right">@budget.PercentageUsed.ToString("N0")%</td>
@@ -222,6 +223,10 @@ else if (budget != null)
         try
         {
             budget = await BudgetService.GetByYearAsync(selectedYear);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load budget: {ex.Message}");
         }
         finally
         {

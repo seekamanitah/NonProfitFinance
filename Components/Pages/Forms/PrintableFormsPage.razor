@@ -3,6 +3,7 @@
 @inject IDonorService DonorService
 @inject ITransactionService TransactionService
 @inject ICategoryService CategoryService
+@inject IToastService ToastService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -105,6 +106,7 @@
                     <SearchableSelect TItem="DonorDto" TValue="int?"
                                     Items="donors"
                                     @bind-SelectedValue="selectedDonorId"
+                                    @bind-SelectedValue:after="OnDonorSelected"
                                     ValueSelector="@(d => (int?)d.Id)"
                                     TextSelector="@(d => d.Name)"
                                     Placeholder="Select donor..." />
@@ -387,9 +389,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        donors = await DonorService.GetAllAsync();
-        var allCategories = await CategoryService.GetAllAsync();
-        expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense).ToList();
+        try
+        {
+            donors = await DonorService.GetAllAsync();
+            var allCategories = await CategoryService.GetAllAsync();
+            expenseCategories = allCategories.Where(c => c.Type == CategoryType.Expense).ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load form data: {ex.Message}");
+        }
     }
 
     private string GetTransactionText(TransactionDto t)
@@ -397,24 +406,46 @@
         return $"{t.Date:MMM d, yyyy} - {t.Amount:C}";
     }
 
-    private async Task ShowDonationReceiptForm()
+    private void ShowDonationReceiptForm()
     {
+        selectedDonorId = null;
+        selectedTransactionId = null;
+        donorTransactions = new();
         showDonationReceiptForm = true;
-        StateHasChanged();
+    }
+
+    private async Task OnDonorSelected()
+    {
+        selectedTransactionId = null;
+        if (selectedDonorId.HasValue)
+        {
+            try
+            {
+                var result = await TransactionService.GetAllAsync(new TransactionFilterRequest(DonorId: selectedDonorId.Value));
+                donorTransactions = result.Items.Where(t => t.Type == TransactionType.Income).ToList();
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError($"Failed to load donor transactions: {ex.Message}");
+                donorTransactions = new();
+            }
+        }
+        else
+        {
+            donorTransactions = new();
+        }
     }
 
     private void ShowReimbursementForm()
     {
         reimbursementData = new ReimbursementFormModel();
         showReimbursementForm = true;
-        StateHasChanged();
     }
 
     private void ShowCheckRequestForm()
     {
         checkRequestData = new CheckRequestFormModel();
         showCheckRequestForm = true;
-        StateHasChanged();
     }
 
     private void ShowExpenseReportForm()
@@ -425,7 +456,6 @@
             EndDate = DateTime.Today
         };
         showExpenseReportForm = true;
-        StateHasChanged();
     }
 
     private void CloseForms()
@@ -434,7 +464,6 @@
         showReimbursementForm = false;
         showCheckRequestForm = false;
         showExpenseReportForm = false;
-        StateHasChanged();
     }
 
     private async Task GenerateDonationReceipt()
@@ -450,6 +479,11 @@
             var pdfBytes = await PrintableFormsService.GenerateDonationReceiptAsync(selectedDonorId.Value, selectedTransactionId.Value);
             await DownloadFile(pdfBytes, $"donation_receipt_{selectedTransactionId.Value}.pdf", "application/pdf");
             CloseForms();
+            ToastService.ShowSuccess("Donation receipt generated successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to generate receipt: {ex.Message}");
         }
         finally
         {
@@ -507,13 +541,17 @@
 
                 if (createdCount > 0)
                 {
-                    await JS.InvokeVoidAsync("alert", $"Success! Created {createdCount} transaction(s) from reimbursement request. View them in Transactions page.");
+                    ToastService.ShowSuccess($"Created {createdCount} transaction(s) from reimbursement request.");
                 }
             }
 
             var pdfBytes = PrintableFormsService.GenerateReimbursementRequestForm(data);
             await DownloadFile(pdfBytes, $"reimbursement_request_{data.RequestId}.pdf", "application/pdf");
             CloseForms();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to generate reimbursement request: {ex.Message}");
         }
         finally
         {
@@ -565,12 +603,16 @@
                 );
 
                 await TransactionService.CreateAsync(transaction);
-                await JS.InvokeVoidAsync("alert", "Success! Transaction created from check request. View it in Transactions page.");
+                ToastService.ShowSuccess("Transaction created from check request.");
             }
 
             var pdfBytes = PrintableFormsService.GenerateCheckRequestForm(data);
             await DownloadFile(pdfBytes, $"check_request_{data.RequestId}.pdf", "application/pdf");
             CloseForms();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to generate check request: {ex.Message}");
         }
         finally
         {
@@ -607,6 +649,11 @@
             var pdfBytes = PrintableFormsService.GenerateExpenseReport(data);
             await DownloadFile(pdfBytes, $"expense_report_{data.ReportId}.pdf", "application/pdf");
             CloseForms();
+            ToastService.ShowSuccess("Expense report generated successfully.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to generate expense report: {ex.Message}");
         }
         finally
         {
@@ -617,14 +664,28 @@
 
     private async Task GenerateBlankGrantApplication()
     {
-        var pdfBytes = PrintableFormsService.GenerateGrantApplicationForm();
-        await DownloadFile(pdfBytes, "grant_application_form.pdf", "application/pdf");
+        try
+        {
+            var pdfBytes = PrintableFormsService.GenerateGrantApplicationForm();
+            await DownloadFile(pdfBytes, "grant_application_form.pdf", "application/pdf");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to generate grant application: {ex.Message}");
+        }
     }
 
     private async Task DownloadFile(byte[] content, string fileName, string contentType)
     {
         var base64 = Convert.ToBase64String(content);
-        await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+        try
+        {
+            await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+        }
+        catch (Microsoft.JSInterop.JSException)
+        {
+            ToastService.ShowError("Download failed. Please try again.");
+        }
     }
 
     private void AddExpenseItem()

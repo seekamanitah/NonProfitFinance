@@ -65,7 +65,7 @@ else
             <i class="fas fa-exclamation-triangle"></i>
             <div>
                 <strong>Revenue Threshold Alert:</strong> Your YTD revenue is approaching the $1M audit threshold for Form 990.
-                Current: @FormatCurrency(metrics?.YtdNetIncome ?? 0) (@GetThresholdPercentage()% of threshold)
+                Current: @FormatCurrency(metrics?.YtdRevenue ?? 0) (@GetThresholdPercentage()% of threshold)
             </div>
         </div>
     }
@@ -105,9 +105,9 @@ else
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">Income vs Expenses Trend</h3>
-                <select class="form-control" style="width: auto;" @onchange="OnTrendPeriodChange">
+                <select class="form-control" style="width: auto;" @bind="trendMonths" @bind:after="OnTrendPeriodChanged">
                     <option value="6">Last 6 Months</option>
-                    <option value="12" selected>Last 12 Months</option>
+                    <option value="12">Last 12 Months</option>
                     <option value="24">Last 24 Months</option>
                 </select>
             </div>
@@ -471,6 +471,8 @@ private List<TrendDataDto> trendData = new();
 private List<CategorySummaryDto> expenseBreakdown = new();
 private int trendMonths = 12;
 
+private bool _jsReady;
+
 protected override async Task OnInitializedAsync()
 {
     await LoadDashboardData();
@@ -478,9 +480,18 @@ protected override async Task OnInitializedAsync()
 
 protected override async Task OnAfterRenderAsync(bool firstRender)
 {
-    if (firstRender && !isLoading)
+    if (firstRender)
     {
-        await RenderCharts();
+        _jsReady = true;
+    }
+
+    if (_jsReady && !isLoading && trendData.Any())
+    {
+        try
+        {
+            await RenderCharts();
+        }
+        catch (Microsoft.JSInterop.JSException) { }
     }
 }
 
@@ -502,6 +513,10 @@ private async Task LoadDashboardData()
             
         await LoadTrendData();
         await LoadExpenseBreakdown();
+    }
+    catch (Exception ex)
+    {
+        ToastService.ShowError($"Failed to load dashboard data: {ex.Message}");
     }
         finally
         {
@@ -554,19 +569,19 @@ private async Task LoadDashboardData()
         }
     }
 
-    private async Task OnTrendPeriodChange(ChangeEventArgs e)
+    private async Task OnTrendPeriodChanged()
     {
-        if (int.TryParse(e.Value?.ToString(), out var months))
+        await LoadTrendData();
+        try
         {
-            trendMonths = months;
-            await LoadTrendData();
             await RenderCharts();
         }
+        catch (Microsoft.JSInterop.JSException) { }
     }
 
     private static string FormatCurrency(decimal value)
     {
-        return value.ToString("C0");
+        return value.ToString("C2");
     }
 
     private string GetRestrictedPercentage()
@@ -576,8 +591,8 @@ private async Task LoadDashboardData()
 
     private string GetThresholdPercentage()
     {
-        var ytd = metrics?.YtdNetIncome ?? 0;
-        return ((ytd / 1_000_000m) * 100).ToString("N1");
+        var ytdRevenue = Math.Max(0, metrics?.YtdRevenue ?? 0);
+        return ((ytdRevenue / 1_000_000m) * 100).ToString("N1");
     }
 
     private void ShowQuickAdd()

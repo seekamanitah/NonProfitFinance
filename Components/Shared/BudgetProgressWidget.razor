@@ -34,15 +34,15 @@
             <div class="budget-summary mb-3">
                 <div class="summary-item">
                     <span class="summary-label">Total Budget</span>
-                    <span class="summary-value">@selectedBudget.TotalBudget.ToString("C0")</span>
+                    <span class="summary-value">@selectedBudget.TotalBudget.ToString("C2")</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Spent</span>
-                    <span class="summary-value expense">@selectedBudget.TotalSpent.ToString("C0")</span>
+                    <span class="summary-value expense">@selectedBudget.TotalSpent.ToString("C2")</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label">Remaining</span>
-                    <span class="summary-value @GetRemainingClass()">@selectedBudget.Remaining.ToString("C0")</span>
+                    <span class="summary-value @GetRemainingClass()">@selectedBudget.Remaining.ToString("C2")</span>
                 </div>
             </div>
 
@@ -68,8 +68,8 @@
                         <div class="category-header">
                             <span class="category-name">@item.CategoryName</span>
                             <span class="category-amounts">
-                                <span class="@statusClass">@item.ActualAmount.ToString("C0")</span>
-                                <span class="text-muted">/ @item.BudgetAmount.ToString("C0")</span>
+                                <span class="@statusClass">@item.ActualAmount.ToString("C2")</span>
+                                <span class="text-muted">/ @item.BudgetAmount.ToString("C2")</span>
                             </span>
                         </div>
                         <div class="progress-bar-container small">
@@ -247,29 +247,40 @@
         isLoading = true;
         StateHasChanged();
 
-        budgets = await BudgetService.GetAllAsync();
-        
-        if (BudgetId.HasValue)
+        try
         {
-            selectedBudgetId = BudgetId.Value;
-        }
-        else if (budgets.Count > 0)
-        {
-            // Default to most recent active budget
-            var currentYear = DateTime.Today.Year;
-            selectedBudgetId = budgets
-                .Where(b => b.FiscalYear == currentYear || b.IsActive)
-                .OrderByDescending(b => b.FiscalYear)
-                .FirstOrDefault()?.Id ?? budgets[0].Id;
-        }
+            budgets = await BudgetService.GetAllAsync();
+            
+            if (BudgetId.HasValue)
+            {
+                selectedBudgetId = BudgetId.Value;
+            }
+            else if (budgets.Count > 0)
+            {
+                // Default to most recent active budget
+                var currentYear = DateTime.Today.Year;
+                selectedBudgetId = budgets
+                    .Where(b => b.FiscalYear == currentYear || b.IsActive)
+                    .OrderByDescending(b => b.FiscalYear)
+                    .FirstOrDefault()?.Id ?? budgets[0].Id;
+            }
 
-        if (selectedBudgetId.HasValue)
-        {
-            selectedBudget = await BudgetService.GetByIdAsync(selectedBudgetId.Value);
+            if (selectedBudgetId.HasValue)
+            {
+                selectedBudget = await BudgetService.GetByIdAsync(selectedBudgetId.Value);
+            }
         }
-
-        isLoading = false;
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            budgets = [];
+            selectedBudget = null;
+            System.Diagnostics.Debug.WriteLine($"Error loading budgets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task OnBudgetChanged(ChangeEventArgs e)
@@ -277,7 +288,15 @@
         if (int.TryParse(e.Value?.ToString(), out var id))
         {
             selectedBudgetId = id;
-            selectedBudget = await BudgetService.GetByIdAsync(id);
+            try
+            {
+                selectedBudget = await BudgetService.GetByIdAsync(id);
+            }
+            catch (Exception ex)
+            {
+                selectedBudget = null;
+                System.Diagnostics.Debug.WriteLine($"Error loading budget: {ex.Message}");
+            }
             StateHasChanged();
         }
     }

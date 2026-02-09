@@ -297,7 +297,8 @@ public record DashboardMetricsDto(
     int ActiveGrantsCount,
     int ActiveDonorsCount,
     decimal MonthlyIncome,
-    decimal MonthlyExpenses
+    decimal MonthlyExpenses,
+    decimal YtdRevenue
 );
 
 public record IncomeExpenseSummaryDto(

@@ -119,7 +119,26 @@
     private bool IsEdit => Category != null;
     
     private IEnumerable<CategoryDto> AvailableParents => AllCategories
-        .Where(c => c.Type == CategoryType && c.Id != Category?.Id && !c.IsArchived);
+        .Where(c => c.Type == CategoryType && c.Id != Category?.Id && !c.IsArchived
+                    && !GetDescendantIds(Category?.Id).Contains(c.Id));
+
+    private HashSet<int> GetDescendantIds(int? categoryId)
+    {
+        if (!categoryId.HasValue) return new HashSet<int>();
+        var descendants = new HashSet<int>();
+        CollectDescendants(categoryId.Value, descendants);
+        return descendants;
+    }
+
+    private void CollectDescendants(int parentId, HashSet<int> result)
+    {
+        var children = AllCategories.Where(c => c.ParentId == parentId);
+        foreach (var child in children)
+        {
+            if (result.Add(child.Id))
+                CollectDescendants(child.Id, result);
+        }
+    }
 
     protected override void OnInitialized()
     {

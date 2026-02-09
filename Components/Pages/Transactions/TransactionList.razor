@@ -1,5 +1,6 @@
 @page "/transactions"
 @using System.Web
+@implements IDisposable
 @inject ITransactionService TransactionService
 @inject ICategoryService CategoryService
 @inject IFundService FundService
@@ -87,7 +88,7 @@
     </div>
     
     <div class="filter-group" style="align-self: flex-end;">
-        <button class="btn btn-secondary" @onclick="ClearFilters" disabled="@isFiltering">
+        <button class="btn btn-secondary" @onclick="ClearFilters" disabled="@(!HasActiveFilters)">
             <i class="fas fa-times"></i> Clear
         </button>
         @if (isFiltering)
@@ -263,11 +264,11 @@
     IsVisible="showDeleteConfirm"
     Title="Delete Transaction"
     Message="Are you sure you want to delete this transaction?"
-    ItemName="@transactionToDelete?.Description"
+    ItemName="@GetDeleteItemName()"
     Type="ConfirmDialog.ConfirmationType.Delete"
     ConfirmText="Delete"
     ShowWarning="true"
-    WarningMessage="This action cannot be undone. Related fund balances will be recalculated."
+    WarningMessage="This will move the transaction to the recycle bin. Fund balances will be recalculated."
     IsProcessing="isDeleting"
     OnConfirmClicked="ConfirmDelete"
     OnCancelClicked="CancelDelete" />
@@ -294,6 +295,13 @@ private ReceiptPreFillData? receiptData;
 // MED-09 fix: Debounce timer for search
 private System.Timers.Timer? _debounceTimer;
 private const int DebounceDelayMs = 300;
+
+private bool HasActiveFilters =>
+    filter.CategoryId.HasValue ||
+    filter.FundId.HasValue ||
+    filter.Type.HasValue ||
+    !string.IsNullOrWhiteSpace(filter.SearchTerm) ||
+    !string.IsNullOrWhiteSpace(filter.Tags);
 
 protected override async Task OnInitializedAsync()
 {
@@ -332,27 +340,39 @@ private async Task LoadTransactions()
 {
         isLoading = true;
         
-        var request = new TransactionFilterRequest(
-            filter.StartDate,
-            filter.EndDate,
-            filter.CategoryId,
-            filter.FundId,
-            null,
-            null,
-            filter.Type,
-            filter.SearchTerm,
-            filter.Tags,
-            false,
-            filter.Page,
-            filter.PageSize
-        );
-        
-        var result = await TransactionService.GetAllAsync(request);
-        transactions = result.Items;
-        totalCount = result.TotalCount;
-        totalPages = result.TotalPages;
-        
-        isLoading = false;
+        try
+        {
+            var request = new TransactionFilterRequest(
+                filter.StartDate,
+                filter.EndDate,
+                filter.CategoryId,
+                filter.FundId,
+                null,
+                null,
+                filter.Type,
+                filter.SearchTerm,
+                filter.Tags,
+                false,
+                filter.Page,
+                filter.PageSize
+            );
+            
+            var result = await TransactionService.GetAllAsync(request);
+            transactions = result.Items;
+            totalCount = result.TotalCount;
+            totalPages = result.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            transactions = [];
+            totalCount = 0;
+            totalPages = 1;
+            Toast.ShowError($"Failed to load transactions: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task ApplyFilters()
@@ -557,6 +577,14 @@ private async Task LoadTransactions()
         transactionToDelete = null;
     }
 
+    private string GetDeleteItemName()
+    {
+        if (transactionToDelete == null) return "";
+        var desc = transactionToDelete.Description ?? transactionToDelete.Payee;
+        var amount = $"{transactionToDelete.Type} - {transactionToDelete.Amount:C}";
+        return !string.IsNullOrWhiteSpace(desc) ? $"{desc} ({amount})" : amount;
+    }
+
     private async Task OnTransactionSaved()
     {
         showForm = false;
@@ -586,5 +614,11 @@ private async Task LoadTransactions()
         public string? Tags { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 25;
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
     }
 }

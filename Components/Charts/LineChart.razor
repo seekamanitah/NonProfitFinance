@@ -50,8 +50,12 @@
     {
         if (firstRender || !isRendered)
         {
-            await RenderChart();
-            isRendered = true;
+            try
+            {
+                await RenderChart();
+                isRendered = true;
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -59,7 +63,11 @@
     {
         if (isRendered && Labels.Any() && Datasets.Any())
         {
-            await RenderChart();
+            try
+            {
+                await RenderChart();
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -111,7 +119,7 @@
         {
             await JS.InvokeVoidAsync("chartInterop.destroyChart", ChartId);
         }
-        catch { }
+        catch (Microsoft.JSInterop.JSException) { }
     }
 
     public class ChartDataset

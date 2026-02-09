@@ -46,7 +46,7 @@
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Theme initialization error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Theme initialization error: {ex.Message}");
                 currentTheme = "light";
             }
         }
@@ -90,7 +90,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Theme toggle error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Theme toggle error: {ex.Message}");
             // Revert on error
             currentTheme = currentTheme == "dark" ? "light" : "dark";
             StateHasChanged();
@@ -114,9 +114,9 @@
             
             dotNetReference?.Dispose();
         }
-        catch
+        catch (Microsoft.JSInterop.JSException)
         {
-            // Ignore disposal errors
+            // Ignore JS disposal errors during disconnect
         }
     }
 }

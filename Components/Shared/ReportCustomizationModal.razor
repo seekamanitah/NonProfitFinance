@@ -238,7 +238,14 @@ private bool saveAsDefault = false;
     
 protected override async Task OnInitializedAsync()
 {
-    settings = await CustomizationService.GetSettingsAsync(ReportType);
+    try
+    {
+        settings = await CustomizationService.GetSettingsAsync(ReportType);
+    }
+    catch
+    {
+        settings = new();
+    }
     columns = CustomizationService.GetDefaultColumns(ReportType);
         
         // If we have saved columns, merge with defaults
@@ -262,7 +269,7 @@ protected override async Task OnInitializedAsync()
                     }
                 }
             }
-            catch { /* Use defaults if parsing fails */ }
+            catch (System.Text.Json.JsonException) { /* Use defaults if parsing fails */ }
         }
     }
     
@@ -323,8 +330,15 @@ protected override async Task OnInitializedAsync()
         settings.ReportType = ReportType;
         settings.ColumnsJson = System.Text.Json.JsonSerializer.Serialize(columns);
         
-        await CustomizationService.SaveSettingsAsync(settings);
-        await OnApply.InvokeAsync(settings);
+        try
+        {
+            await CustomizationService.SaveSettingsAsync(settings);
+            await OnApply.InvokeAsync(settings);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error saving preset: {ex.Message}");
+        }
     }
     
     private async Task Cancel()

@@ -74,7 +74,7 @@
                     <div class="print-footer">
                         <div class="footer-left">@OrganizationName</div>
                         <div class="footer-center">Page 1 of 1</div>
-                        <div class="footer-right">@DateTime.Now:MM/dd/yyyy HH:mm</div>
+                        <div class="footer-right">@DateTime.Now.ToString("MM/dd/yyyy HH:mm")</div>
                     </div>
                 }
             </div>
@@ -243,7 +243,11 @@
     
     private async Task Print()
     {
-        await JS.InvokeVoidAsync("print");
+        try
+        {
+            await JS.InvokeVoidAsync("print");
+        }
+        catch (Microsoft.JSInterop.JSException) { }
     }
     
     private async Task Close()

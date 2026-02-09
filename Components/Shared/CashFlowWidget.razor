@@ -27,18 +27,18 @@
             <div class="cash-flow-summary">
                 <div class="cash-flow-metric">
                     <div class="metric-label">Current Balance</div>
-                    <div class="metric-value">@forecast.CurrentBalance.ToString("C0")</div>
+                    <div class="metric-value">@forecast.CurrentBalance.ToString("C2")</div>
                 </div>
                 <div class="cash-flow-metric">
                     <div class="metric-label">Projected (@forecastDays days)</div>
                     <div class="metric-value @(forecast.ProjectedEndBalance >= 0 ? "positive" : "negative")">
-                        @forecast.ProjectedEndBalance.ToString("C0")
+                        @forecast.ProjectedEndBalance.ToString("C2")
                     </div>
                 </div>
                 <div class="cash-flow-metric">
                     <div class="metric-label">Net Cash Flow</div>
                     <div class="metric-value @(forecast.NetProjectedCashFlow >= 0 ? "positive" : "negative")">
-                        @(forecast.NetProjectedCashFlow >= 0 ? "+" : "")@forecast.NetProjectedCashFlow.ToString("C0")
+                        @(forecast.NetProjectedCashFlow >= 0 ? "+" : "")@forecast.NetProjectedCashFlow.ToString("C2")
                     </div>
                 </div>
             </div>
@@ -74,10 +74,10 @@
                             <div class="transaction-row">
                                 <div class="transaction-info">
                                     <span class="transaction-desc">@tx.Description</span>
-                                    <span class="transaction-meta">@tx.Date.ToString("MMM d") • @((int)(tx.Confidence * 100))%</span>
+                                    <span class="transaction-meta">@tx.Date.ToString("MMM d") â€¢ @((int)(tx.Confidence * 100))%</span>
                                 </div>
                                 <div class="transaction-amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
-                                    @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C0")
+                                    @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C2")
                                 </div>
                             </div>
                         }
@@ -116,7 +116,11 @@ private int forecastDays = 90;
     {
         if (!firstRender && forecast != null)
         {
-            await RenderChart();
+            try
+            {
+                await RenderChart();
+            }
+            catch (Microsoft.JSInterop.JSException) { }
         }
     }
 
@@ -126,6 +130,11 @@ private int forecastDays = 90;
         try
         {
             forecast = await CashFlowService.GetForecastAsync(forecastDays);
+        }
+        catch (Exception ex)
+        {
+            forecast = null;
+            System.Diagnostics.Debug.WriteLine($"Error loading cash flow forecast: {ex.Message}");
         }
         finally
         {

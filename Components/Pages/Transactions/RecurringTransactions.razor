@@ -1,6 +1,7 @@
 @page "/transactions/recurring"
 @inject IRecurringTransactionService RecurringService
 @inject ICategoryService CategoryService
+@inject IToastService ToastService
 @rendermode InteractiveServer
 
 <PageTitle>Recurring Transactions - NonProfit Finance</PageTitle>
@@ -54,7 +55,7 @@
                          style="padding: 0.75rem; font-size: 0.9rem;">
                         <div>@item.Name</div>
                         <div style="font-weight: normal;">
-                            @item.Amount.ToString("C") • @item.NextDate.ToString("MMM d") 
+                            @item.Amount.ToString("C") â€¢ @item.NextDate.ToString("MMM d") 
                             (@item.DaysUntil days)
                         </div>
                     </div>
@@ -109,7 +110,7 @@
                                     @template.Type
                                 </span>
                             </td>
-                            <td>@(template.CategoryName ?? "—")</td>
+                            <td>@(template.CategoryName ?? "â€”")</td>
                             <td>
                                 @GetPatternDisplay(template.Pattern, template.Interval)
                             </td>
@@ -123,7 +124,7 @@
                                 }
                                 else
                                 {
-                                    <span class="text-muted">—</span>
+                                    <span class="text-muted">â€”</span>
                                 }
                             </td>
                             <td>
@@ -302,7 +303,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        categories = await CategoryService.GetAllAsync();
+        try
+        {
+            categories = await CategoryService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load categories: {ex.Message}");
+        }
         await LoadData();
     }
 
@@ -313,6 +321,10 @@
         {
             templates = await RecurringService.GetAllAsync();
             upcoming = await RecurringService.GetUpcomingAsync(30);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load recurring transactions: {ex.Message}");
         }
         finally
         {
@@ -422,28 +434,52 @@
 
     private async Task SkipNext(RecurringTransactionDto template)
     {
-        await RecurringService.SkipNextOccurrenceAsync(template.Id);
-        await LoadData();
+        try
+        {
+            await RecurringService.SkipNextOccurrenceAsync(template.Id);
+            await LoadData();
+            ToastService.ShowSuccess($"Skipped next occurrence of '{template.Name}'.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to skip occurrence: {ex.Message}");
+        }
     }
 
     private async Task ToggleActive(RecurringTransactionDto template)
     {
-        await RecurringService.UpdateAsync(template.Id, new UpdateRecurringTransactionRequest(
-            template.Name,
-            template.Amount,
-            template.CategoryId,
-            template.Pattern,
-            template.Interval,
-            template.EndDate,
-            !template.IsActive
-        ));
-        await LoadData();
+        try
+        {
+            await RecurringService.UpdateAsync(template.Id, new UpdateRecurringTransactionRequest(
+                template.Name,
+                template.Amount,
+                template.CategoryId,
+                template.Pattern,
+                template.Interval,
+                template.EndDate,
+                !template.IsActive
+            ));
+            await LoadData();
+            ToastService.ShowSuccess($"'{template.Name}' {(template.IsActive ? "paused" : "activated")}.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to update recurring transaction: {ex.Message}");
+        }
     }
 
     private async Task DeleteTemplate(RecurringTransactionDto template)
     {
-        await RecurringService.DeleteAsync(template.Id);
-        await LoadData();
+        try
+        {
+            await RecurringService.DeleteAsync(template.Id);
+            await LoadData();
+            ToastService.ShowSuccess($"'{template.Name}' deleted.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to delete recurring transaction: {ex.Message}");
+        }
     }
 
     private string GetPatternDisplay(RecurrencePattern pattern, int interval)

@@ -42,7 +42,11 @@ public class CategoryService : ICategoryService
             .ThenBy(c => c.Name)
             .ToListAsync();
 
-        var rootCategories = allCategories.Where(c => c.ParentId == null).ToList();
+        var categoryIds = allCategories.Select(c => c.Id).ToHashSet();
+        // Treat as root: no parent, or parent not in the visible set (e.g. archived parent)
+        var rootCategories = allCategories
+            .Where(c => c.ParentId == null || !categoryIds.Contains(c.ParentId.Value))
+            .ToList();
         return rootCategories.Select(c => BuildTree(c, allCategories)).ToList();
     }
 

@@ -31,11 +31,11 @@
                     <div class="stat-label">Donors</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value income">@totalContributions.ToString("C0")</div>
+                    <div class="stat-value income">@totalContributions.ToString("C2")</div>
                     <div class="stat-label">Contributions</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">@averageContribution.ToString("C0")</div>
+                    <div class="stat-value">@averageContribution.ToString("C2")</div>
                     <div class="stat-label">Average</div>
                 </div>
             </div>
@@ -53,7 +53,7 @@
                                 <Badge CssClass="@GetDonorTypeBadgeClass(donor.Type)">@GetDonorTypeLabel(donor.Type)</Badge>
                             </div>
                             <div class="donor-details">
-                                <span class="donor-amount income">@donor.TotalContributions.ToString("C0")</span>
+                                <span class="donor-amount income">@donor.TotalContributions.ToString("C2")</span>
                                 @if (donor.LastContributionDate.HasValue)
                                 {
                                     <span class="donor-last-date text-muted">
@@ -258,8 +258,19 @@
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
-        donors = await DonorService.GetAllAsync();
-        isLoading = false;
+        try
+        {
+            donors = await DonorService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            donors = [];
+            System.Diagnostics.Debug.WriteLine($"Error loading donors: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private static string GetDonorTypeBadgeClass(DonorType type)

@@ -1,5 +1,6 @@
 @page "/compliance/form990"
 @inject IForm990Service Form990Service
+@inject IToastService ToastService
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -72,7 +73,7 @@ else if (form990Data != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Total Revenue (Line 12)</div>
-                <div class="metric-value positive">@form990Data.TotalRevenue.ToString("C0")</div>
+                <div class="metric-value positive">@form990Data.TotalRevenue.ToString("C2")</div>
             </div>
         </div>
         
@@ -82,7 +83,7 @@ else if (form990Data != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Total Expenses (Line 17)</div>
-                <div class="metric-value negative">@form990Data.TotalExpenses.ToString("C0")</div>
+                <div class="metric-value negative">@form990Data.TotalExpenses.ToString("C2")</div>
             </div>
         </div>
         
@@ -92,7 +93,7 @@ else if (form990Data != null)
             </div>
             <div class="metric-content">
                 <div class="metric-label">Net Assets (Line 21)</div>
-                <div class="metric-value">@form990Data.NetAssets.ToString("C0")</div>
+                <div class="metric-value">@form990Data.NetAssets.ToString("C2")</div>
             </div>
         </div>
         
@@ -103,7 +104,7 @@ else if (form990Data != null)
             <div class="metric-content">
                 <div class="metric-label">Net Income (Line 18)</div>
                 <div class="metric-value @(form990Data.PartI.RevenueMinusExpenses >= 0 ? "positive" : "negative")">
-                    @form990Data.PartI.RevenueMinusExpenses.ToString("C0")
+                    @form990Data.PartI.RevenueMinusExpenses.ToString("C2")
                 </div>
             </div>
         </div>
@@ -267,6 +268,10 @@ else if (form990Data != null)
         {
             form990Data = await Form990Service.GetForm990DataAsync(selectedYear);
         }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to load Form 990 data: {ex.Message}");
+        }
         finally
         {
             isLoading = false;
@@ -275,17 +280,31 @@ else if (form990Data != null)
 
     private async Task ExportToPdf()
     {
-        var pdfBytes = await Form990Service.ExportForm990ToPdfAsync(selectedYear);
-        var base64 = Convert.ToBase64String(pdfBytes);
-        await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.pdf", "application/pdf", base64);
+        try
+        {
+            var pdfBytes = await Form990Service.ExportForm990ToPdfAsync(selectedYear);
+            var base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.pdf", "application/pdf", base64);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export PDF: {ex.Message}");
+        }
     }
 
     private async Task ExportToExcel()
     {
-        var excelBytes = await Form990Service.ExportForm990ToExcelAsync(selectedYear);
-        var base64 = Convert.ToBase64String(excelBytes);
-        await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.xlsx", 
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64);
+        try
+        {
+            var excelBytes = await Form990Service.ExportForm990ToExcelAsync(selectedYear);
+            var base64 = Convert.ToBase64String(excelBytes);
+            await JS.InvokeVoidAsync("downloadFile", $"Form990_Worksheet_{selectedYear}.xlsx", 
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to export Excel: {ex.Message}");
+        }
     }
 
     private string GetFormTypeAlertClass() => form990Data?.RequiredFormType switch

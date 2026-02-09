@@ -76,7 +76,8 @@ public class ReportService : IReportService
             activeGrants,
             activeDonors,
             monthlyIncome,
-            monthlyExpenses
+            monthlyExpenses,
+            ytdIncome
         );
     }
 
@@ -366,8 +367,9 @@ public class ReportService : IReportService
     {
         var startOfYear = new DateTime(DateTime.UtcNow.Year, 1, 1);
 
+        // Exclude transfer transactions — they inflate revenue totals
         return await _context.Transactions
-            .Where(t => t.Date >= startOfYear && t.Type == TransactionType.Income)
+            .Where(t => t.Date >= startOfYear && t.Type == TransactionType.Income && t.TransferPairId == null)
             .SumAsync(t => t.Amount);
     }
 

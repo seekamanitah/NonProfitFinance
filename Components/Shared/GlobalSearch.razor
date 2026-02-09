@@ -1,4 +1,5 @@
 @rendermode InteractiveServer
+@implements IDisposable
 @inject ITransactionService TransactionService
 @inject IDonorService DonorService
 @inject IGrantService GrantService
@@ -211,11 +212,15 @@ private async Task PerformSearch()
     debounceTimer.Elapsed += async (sender, args) =>
     {
         debounceTimer?.Stop();
-        await InvokeAsync(async () =>
+        try
         {
-            await SearchAll(searchQuery);
-            StateHasChanged();
-        });
+            await InvokeAsync(async () =>
+            {
+                await SearchAll(searchQuery);
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException) { }
     };
     debounceTimer.Start();
 }
@@ -225,70 +230,77 @@ private async Task PerformSearch()
         results.Clear();
         var lowerQuery = query.ToLower();
 
-        // Search Transactions
-        var transactions = await TransactionService.GetAllAsync(new DTOs.TransactionFilterRequest(
-            DateTime.Today.AddYears(-2), 
-            DateTime.Today
-        ));
-
-        foreach (var tx in transactions.Items.Where(t => 
-            (t.Description != null && t.Description.ToLower().Contains(lowerQuery)) ||
-            (t.Payee != null && t.Payee.ToLower().Contains(lowerQuery)) ||
-            (t.CategoryName != null && t.CategoryName.ToLower().Contains(lowerQuery))
-        ).Take(5))
+        try
         {
-            results.Add(new SearchResult
-            {
-                Type = "Transaction",
-                Title = tx.Description ?? "Transaction",
-                Subtitle = $"{tx.Date:MMM d, yyyy} • {tx.Amount:C} • {tx.CategoryName}",
-                Url = $"/transactions?search={Uri.EscapeDataString(tx.Description ?? tx.Id.ToString())}"
-            });
-        }
+            // Search Transactions
+            var transactions = await TransactionService.GetAllAsync(new DTOs.TransactionFilterRequest(
+                DateTime.Today.AddYears(-2), 
+                DateTime.Today
+            ));
 
-        // Search Donors
-        var donors = await DonorService.GetAllAsync();
-        foreach (var donor in donors.Where(d => d.Name.ToLower().Contains(lowerQuery)).Take(5))
+            foreach (var tx in transactions.Items.Where(t => 
+                (t.Description != null && t.Description.ToLower().Contains(lowerQuery)) ||
+                (t.Payee != null && t.Payee.ToLower().Contains(lowerQuery)) ||
+                (t.CategoryName != null && t.CategoryName.ToLower().Contains(lowerQuery))
+            ).Take(5))
+            {
+                results.Add(new SearchResult
+                {
+                    Type = "Transaction",
+                    Title = tx.Description ?? "Transaction",
+                    Subtitle = $"{tx.Date:MMM d, yyyy} • {tx.Amount:C} • {tx.CategoryName}",
+                    Url = $"/transactions?search={Uri.EscapeDataString(tx.Description ?? tx.Id.ToString())}"
+                });
+            }
+
+            // Search Donors
+            var donors = await DonorService.GetAllAsync();
+            foreach (var donor in donors.Where(d => d.Name.ToLower().Contains(lowerQuery)).Take(5))
+            {
+                results.Add(new SearchResult
+                {
+                    Type = "Donor",
+                    Title = donor.Name,
+                    Subtitle = $"{donor.Type} • {donor.TotalContributions:C} contributed",
+                    Url = $"/donors?search={Uri.EscapeDataString(donor.Name)}"
+                });
+            }
+
+            // Search Grants
+            var grants = await GrantService.GetAllAsync(null);
+            foreach (var grant in grants.Where(g => 
+                g.Name.ToLower().Contains(lowerQuery) || 
+                (g.GrantorName != null && g.GrantorName.ToLower().Contains(lowerQuery))
+            ).Take(5))
+            {
+                results.Add(new SearchResult
+                {
+                    Type = "Grant",
+                    Title = grant.Name,
+                    Subtitle = $"{grant.GrantorName} • {grant.Amount:C} • {grant.Status}",
+                    Url = $"/grants?search={Uri.EscapeDataString(grant.Name)}"
+                });
+            }
+
+            // Search Categories
+            var categories = await CategoryService.GetAllAsync();
+            foreach (var cat in categories.Where(c => c.Name.ToLower().Contains(lowerQuery)).Take(3))
+            {
+                results.Add(new SearchResult
+                {
+                    Type = "Category",
+                    Title = cat.Name,
+                    Subtitle = $"{cat.Type} category",
+                    Url = $"/categories?search={Uri.EscapeDataString(cat.Name)}"
+                });
+            }
+
+            results = results.OrderBy(r => r.Type).ToList();
+        }
+        catch (Exception ex)
         {
-            results.Add(new SearchResult
-            {
-                Type = "Donor",
-                Title = donor.Name,
-                Subtitle = $"{donor.Type} • {donor.TotalContributions:C} contributed",
-                Url = $"/donors?search={Uri.EscapeDataString(donor.Name)}"
-            });
+            System.Diagnostics.Debug.WriteLine($"Search error: {ex.Message}");
         }
-
-        // Search Grants
-        var grants = await GrantService.GetAllAsync(null);
-        foreach (var grant in grants.Where(g => 
-            g.Name.ToLower().Contains(lowerQuery) || 
-            (g.GrantorName != null && g.GrantorName.ToLower().Contains(lowerQuery))
-        ).Take(5))
-        {
-            results.Add(new SearchResult
-            {
-                Type = "Grant",
-                Title = grant.Name,
-                Subtitle = $"{grant.GrantorName} • {grant.Amount:C} • {grant.Status}",
-                Url = $"/grants?search={Uri.EscapeDataString(grant.Name)}"
-            });
-        }
-
-        // Search Categories
-        var categories = await CategoryService.GetAllAsync();
-        foreach (var cat in categories.Where(c => c.Name.ToLower().Contains(lowerQuery)).Take(3))
-        {
-            results.Add(new SearchResult
-            {
-                Type = "Category",
-                Title = cat.Name,
-                Subtitle = $"{cat.Type} category",
-                Url = $"/categories?search={Uri.EscapeDataString(cat.Name)}"
-            });
-        }
-
-        results = results.OrderBy(r => r.Type).ToList();
     }
 
     private void ClearSearch()
@@ -321,5 +333,11 @@ private async Task PerformSearch()
         public string Title { get; set; } = "";
         public string Subtitle { get; set; } = "";
         public string Url { get; set; } = "";
+    }
+
+    public void Dispose()
+    {
+        debounceTimer?.Stop();
+        debounceTimer?.Dispose();
     }
 }

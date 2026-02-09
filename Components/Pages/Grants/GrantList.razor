@@ -2,6 +2,7 @@
 @using System.Web
 @inject IGrantService GrantService
 @inject IDocumentService DocumentService
+@inject IToastService Toast
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
@@ -83,14 +84,14 @@ else
                     
                     <div class="d-flex justify-between mb-2">
                         <span class="text-muted">Total Amount</span>
-                        <span class="amount" style="font-weight: 600;">@grant.Amount.ToString("C0")</span>
+                        <span class="amount" style="font-weight: 600;">@grant.Amount.ToString("C2")</span>
                     </div>
                     
                     <!-- Usage Progress -->
                     <div class="mb-2">
                         <div class="d-flex justify-between mb-1">
-                            <span class="text-muted">Used: @grant.AmountUsed.ToString("C0")</span>
-                            <span class="text-muted">Remaining: @grant.RemainingBalance.ToString("C0")</span>
+                            <span class="text-muted">Used: @grant.AmountUsed.ToString("C2")</span>
+                            <span class="text-muted">Remaining: @grant.RemainingBalance.ToString("C2")</span>
                         </div>
                         <div class="progress">
                             <div class="progress-bar @GetProgressClass(grant)" 
@@ -166,19 +167,19 @@ else
                     <div class="metric-card">
                         <div class="metric-content">
                             <div class="metric-label">Total Amount</div>
-                            <div class="metric-value">@selectedGrant.Amount.ToString("C0")</div>
+                            <div class="metric-value">@selectedGrant.Amount.ToString("C2")</div>
                         </div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-content">
                             <div class="metric-label">Amount Used</div>
-                            <div class="metric-value negative">@selectedGrant.AmountUsed.ToString("C0")</div>
+                            <div class="metric-value negative">@selectedGrant.AmountUsed.ToString("C2")</div>
                         </div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-content">
                             <div class="metric-label">Remaining</div>
-                            <div class="metric-value positive">@selectedGrant.RemainingBalance.ToString("C0")</div>
+                            <div class="metric-value positive">@selectedGrant.RemainingBalance.ToString("C2")</div>
                         </div>
                     </div>
                 </div>
@@ -359,22 +360,48 @@ else
         }
         
         await LoadGrants();
-        expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
-        upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);
+        try
+        {
+            expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
+            upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load grant alerts: {ex.Message}");
+        }
     }
 
     private async Task LoadGrants()
     {
         isLoading = true;
-        grants = await GrantService.GetAllAsync();
-        isLoading = false;
+        try
+        {
+            grants = await GrantService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load grants: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task SelectGrant(GrantDto grant)
     {
         selectedGrant = grant;
-        grantTransactions = await GrantService.GetUsageHistoryAsync(grant.Id);
-        grantDocuments = await DocumentService.GetByGrantIdAsync(grant.Id);
+        try
+        {
+            grantTransactions = await GrantService.GetUsageHistoryAsync(grant.Id);
+            grantDocuments = await DocumentService.GetByGrantIdAsync(grant.Id);
+        }
+        catch (Exception ex)
+        {
+            grantTransactions = new();
+            grantDocuments = new();
+            Toast.ShowError($"Failed to load grant details: {ex.Message}");
+        }
     }
 
     private void CloseDetail()
@@ -431,7 +458,7 @@ else
     private int DaysUntil(DateTime? date)
     {
         if (!date.HasValue) return 0;
-        return (int)(date.Value - DateTime.Today).TotalDays;
+        return Math.Max(0, (int)(date.Value - DateTime.Today).TotalDays);
     }
 
     private string GetStatusBadgeClass(GrantStatus status) => status switch
@@ -469,6 +496,11 @@ else
 
             await DocumentService.UploadAsync(memoryStream, file.Name, file.ContentType, request);
             grantDocuments = await DocumentService.GetByGrantIdAsync(selectedGrant.Id);
+            Toast.ShowSuccess("Document uploaded successfully.");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to upload document: {ex.Message}");
         }
         finally
         {
@@ -488,10 +520,18 @@ else
 
     private async Task DeleteDocument(int documentId)
     {
-        await DocumentService.DeleteAsync(documentId);
-        if (selectedGrant != null)
+        try
         {
-            grantDocuments = await DocumentService.GetByGrantIdAsync(selectedGrant.Id);
+            await DocumentService.DeleteAsync(documentId);
+            if (selectedGrant != null)
+            {
+                grantDocuments = await DocumentService.GetByGrantIdAsync(selectedGrant.Id);
+            }
+            Toast.ShowSuccess("Document deleted.");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to delete document: {ex.Message}");
         }
     }
 

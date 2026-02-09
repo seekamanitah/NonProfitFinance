@@ -255,9 +255,8 @@
     {
         if (float.TryParse(e.Value?.ToString(), out var rate))
         {
-            speechRate = rate / 100f; // Convert from 50-200 to 0.5-2.0
+            speechRate = rate;
             TextToSpeechService.SpeechRate = speechRate;
-            StateHasChanged();
         }
     }
 
@@ -267,9 +266,12 @@
         {
             uiScale = scale / 100f; // Convert from 80-150 to 0.8-1.5
             AccessibilityService.UiScale = uiScale;
-            await AccessibilityService.SaveSettingsAsync();
-            await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
-            StateHasChanged();
+            try
+            {
+                await AccessibilityService.SaveSettingsAsync();
+                await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
+            }
+            catch (JSException) { }
         }
     }
 
@@ -277,20 +279,29 @@
     {
         uiScale = scale;
         AccessibilityService.UiScale = uiScale;
-        await AccessibilityService.SaveSettingsAsync();
-        await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
-        StateHasChanged();
+        try
+        {
+            await AccessibilityService.SaveSettingsAsync();
+            await JSRuntime.InvokeVoidAsync("accessibilityHelpers.setUiScale", uiScale);
+        }
+        catch (JSException) { }
     }
 
     private async Task TestTts()
     {
-        await TextToSpeechService.SpeakAsync(testText);
-        StateHasChanged();
+        try
+        {
+            await TextToSpeechService.SpeakAsync(testText);
+        }
+        catch (JSException) { }
     }
 
     private async Task StopTts()
     {
-        await TextToSpeechService.Stop();
-        StateHasChanged();
+        try
+        {
+            await TextToSpeechService.Stop();
+        }
+        catch (JSException) { }
     }
 }
