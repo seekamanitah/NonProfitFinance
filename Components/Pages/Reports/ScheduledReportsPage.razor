@@ -1,0 +1,428 @@
+@page "/scheduled-reports"
+@inject IScheduledReportService ScheduledReportService
+@inject IFundService FundService
+@inject IToastService Toast
+@rendermode InteractiveServer
+
+<PageTitle>Scheduled Reports - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3 flex-wrap gap-2">
+    <h2 style="margin: 0;"><i class="fas fa-clock"></i> Scheduled Reports</h2>
+    <button class="btn btn-primary" @onclick="ShowAddForm">
+        <i class="fas fa-plus"></i> <span class="hide-mobile">New Schedule</span>
+    </button>
+</div>
+
+@if (isLoading)
+{
+    <SkeletonLoader Type="SkeletonLoader.SkeletonType.CardGrid" Count="3" />
+}
+else if (!reports.Any())
+{
+    <div class="card">
+        <div class="card-body text-center text-muted" style="padding: 3rem;">
+            <i class="fas fa-calendar-alt" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
+            <h4>No Scheduled Reports</h4>
+            <p>Set up automated report generation to receive reports on a regular schedule.</p>
+            <button class="btn btn-primary" @onclick="ShowAddForm">
+                <i class="fas fa-plus"></i> Create First Schedule
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
+        @foreach (var report in reports)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-between align-center mb-2">
+                        <h4 style="margin: 0;">@report.Name</h4>
+                        <div class="d-flex gap-1">
+                            <span class="badge @(report.IsActive ? "badge-success" : "badge-warning")">
+                                @(report.IsActive ? "Active" : "Paused")
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="text-muted mb-2" style="font-size: 0.85rem;">
+                        <div><i class="fas fa-file-alt"></i> @report.ReportType — @report.Format</div>
+                        <div><i class="fas fa-redo"></i> @report.Frequency @GetScheduleDetail(report)</div>
+                        <div><i class="fas fa-calendar"></i> Period: @report.PeriodType</div>
+                    </div>
+
+                    @if (report.LastRunAt.HasValue)
+                    {
+                        <div class="mb-2" style="font-size: 0.85rem;">
+                            <span class="text-muted">Last run:</span>
+                            <span>@report.LastRunAt.Value.ToLocalTime().ToString("MMM dd, HH:mm")</span>
+                            @if (!string.IsNullOrEmpty(report.LastRunStatus))
+                            {
+                                <span class="badge @(report.LastRunStatus == "Success" ? "badge-success" : "badge-danger")" style="font-size: 0.7rem;">
+                                    @(report.LastRunStatus.Length > 30 ? report.LastRunStatus[..30] + "..." : report.LastRunStatus)
+                                </span>
+                            }
+                        </div>
+                    }
+
+                    @if (report.NextRunAt.HasValue && report.IsActive)
+                    {
+                        <div class="mb-2 text-muted" style="font-size: 0.85rem;">
+                            <i class="fas fa-clock"></i> Next run: @report.NextRunAt.Value.ToLocalTime().ToString("MMM dd, HH:mm")
+                        </div>
+                    }
+
+                    @if (report.FailureCount > 0)
+                    {
+                        <div class="alert alert-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                            <i class="fas fa-exclamation-triangle"></i> @report.FailureCount consecutive failure(s)
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2 mt-2 flex-wrap">
+                        <button class="btn btn-outline btn-sm" @onclick="() => ToggleActive(report)">
+                            <i class="fas @(report.IsActive ? "fa-pause" : "fa-play")"></i>
+                            @(report.IsActive ? "Pause" : "Resume")
+                        </button>
+                        <button class="btn btn-outline btn-sm" @onclick="() => EditReport(report)">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-outline btn-sm text-danger" @onclick="() => ConfirmDelete(report)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Add/Edit Form Modal -->
+@if (showForm)
+{
+    <div class="modal-backdrop" @onclick="CloseForm">
+        <div class="modal" style="max-width: 550px; max-height: 90vh; overflow-y: auto;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3 class="modal-title">@(editingReport?.Id > 0 ? "Edit" : "New") Scheduled Report</h3>
+                <button class="modal-close" @onclick="CloseForm"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" class="form-control" @bind="editingReport!.Name" placeholder="e.g., Monthly Financial Summary" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Report Type</label>
+                        <select class="form-control" @bind="editingReport!.ReportType">
+                            @foreach (var t in Enum.GetValues<ScheduledReportType>())
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Format</label>
+                        <select class="form-control" @bind="editingReport!.Format">
+                            @foreach (var f in Enum.GetValues<ReportFormat>())
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Frequency</label>
+                        <select class="form-control" @bind="editingReport!.Frequency">
+                            @foreach (var f in Enum.GetValues<ScheduleFrequency>())
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Time of Day</label>
+                        <input type="time" class="form-control" 
+                               value="@editingReport!.TimeOfDay.ToString("HH:mm")" 
+                               @onchange="OnTimeChanged" />
+                    </div>
+                </div>
+
+                @if (editingReport!.Frequency == ScheduleFrequency.Weekly)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Day of Week</label>
+                        <select class="form-control" @bind="selectedDayOfWeek">
+                            @foreach (var d in Enum.GetValues<DayOfWeek>())
+                            {
+                                <option value="@d">@d</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (editingReport!.Frequency is ScheduleFrequency.Monthly or ScheduleFrequency.Quarterly or ScheduleFrequency.Yearly)
+                {
+                    <div class="form-group">
+                        <label class="form-label">Day of Month</label>
+                        <input type="number" class="form-control" @bind="editingReport!.DayOfMonth" min="1" max="28" />
+                        <small class="text-muted">Use 1-28 to avoid month-length issues</small>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="form-label">Report Period</label>
+                    <select class="form-control" @bind="editingReport!.PeriodType">
+                        @foreach (var p in Enum.GetValues<ReportPeriodType>())
+                        {
+                            <option value="@p">@p</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Account Filter</label>
+                    <select class="form-control" @bind="editingReport!.FundId">
+                        <option value="">All Accounts</option>
+                        @foreach (var fund in funds)
+                        {
+                            <option value="@fund.Id">@fund.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Recipients</label>
+                    <input type="text" class="form-control" @bind="editingReport!.EmailRecipients" 
+                           placeholder="Comma-separated emails (optional)" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">PDF Theme</label>
+                    <select class="form-control" @bind="editingReport!.PdfTheme">
+                        <option value="Modern">Modern</option>
+                        <option value="Classic">Classic</option>
+                        <option value="FireDepartment">Fire Dept</option>
+                        <option value="Dark">Dark</option>
+                        <option value="Light">Light</option>
+                    </select>
+                </div>
+
+                <div class="form-row" style="margin-top: 0.5rem;">
+                    <div class="form-group">
+                        <label class="d-flex align-center gap-2">
+                            <input type="checkbox" @bind="editingReport!.SaveToDocuments" /> Save to Documents
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="d-flex align-center gap-2">
+                            <input type="checkbox" @bind="editingReport!.IncludeDetails" /> Include Details
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="d-flex align-center gap-2">
+                            <input type="checkbox" @bind="editingReport!.IncludeCharts" /> Include Charts
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="CloseForm">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveReport" disabled="@isSaving">
+                    @if (isSaving) { <span class="spinner"></span> }
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation -->
+@if (deletingReport != null)
+{
+    <ConfirmDialog
+        Title="Delete Scheduled Report"
+        Message="@($"Are you sure you want to delete the scheduled report '{deletingReport.Name}'?")"
+        ConfirmText="Delete"
+        ConfirmClass="btn-danger"
+        OnConfirm="DeleteReport"
+        OnCancel="() => deletingReport = null" />
+}
+
+@code {
+    private List<ScheduledReport> reports = new();
+    private List<FundDto> funds = new();
+    private ScheduledReport? editingReport;
+    private ScheduledReport? deletingReport;
+    private bool isLoading = true;
+    private bool showForm = false;
+    private bool isSaving = false;
+    private DayOfWeek selectedDayOfWeek = DayOfWeek.Monday;
+
+    private void OnTimeChanged(ChangeEventArgs e)
+    {
+        if (editingReport != null && TimeOnly.TryParse(e.Value?.ToString(), out var time))
+        {
+            editingReport.TimeOfDay = time;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            funds = await FundService.GetAllAsync();
+        }
+        catch { /* funds optional */ }
+        await LoadReports();
+    }
+
+    private async Task LoadReports()
+    {
+        isLoading = true;
+        try
+        {
+            reports = await ScheduledReportService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load scheduled reports: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        editingReport = new ScheduledReport
+        {
+            Name = "",
+            Frequency = ScheduleFrequency.Monthly,
+            DayOfMonth = 1,
+            PeriodType = ReportPeriodType.PreviousMonth,
+            IsActive = true
+        };
+        selectedDayOfWeek = DayOfWeek.Monday;
+        showForm = true;
+    }
+
+    private void EditReport(ScheduledReport report)
+    {
+        editingReport = new ScheduledReport
+        {
+            Id = report.Id,
+            Name = report.Name,
+            ReportType = report.ReportType,
+            Format = report.Format,
+            Frequency = report.Frequency,
+            DayOfMonth = report.DayOfMonth,
+            DayOfWeek = report.DayOfWeek,
+            TimeOfDay = report.TimeOfDay,
+            PeriodType = report.PeriodType,
+            FundId = report.FundId,
+            EmailRecipients = report.EmailRecipients,
+            SaveToDocuments = report.SaveToDocuments,
+            PdfTheme = report.PdfTheme,
+            IncludeDetails = report.IncludeDetails,
+            IncludeCharts = report.IncludeCharts,
+            IsActive = report.IsActive,
+            CreatedAt = report.CreatedAt
+        };
+        selectedDayOfWeek = report.DayOfWeek ?? DayOfWeek.Monday;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        showForm = false;
+        editingReport = null;
+    }
+
+    private async Task SaveReport()
+    {
+        if (editingReport == null || string.IsNullOrWhiteSpace(editingReport.Name))
+        {
+            Toast.ShowWarning("Please enter a report name", "Required");
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            if (editingReport.Frequency == ScheduleFrequency.Weekly)
+                editingReport.DayOfWeek = selectedDayOfWeek;
+
+            await ScheduledReportService.SaveAsync(editingReport);
+            await LoadReports();
+            showForm = false;
+            editingReport = null;
+            Toast.ShowSuccess("Scheduled report saved", "Saved");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to save: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleActive(ScheduledReport report)
+    {
+        try
+        {
+            var newState = await ScheduledReportService.ToggleActiveAsync(report.Id);
+            report.IsActive = newState;
+            Toast.ShowSuccess(newState ? "Schedule activated" : "Schedule paused", "Updated");
+            await LoadReports();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to toggle: {ex.Message}");
+        }
+    }
+
+    private void ConfirmDelete(ScheduledReport report)
+    {
+        deletingReport = report;
+    }
+
+    private async Task DeleteReport()
+    {
+        if (deletingReport == null) return;
+        try
+        {
+            await ScheduledReportService.DeleteAsync(deletingReport.Id);
+            await LoadReports();
+            Toast.ShowSuccess("Scheduled report deleted", "Deleted");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to delete: {ex.Message}");
+        }
+        finally
+        {
+            deletingReport = null;
+        }
+    }
+
+    private static string GetScheduleDetail(ScheduledReport report)
+    {
+        return report.Frequency switch
+        {
+            ScheduleFrequency.Daily => $"at {report.TimeOfDay:HH:mm}",
+            ScheduleFrequency.Weekly => $"on {report.DayOfWeek ?? DayOfWeek.Monday}s at {report.TimeOfDay:HH:mm}",
+            ScheduleFrequency.Monthly => $"on day {report.DayOfMonth ?? 1} at {report.TimeOfDay:HH:mm}",
+            ScheduleFrequency.Quarterly => $"on day {report.DayOfMonth ?? 1} at {report.TimeOfDay:HH:mm}",
+            ScheduleFrequency.Yearly => $"on day {report.DayOfMonth ?? 1} at {report.TimeOfDay:HH:mm}",
+            _ => ""
+        };
+    }
+}

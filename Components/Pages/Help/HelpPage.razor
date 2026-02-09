@@ -14,125 +14,30 @@
         </div>
         
         <nav class="help-nav">
-            <div class="help-nav-section">
-                <h4><i class="fas fa-rocket"></i> Getting Started</h4>
-                <ul>
-                    <li class="@(Section == "welcome" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("welcome")'>Welcome & Overview</a>
-                    </li>
-                    <li class="@(Section == "quickstart" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("quickstart")'>Quick Start Guide</a>
-                    </li>
-                    <li class="@(Section == "navigation" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("navigation")'>Navigating the App</a>
-                    </li>
-                    <li class="@(Section == "shortcuts" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("shortcuts")'>Keyboard Shortcuts</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-dollar-sign"></i> Financial Management</h4>
-                <ul>
-                    <li class="@(Section == "transactions" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("transactions")'>Transactions</a>
-                    </li>
-                    <li class="@(Section == "categories" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("categories")'>Categories</a>
-                    </li>
-                    <li class="@(Section == "accounts" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("accounts")'>Accounts (Funds)</a>
-                    </li>
-                    <li class="@(Section == "budgets" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("budgets")'>Budgets</a>
-                    </li>
-                    <li class="@(Section == "recurring" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("recurring")'>Recurring Transactions</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-users"></i> Relationships</h4>
-                <ul>
-                    <li class="@(Section == "donors" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("donors")'>Donors</a>
-                    </li>
-                    <li class="@(Section == "grants" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("grants")'>Grants</a>
-                    </li>
-                    <li class="@(Section == "documents" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("documents")'>Documents</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-chart-bar"></i> Analysis & Reports</h4>
-                <ul>
-                    <li class="@(Section == "dashboard" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("dashboard")'>Dashboard</a>
-                    </li>
-                    <li class="@(Section == "reports" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("reports")'>Reports</a>
-                    </li>
-                    <li class="@(Section == "forms" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("forms")'>Printable Forms</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-shield-alt"></i> Compliance</h4>
-                <ul>
-                    <li class="@(Section == "compliance" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("compliance")'>Compliance Overview</a>
-                    </li>
-                    <li class="@(Section == "form990" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("form990")'>Form 990</a>
-                    </li>
-                    <li class="@(Section == "fundaccounting" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("fundaccounting")'>Fund Accounting</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-cog"></i> System</h4>
-                <ul>
-                    <li class="@(Section == "settings" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("settings")'>Settings</a>
-                    </li>
-                    <li class="@(Section == "spellcheck" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("spellcheck")'>Spell Check</a>
-                    </li>
-                    <li class="@(Section == "importexport" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("importexport")'>Import/Export</a>
-                    </li>
-                    <li class="@(Section == "backup" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("backup")'>Backup & Restore</a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="help-nav-section">
-                <h4><i class="fas fa-book"></i> Reference</h4>
-                <ul>
-                    <li class="@(Section == "glossary" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("glossary")'>Glossary</a>
-                    </li>
-                    <li class="@(Section == "workflows" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("workflows")'>Workflow Examples</a>
-                    </li>
-                    <li class="@(Section == "faq" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("faq")'>FAQ</a>
-                    </li>
-                    <li class="@(Section == "troubleshooting" ? "active" : "")">
-                        <a @onclick='() => NavigateTo("troubleshooting")'>Troubleshooting</a>
-                    </li>
-                </ul>
-            </div>
+            @foreach (var group in helpSections)
+            {
+                var visibleItems = group.Items.Where(i => MatchesSearch(i.Label)).ToList();
+                @if (visibleItems.Any())
+                {
+                    <div class="help-nav-section">
+                        <h4><i class="fas @group.Icon"></i> @group.Title</h4>
+                        <ul>
+                            @foreach (var item in visibleItems)
+                            {
+                                <li class="@(Section == item.Key ? "active" : "")">
+                                    <a @onclick="() => NavigateTo(item.Key)">@item.Label</a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            }
+            @if (!string.IsNullOrWhiteSpace(searchQuery) && !helpSections.Any(g => g.Items.Any(i => MatchesSearch(i.Label))))
+            {
+                <p class="text-muted" style="padding: 1rem; font-size: 0.9rem;">
+                    <i class="fas fa-search"></i> No help topics match "<strong>@searchQuery</strong>"
+                </p>
+            }
         </nav>
     </aside>
     
@@ -232,6 +137,60 @@
     public string? Section { get; set; }
     
     private string searchQuery = "";
+    
+    private record HelpItem(string Key, string Label);
+    private record HelpGroup(string Title, string Icon, List<HelpItem> Items);
+    
+    private static readonly List<HelpGroup> helpSections =
+    [
+        new("Getting Started", "fa-rocket", [
+            new("welcome", "Welcome & Overview"),
+            new("quickstart", "Quick Start Guide"),
+            new("navigation", "Navigating the App"),
+            new("shortcuts", "Keyboard Shortcuts")
+        ]),
+        new("Financial Management", "fa-dollar-sign", [
+            new("transactions", "Transactions"),
+            new("categories", "Categories"),
+            new("accounts", "Accounts (Funds)"),
+            new("budgets", "Budgets"),
+            new("recurring", "Recurring Transactions")
+        ]),
+        new("Relationships", "fa-users", [
+            new("donors", "Donors"),
+            new("grants", "Grants"),
+            new("documents", "Documents")
+        ]),
+        new("Analysis & Reports", "fa-chart-bar", [
+            new("dashboard", "Dashboard"),
+            new("reports", "Reports"),
+            new("forms", "Printable Forms")
+        ]),
+        new("Compliance", "fa-shield-alt", [
+            new("compliance", "Compliance Overview"),
+            new("form990", "Form 990"),
+            new("fundaccounting", "Fund Accounting")
+        ]),
+        new("System", "fa-cog", [
+            new("settings", "Settings"),
+            new("spellcheck", "Spell Check"),
+            new("importexport", "Import/Export"),
+            new("backup", "Backup & Restore")
+        ]),
+        new("Reference", "fa-book", [
+            new("glossary", "Glossary"),
+            new("workflows", "Workflow Examples"),
+            new("faq", "FAQ"),
+            new("troubleshooting", "Troubleshooting")
+        ])
+    ];
+    
+    private bool MatchesSearch(string label)
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+            return true;
+        return label.Contains(searchQuery, StringComparison.OrdinalIgnoreCase);
+    }
     
     private void NavigateTo(string section)
     {

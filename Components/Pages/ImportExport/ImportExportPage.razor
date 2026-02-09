@@ -80,36 +80,36 @@
                     </label>
                 </div>
                 
-                <h4>Column Mapping</h4>
+                <h4>Column Mapping <small class="text-muted" style="font-weight: normal;">(Column 1 = first column in your CSV)</small></h4>
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Date Column</label>
-                        <input type="number" class="form-control" @bind="dateColumn" min="0" />
+                        <input type="number" class="form-control" @bind="dateColumn" min="1" />
                     </div>
                     <div class="form-group">
                         <label class="form-label">Amount Column</label>
-                        <input type="number" class="form-control" @bind="amountColumn" min="0" />
+                        <input type="number" class="form-control" @bind="amountColumn" min="1" />
                     </div>
                     <div class="form-group">
                         <label class="form-label">Description Column</label>
-                        <input type="number" class="form-control" @bind="descriptionColumn" min="0" />
+                        <input type="number" class="form-control" @bind="descriptionColumn" min="1" />
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Type Column (optional)</label>
-                        <input type="number" class="form-control" @bind="typeColumn" min="0" placeholder="e.g., 3" />
+                        <input type="number" class="form-control" @bind="typeColumn" min="1" placeholder="e.g., 4" />
                         <small class="text-muted">Column with Income/Expense/Transfer</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Category Column (optional)</label>
-                        <input type="number" class="form-control" @bind="categoryColumn" min="0" />
+                        <input type="number" class="form-control" @bind="categoryColumn" min="1" />
                         <small class="text-muted">Name of category</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Account Column (optional)</label>
-                        <input type="number" class="form-control" @bind="fundColumn" min="0" />
+                        <input type="number" class="form-control" @bind="fundColumn" min="1" />
                         <small class="text-muted">Name of fund/account</small>
                     </div>
                 </div>
@@ -117,17 +117,17 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Donor Column (optional)</label>
-                        <input type="number" class="form-control" @bind="donorColumn" min="0" />
+                        <input type="number" class="form-control" @bind="donorColumn" min="1" />
                         <small class="text-muted">Donor name for income transactions</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Payee Column (optional)</label>
-                        <input type="number" class="form-control" @bind="payeeColumn" min="0" />
+                        <input type="number" class="form-control" @bind="payeeColumn" min="1" />
                         <small class="text-muted">Who received/paid the money</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Balance Column (optional)</label>
-                        <input type="number" class="form-control" @bind="balanceColumn" min="0" />
+                        <input type="number" class="form-control" @bind="balanceColumn" min="1" />
                         <small class="text-muted">Running balance from bank statement</small>
                     </div>
                 </div>
@@ -460,12 +460,12 @@
 private string importTab = "transactions";
 private IBrowserFile? selectedFile;
 private bool hasHeaderRow = true;
-private int dateColumn = 0;
-private int amountColumn = 1;
-private int descriptionColumn = 2;
-private int? typeColumn = 3; // Default to column 3 (Type in exported CSV)
-private int? categoryColumn = 4; // Default to column 4 (Category in exported CSV)
-private int? fundColumn = 5; // Default to column 5 (Fund/Account in exported CSV)
+private int dateColumn = 1;
+private int amountColumn = 2;
+private int descriptionColumn = 3;
+private int? typeColumn = 4; // Default to column 4 (Type in exported CSV)
+private int? categoryColumn = 5; // Default to column 5 (Category in exported CSV)
+private int? fundColumn = 6; // Default to column 6 (Fund/Account in exported CSV)
 private int? donorColumn = null; // Donor column (optional)
 private int? payeeColumn = null; // Payee column (optional)
 private int? balanceColumn = null; // Balance column (optional, for bank statements)
@@ -539,9 +539,16 @@ private async Task PreviewImport()
             memoryStream.Position = 0;
 
             var mapping = new ImportMappingConfig(
-                dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, fundColumn, donorColumn, null, typeColumn,
-                payeeColumn, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
+                dateColumn - 1, amountColumn - 1, descriptionColumn - 1,
+                categoryColumn.HasValue ? categoryColumn - 1 : null,
+                fundColumn.HasValue ? fundColumn - 1 : null,
+                donorColumn.HasValue ? donorColumn - 1 : null,
+                null,
+                typeColumn.HasValue ? typeColumn - 1 : null,
+                payeeColumn.HasValue ? payeeColumn - 1 : null,
+                null,
+                balanceColumn.HasValue ? balanceColumn - 1 : null,
+                defaultFundId, hasHeaderRow, dateFormat);
 
             previewResult = await ImportExportService.PreviewImportAsync(memoryStream, mapping);
         }
@@ -573,9 +580,16 @@ private async Task PreviewImport()
             memoryStream.Position = 0;
 
             var mapping = new ImportMappingConfig(
-                dateColumn, amountColumn, descriptionColumn,
-                categoryColumn, fundColumn, donorColumn, null, typeColumn,
-                payeeColumn, null, balanceColumn, defaultFundId, hasHeaderRow, dateFormat);
+                dateColumn - 1, amountColumn - 1, descriptionColumn - 1,
+                categoryColumn.HasValue ? categoryColumn - 1 : null,
+                fundColumn.HasValue ? fundColumn - 1 : null,
+                donorColumn.HasValue ? donorColumn - 1 : null,
+                null,
+                typeColumn.HasValue ? typeColumn - 1 : null,
+                payeeColumn.HasValue ? payeeColumn - 1 : null,
+                null,
+                balanceColumn.HasValue ? balanceColumn - 1 : null,
+                defaultFundId, hasHeaderRow, dateFormat);
 
             // Store mapping for error report generation
             lastMappingConfig = mapping;
@@ -762,16 +776,16 @@ private async Task PreviewImport()
 
     private void ApplyPreset(ImportPreset preset)
     {
-        dateColumn = preset.DateColumn;
-        amountColumn = preset.AmountColumn;
-        descriptionColumn = preset.DescriptionColumn;
-        typeColumn = preset.TypeColumn;
-        categoryColumn = preset.CategoryColumn;
-        fundColumn = preset.FundColumn;
-        donorColumn = preset.DonorColumn;
-        payeeColumn = preset.PayeeColumn;
-        balanceColumn = preset.BalanceColumn; // NEW
-        defaultFundId = preset.DefaultFundId; // NEW
+        dateColumn = preset.DateColumn + 1;
+        amountColumn = preset.AmountColumn + 1;
+        descriptionColumn = preset.DescriptionColumn + 1;
+        typeColumn = preset.TypeColumn.HasValue ? preset.TypeColumn + 1 : null;
+        categoryColumn = preset.CategoryColumn.HasValue ? preset.CategoryColumn + 1 : null;
+        fundColumn = preset.FundColumn.HasValue ? preset.FundColumn + 1 : null;
+        donorColumn = preset.DonorColumn.HasValue ? preset.DonorColumn + 1 : null;
+        payeeColumn = preset.PayeeColumn.HasValue ? preset.PayeeColumn + 1 : null;
+        balanceColumn = preset.BalanceColumn.HasValue ? preset.BalanceColumn + 1 : null;
+        defaultFundId = preset.DefaultFundId;
         hasHeaderRow = preset.HasHeaderRow;
         dateFormat = preset.DateFormat;
         StateHasChanged();
@@ -801,15 +815,15 @@ private async Task PreviewImport()
                 Name = newPresetName.Trim(),
                 Description = string.IsNullOrWhiteSpace(newPresetDescription) ? null : newPresetDescription.Trim(),
                 ImportType = importTab,
-                DateColumn = dateColumn,
-                AmountColumn = amountColumn,
-                DescriptionColumn = descriptionColumn,
-                TypeColumn = typeColumn,
-                CategoryColumn = categoryColumn,
-                FundColumn = fundColumn,
-                DonorColumn = donorColumn,
-                PayeeColumn = payeeColumn,
-                BalanceColumn = balanceColumn,
+                DateColumn = dateColumn - 1,
+                AmountColumn = amountColumn - 1,
+                DescriptionColumn = descriptionColumn - 1,
+                TypeColumn = typeColumn.HasValue ? typeColumn - 1 : null,
+                CategoryColumn = categoryColumn.HasValue ? categoryColumn - 1 : null,
+                FundColumn = fundColumn.HasValue ? fundColumn - 1 : null,
+                DonorColumn = donorColumn.HasValue ? donorColumn - 1 : null,
+                PayeeColumn = payeeColumn.HasValue ? payeeColumn - 1 : null,
+                BalanceColumn = balanceColumn.HasValue ? balanceColumn - 1 : null,
                 DefaultFundId = defaultFundId,
                 HasHeaderRow = hasHeaderRow,
                 DateFormat = dateFormat,

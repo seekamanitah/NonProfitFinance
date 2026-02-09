@@ -1,0 +1,210 @@
+@page "/audit-log"
+@inject IAuditService AuditService
+@inject IToastService Toast
+@rendermode InteractiveServer
+
+<PageTitle>Audit Log - NonProfit Finance</PageTitle>
+
+<div class="d-flex justify-between align-center mb-3 flex-wrap gap-2">
+    <h2 style="margin: 0;"><i class="fas fa-history"></i> Audit Log</h2>
+    <button class="btn btn-outline btn-sm" @onclick="RefreshLogs">
+        <i class="fas fa-sync"></i> <span class="hide-mobile">Refresh</span>
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="form-row flex-wrap gap-2">
+            <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" @bind="startDate" @bind:event="onchange" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" @bind="endDate" @bind:event="onchange" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Entity Type</label>
+                <select class="form-control" @bind="entityTypeFilter">
+                    <option value="">All Entities</option>
+                    @foreach (var et in entityTypes)
+                    {
+                        <option value="@et">@et</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Action</label>
+                <select class="form-control" @bind="actionFilter">
+                    <option value="">All Actions</option>
+                    @foreach (var a in actionTypes)
+                    {
+                        <option value="@a">@a</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Max Results</label>
+                <select class="form-control" @bind="maxResults">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="250">250</option>
+                    <option value="500">500</option>
+                </select>
+            </div>
+            <div class="form-group" style="align-self: flex-end;">
+                <button class="btn btn-primary" @onclick="LoadLogs">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Count="8" />
+}
+else if (!logs.Any())
+{
+    <div class="card">
+        <div class="card-body text-center text-muted" style="padding: 3rem;">
+            <i class="fas fa-clipboard-list" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
+            <h4>No audit log entries found</h4>
+            <p>Adjust your filters or date range to see activity.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-between align-center">
+                <h3 class="card-title">Results (@logs.Count entries)</h3>
+            </div>
+        </div>
+        <div class="card-body" style="padding: 0; overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th class="hide-mobile">ID</th>
+                        <th>Description</th>
+                        <th class="hide-mobile">User</th>
+                        <th class="hide-mobile">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in logs)
+                    {
+                        <tr>
+                            <td style="white-space: nowrap;">
+                                <span title="@log.Timestamp.ToString("f")">
+                                    @log.Timestamp.ToLocalTime().ToString("MMM dd, HH:mm")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge @GetActionBadgeClass(log.Action)">
+                                    <i class="fas @GetActionIcon(log.Action)" aria-hidden="true"></i> @log.Action
+                                </span>
+                            </td>
+                            <td>@log.EntityType</td>
+                            <td class="hide-mobile">@log.EntityId</td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                                title="@log.Description">
+                                @(log.Description ?? "—")
+                            </td>
+                            <td class="hide-mobile">@(log.UserName ?? "System")</td>
+                            <td class="hide-mobile">@(log.IpAddress ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AuditLogDto> logs = new();
+    private bool isLoading = true;
+
+    private DateTime? startDate = DateTime.Today.AddDays(-30);
+    private DateTime? endDate = DateTime.Today;
+    private string? entityTypeFilter;
+    private string? actionFilter;
+    private int maxResults = 100;
+
+    private readonly string[] entityTypes = ["Transaction", "Fund", "Category", "Donor", "Grant", "Budget", "Document"];
+    private readonly string[] actionTypes = [AuditAction.Create, AuditAction.Update, AuditAction.Delete,
+        AuditAction.Restore, AuditAction.Export, AuditAction.Import, AuditAction.Backup, AuditAction.Transfer];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var filter = new AuditLogFilterRequest(
+                EntityType: string.IsNullOrEmpty(entityTypeFilter) ? null : entityTypeFilter,
+                EntityId: null,
+                Action: string.IsNullOrEmpty(actionFilter) ? null : actionFilter,
+                UserId: null,
+                StartDate: startDate,
+                EndDate: endDate?.AddDays(1), // include the full end date
+                MaxResults: maxResults
+            );
+            logs = await AuditService.GetLogsAsync(filter);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to load audit logs: {ex.Message}");
+            logs = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshLogs()
+    {
+        await LoadLogs();
+    }
+
+    private static string GetActionBadgeClass(string action) => action switch
+    {
+        AuditAction.Create => "badge-success",
+        AuditAction.Update => "badge-info",
+        AuditAction.Delete => "badge-danger",
+        AuditAction.PermanentDelete => "badge-danger",
+        AuditAction.Restore => "badge-warning",
+        AuditAction.Export => "badge-info",
+        AuditAction.Import => "badge-info",
+        AuditAction.Transfer => "badge-warning",
+        AuditAction.Backup => "badge-info",
+        _ => "badge-info"
+    };
+
+    private static string GetActionIcon(string action) => action switch
+    {
+        AuditAction.Create => "fa-plus-circle",
+        AuditAction.Update => "fa-edit",
+        AuditAction.Delete => "fa-trash",
+        AuditAction.PermanentDelete => "fa-trash-alt",
+        AuditAction.Restore => "fa-undo",
+        AuditAction.Export => "fa-download",
+        AuditAction.Import => "fa-upload",
+        AuditAction.Transfer => "fa-exchange-alt",
+        AuditAction.Backup => "fa-database",
+        _ => "fa-circle"
+    };
+}

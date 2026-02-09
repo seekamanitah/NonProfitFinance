@@ -29,6 +29,31 @@
     </div>
 </div>
 
+<!-- Filter Bar -->
+<div class="d-flex gap-3 align-center mb-3 flex-wrap">
+    <SearchInput 
+        @bind-Value="searchTerm"
+        OnSearch="OnSearchChanged"
+        Placeholder="Search accounts..."
+        AriaLabel="Search accounts"
+        ShowClearButton="true"
+        DebounceMs="300" />
+    
+    <div class="form-group" style="margin-bottom: 0;">
+        <select class="form-control" value="@typeFilter" @onchange="OnTypeFilterChanged" aria-label="Filter by fund type">
+            <option value="">All Types</option>
+            @foreach (var type in Enum.GetValues<FundType>())
+            {
+                <option value="@type">@type</option>
+            }
+        </select>
+    </div>
+    
+    <label class="d-flex align-center gap-2">
+        <input type="checkbox" @bind="showInactive" @bind:after="StateHasChanged" /> Show Inactive
+    </label>
+</div>
+
 <!-- Summary Cards -->
 @if (isLoading)
 {
@@ -81,14 +106,14 @@ else
 
 <!-- Accounts List -->
 <PageWrapper IsLoading="@isLoading" 
-             IsEmpty="@(!funds.Any())"
-             EmptyIcon="fas fa-wallet"
-             EmptyTitle="No Accounts Created"
-             EmptyMessage="Click 'Add Account' to create your first account.">
-    <Content>
-        <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
-            @foreach (var fund in funds)
-            {
+         IsEmpty="@(!FilteredFunds.Any())"
+         EmptyIcon="fas fa-wallet"
+         EmptyTitle="No Accounts Found"
+         EmptyMessage="No accounts match your filters. Try adjusting your search criteria.">
+<Content>
+    <div class="charts-grid" style="grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));">
+        @foreach (var fund in FilteredFunds)
+        {
                 <div class="card" @key="fund.Id">
                 <div class="card-header">
                     <h4 style="margin: 0;">@fund.Name</h4>
@@ -168,11 +193,22 @@ else
 private List<FundDto> funds = new();
 private FundDto? editingFund;
 private FundDto? fundToDelete;
+private string searchTerm = "";
+private FundType? typeFilter;
+private bool showInactive = true;
 private bool isLoading = true;
 private bool isRecalculating = false;
 private bool isDeleting = false;
 private bool showForm = false;
 private bool showDeleteConfirm = false;
+
+private IEnumerable<FundDto> FilteredFunds => funds
+    .Where(f => showInactive || f.IsActive)
+    .Where(f => string.IsNullOrEmpty(searchTerm) ||
+                f.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                (f.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+    .Where(f => !typeFilter.HasValue || f.Type == typeFilter.Value)
+    .OrderBy(f => f.Name);
     
 // Calculated summaries
 private decimal unrestrictedTotal = 0;
@@ -289,6 +325,25 @@ private async Task RecalculateBalances()
     private void CloseForm()
     {
         showForm = false;
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTypeFilterChanged(ChangeEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Value?.ToString()))
+        {
+            typeFilter = null;
+        }
+        else if (Enum.TryParse<FundType>(e.Value.ToString(), out var type))
+        {
+            typeFilter = type;
+        }
+        StateHasChanged();
     }
 
     private decimal GetPercentage(FundDto fund)

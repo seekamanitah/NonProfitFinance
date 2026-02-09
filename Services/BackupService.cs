@@ -15,9 +15,6 @@ public class BackupService : IBackupService
     private readonly string _settingsFilePath;
     private readonly byte[] _encryptionKey;
     private BackupSettings _settings;
-    
-    // Default key used only if configuration is missing - HIGH-04 fix
-    private const string FallbackKeyBase64 = "QXVkaXRSZW1lZGlhdGlvbjIwMjZLZXk9MDEyMzQ1Njc4OWFiY2RlZg==";
 
     public BackupService(
         IConfiguration configuration,
@@ -29,7 +26,7 @@ public class BackupService : IBackupService
         _scopeFactory = scopeFactory;
         _logger = logger;
         
-        // Load encryption key from configuration or use fallback - HIGH-04 fix
+        // Load encryption key from configuration - HIGH-04 fix
         var configuredKey = _configuration["Backup:EncryptionKey"];
         if (!string.IsNullOrEmpty(configuredKey))
         {
@@ -37,8 +34,12 @@ public class BackupService : IBackupService
         }
         else
         {
-            _logger.LogWarning("Backup:EncryptionKey not configured. Using fallback key. Configure a secure key in production!");
-            _encryptionKey = Convert.FromBase64String(FallbackKeyBase64);
+            // Generate a machine-specific key derived from the machine name + app path
+            // This is more secure than a hardcoded fallback, but config-based key is still recommended
+            _logger.LogWarning("Backup:EncryptionKey not configured. Generating machine-specific key. " +
+                "Configure 'Backup:EncryptionKey' in appsettings.json for production use!");
+            var keyMaterial = $"{Environment.MachineName}:{environment.ContentRootPath}:NonProfitFinance";
+            _encryptionKey = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(keyMaterial));
         }
         
         // Store settings in app data folder

@@ -168,7 +168,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var tx in donorContributions.Take(10))
+                            @foreach (var tx in donorContributions)
                             {
                                 <tr>
                                     <td>@tx.Date.ToString("MMM dd, yyyy")</td>
@@ -178,10 +178,44 @@ else
                             }
                         </tbody>
                     </table>
+                    @if (donorContributions.Count > 20)
+                    {
+                        <p class="text-muted mt-1">Showing all @donorContributions.Count contributions</p>
+                    }
                 }
                 else
                 {
                     <p class="text-muted">No contributions recorded</p>
+                }
+                
+                <!-- Communication Log -->
+                <h4 class="mb-2 mt-3"><i class="fas fa-comments"></i> Communication Log</h4>
+                <div class="d-flex gap-2 mb-2">
+                    <input type="text" class="form-control" @bind="newCommNote" 
+                           placeholder="Add a communication note..." 
+                           @onkeydown="HandleCommKeyDown" />
+                    <button class="btn btn-sm btn-primary" @onclick="AddCommunicationNote" 
+                            disabled="@string.IsNullOrWhiteSpace(newCommNote)">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                @if (communicationEntries.Any())
+                {
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        @foreach (var entry in communicationEntries)
+                        {
+                            <div style="padding: 0.5rem; border-left: 3px solid var(--color-primary); margin-bottom: 0.5rem; background: var(--bg-secondary); border-radius: 0 4px 4px 0;">
+                                <div class="d-flex justify-between">
+                                    <small class="text-muted"><i class="fas fa-clock"></i> @entry.Date</small>
+                                </div>
+                                <div style="margin-top: 0.25rem;">@entry.Text</div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted" style="font-size: 0.85rem;">No communication notes yet</p>
                 }
             </div>
             <div class="modal-footer">
@@ -213,6 +247,10 @@ private DonorType? typeFilter;
 private bool showInactive = false;
 private bool isLoading = true;
 private bool showForm = false;
+private string newCommNote = "";
+private List<CommEntry> communicationEntries = new();
+
+private record CommEntry(string Date, string Text);
 
 private IEnumerable<DonorDto> FilteredDonors => donors
     .Where(d => showInactive || d.IsActive)
@@ -276,6 +314,7 @@ private async Task LoadDonors()
     private async Task SelectDonor(DonorDto donor)
     {
         selectedDonor = donor;
+        ParseCommunicationLog(donor.Notes);
         try
         {
             donorContributions = await DonorService.GetContributionHistoryAsync(donor.Id);
@@ -284,6 +323,61 @@ private async Task LoadDonors()
         {
             donorContributions = new();
             Toast.ShowError($"Failed to load contributions: {ex.Message}");
+        }
+    }
+
+    private void ParseCommunicationLog(string? notes)
+    {
+        communicationEntries = new();
+        if (string.IsNullOrEmpty(notes)) return;
+        
+        foreach (var line in notes.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Format: [YYYY-MM-DD HH:mm] Note text
+            if (line.StartsWith('[') && line.Length > 18 && line[17] == ']')
+            {
+                communicationEntries.Add(new CommEntry(line[1..17], line[19..]));
+            }
+        }
+        communicationEntries.Reverse(); // newest first
+    }
+
+    private async Task AddCommunicationNote()
+    {
+        if (selectedDonor == null || string.IsNullOrWhiteSpace(newCommNote)) return;
+        
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        var entry = $"[{timestamp}] {newCommNote.Trim()}";
+        var updatedNotes = string.IsNullOrEmpty(selectedDonor.Notes) 
+            ? entry 
+            : selectedDonor.Notes + "\n" + entry;
+        
+        try
+        {
+            await DonorService.UpdateAsync(selectedDonor.Id, new UpdateDonorRequest(
+                selectedDonor.Name, selectedDonor.Type, selectedDonor.Email,
+                selectedDonor.Phone, selectedDonor.Address, updatedNotes,
+                selectedDonor.IsAnonymous, selectedDonor.IsActive));
+            
+            // Update local state
+            selectedDonor = selectedDonor with { Notes = updatedNotes };
+            ParseCommunicationLog(updatedNotes);
+            newCommNote = "";
+            
+            // Refresh the donor list to reflect updated notes
+            await LoadDonors();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Failed to add note: {ex.Message}");
+        }
+    }
+
+    private async Task HandleCommKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddCommunicationNote();
         }
     }
 

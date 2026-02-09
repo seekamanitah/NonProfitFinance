@@ -212,9 +212,21 @@
                             <option value="">No grant / General funds</option>
                             @foreach (var grant in grants)
                             {
-                                <option value="@grant.Id">@grant.Name</option>
+                                <option value="@grant.Id">@grant.Name (@FormatCurrency(grant.RemainingBalance) remaining)</option>
                             }
                         </InputSelect>
+                        @if (model.GrantId.HasValue && model.GrantId > 0 && model.Amount > 0)
+                        {
+                            var selectedGrant = grants.FirstOrDefault(g => g.Id == model.GrantId);
+                            @if (selectedGrant != null && model.Amount > selectedGrant.RemainingBalance)
+                            {
+                                <div class="alert alert-warning mt-2" style="padding: 0.5rem; font-size: 0.85rem;">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <strong>Warning:</strong> Amount (@FormatCurrency(model.Amount)) exceeds grant remaining balance (@FormatCurrency(selectedGrant.RemainingBalance)).
+                                    This transaction will be blocked on save.
+                                </div>
+                            }
+                        }
                     </div>
                 }
                 
@@ -230,6 +242,13 @@
                         <label class="form-label">Tags</label>
                         <InputText class="form-control" @bind-Value="model.Tags" 
                                    placeholder="Comma-separated tags" />
+                    </div>
+                    
+                    <div class="form-group" style="align-self: flex-end;">
+                        <label class="d-flex align-center gap-2" style="cursor: pointer;">
+                            <InputCheckbox @bind-Value="model.IsReconciled" />
+                            <i class="fas fa-check-double" style="color: var(--color-success);"></i> Reconciled
+                        </label>
                     </div>
                 </div>
                 
@@ -410,7 +429,8 @@ private void OnSplitAmountChanged(int index, ChangeEventArgs e)
                 GrantId = Transaction.GrantId,
                 Payee = Transaction.Payee,
                 Tags = Transaction.Tags,
-                ReferenceNumber = Transaction.ReferenceNumber
+                ReferenceNumber = Transaction.ReferenceNumber,
+                IsReconciled = Transaction.IsReconciled
             };
 
             // Restore split state when editing a split transaction
@@ -628,7 +648,7 @@ private void OnSplitAmountChanged(int index, ChangeEventArgs e)
                     model.Tags,
                     model.ReferenceNumber,
                     null, // PONumber
-                    false, // IsReconciled
+                    model.IsReconciled,
                     splitRequests
                 ));
             }
@@ -687,6 +707,7 @@ private void OnSplitAmountChanged(int index, ChangeEventArgs e)
         public string? Payee { get; set; }
         public string? Tags { get; set; }
         public string? ReferenceNumber { get; set; }
+        public bool IsReconciled { get; set; }
     }
 
     private class SplitItem
@@ -717,4 +738,6 @@ private void OnSplitAmountChanged(int index, ChangeEventArgs e)
             splits.Add(new SplitItem { Amount = model.Amount / 2 });
         }
     }
+
+    private static string FormatCurrency(decimal amount) => amount.ToString("C2");
 }

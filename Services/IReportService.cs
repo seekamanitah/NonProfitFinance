@@ -8,6 +8,7 @@ public interface IReportService
     Task<IncomeExpenseSummaryDto> GetIncomeExpenseSummaryAsync(ReportFilterRequest filter);
     Task<List<CategorySummaryDto>> GetCategoryBreakdownAsync(ReportFilterRequest filter);
     Task<List<TrendDataDto>> GetTrendDataAsync(DateTime startDate, DateTime endDate, string interval = "monthly");
+    Task<List<TrendDataDto>> GetTrendDataAsync(ReportFilterRequest filter, string interval = "monthly");
     Task<decimal> GetYtdRevenueAsync();
     Task<bool> IsApproachingAuditThresholdAsync();
 }

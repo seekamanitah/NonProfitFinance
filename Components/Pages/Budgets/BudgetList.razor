@@ -12,7 +12,7 @@
         <p class="text-muted">Track spending against budget targets</p>
     </div>
     <div class="d-flex gap-2">
-        <select class="form-control" @bind="selectedYear">
+        <select class="form-control" value="@selectedYear" @onchange="OnYearChanged">
             @for (int year = DateTime.Today.Year + 1; year >= DateTime.Today.Year - 3; year--)
             {
                 <option value="@year">FY @year</option>
@@ -26,6 +26,21 @@
         </button>
     </div>
 </div>
+
+@if (budget != null && budget.LineItems.Any())
+{
+    <div class="d-flex gap-3 align-center mb-3">
+        <SearchInput @bind-Value="budgetSearch" 
+                     Placeholder="Search categories..." 
+                     OnSearch="OnBudgetSearchChanged"
+                     DebounceMs="300"
+                     Style="width: 250px;" />
+        <label class="d-flex align-center gap-2" style="margin-bottom: 0;">
+            <input type="checkbox" checked="@showOverBudgetOnly" @onchange="OnOverBudgetToggled" />
+            Over Budget Only
+        </label>
+    </div>
+}
 
 @if (isLoading)
 {
@@ -136,7 +151,7 @@ else if (budget != null)
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var item in budget.LineItems.OrderByDescending(l => l.PercentageUsed))
+                        @foreach (var item in FilteredLineItems)
                         {
                             var isOverBudget = item.Variance < 0;
                             <tr>
@@ -205,17 +220,47 @@ else if (budget != null)
 }
 
 @code {
-    private int selectedYear = DateTime.Today.Year;
-    private BudgetDto? budget;
-    private bool isLoading = true;
-    private bool showBudgetForm = false;
-    private BudgetDto? selectedBudget;
-    private bool isEdit = false;
+private int selectedYear = DateTime.Today.Year;
+private BudgetDto? budget;
+private bool isLoading = true;
+private bool showBudgetForm = false;
+private BudgetDto? selectedBudget;
+private bool isEdit = false;
+private string budgetSearch = "";
+private bool showOverBudgetOnly = false;
 
-    protected override async Task OnInitializedAsync()
+private IEnumerable<BudgetLineItemDto> FilteredLineItems =>
+    (budget?.LineItems ?? Enumerable.Empty<BudgetLineItemDto>())
+        .Where(l => string.IsNullOrEmpty(budgetSearch) ||
+                    l.CategoryName.Contains(budgetSearch, StringComparison.OrdinalIgnoreCase))
+        .Where(l => !showOverBudgetOnly || l.Variance < 0)
+        .OrderByDescending(l => l.PercentageUsed);
+
+protected override async Task OnInitializedAsync()
+{
+    await LoadBudget();
+}
+
+private async Task OnYearChanged(ChangeEventArgs e)
+{
+    if (int.TryParse(e.Value?.ToString(), out var year))
     {
+        selectedYear = year;
         await LoadBudget();
     }
+}
+
+private void OnBudgetSearchChanged(string value)
+{
+    budgetSearch = value;
+    StateHasChanged();
+}
+
+private void OnOverBudgetToggled(ChangeEventArgs e)
+{
+    showOverBudgetOnly = (bool)(e.Value ?? false);
+    StateHasChanged();
+}
 
     private async Task LoadBudget()
     {

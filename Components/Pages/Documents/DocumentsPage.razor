@@ -26,12 +26,14 @@
     <div class="card-body">
         <div class="d-flex gap-3 flex-wrap align-center">
             <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
-                <input type="text" class="form-control" placeholder="Search documents..." 
-                       @bind="searchTerm" @bind:event="oninput" />
+                <SearchInput @bind-Value="searchTerm" 
+                             Placeholder="Search documents..." 
+                             OnSearch="OnSearchChanged"
+                             DebounceMs="300" />
             </div>
             
             <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control" @bind="typeFilter">
+                <select class="form-control" value="@typeFilter" @onchange="OnTypeFilterChanged">
                     <option value="">All Types</option>
                     @foreach (var type in Enum.GetValues<DocumentType>())
                     {
@@ -41,7 +43,7 @@
             </div>
             
             <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control" @bind="grantFilter">
+                <select class="form-control" value="@grantFilter" @onchange="OnGrantFilterChanged">
                     <option value="">All Grants</option>
                     @foreach (var grant in grants)
                     {
@@ -51,7 +53,7 @@
             </div>
             
             <div class="form-group" style="margin-bottom: 0;">
-                <select class="form-control" @bind="donorFilter">
+                <select class="form-control" value="@donorFilter" @onchange="OnDonorFilterChanged">
                     <option value="">All Donors</option>
                     @foreach (var donor in donors)
                     {
@@ -61,13 +63,9 @@
             </div>
             
             <label class="d-flex align-center gap-2" style="margin-bottom: 0;">
-                <input type="checkbox" @bind="includeArchived" />
+                <input type="checkbox" checked="@includeArchived" @onchange="OnArchivedChanged" />
                 Include Archived
             </label>
-            
-            <button class="btn btn-outline" @onclick="LoadDocuments">
-                <i class="fas fa-search"></i> Search
-            </button>
         </div>
     </div>
 </div>
@@ -382,6 +380,40 @@ else
         {
             ToastService.ShowError($"Failed to load filter options: {ex.Message}");
         }
+        await LoadDocuments();
+    }
+
+    private async void OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        await LoadDocuments();
+        StateHasChanged();
+    }
+
+    private async Task OnTypeFilterChanged(ChangeEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Value?.ToString()))
+            typeFilter = null;
+        else if (Enum.TryParse<DocumentType>(e.Value.ToString(), out var type))
+            typeFilter = type;
+        await LoadDocuments();
+    }
+
+    private async Task OnGrantFilterChanged(ChangeEventArgs e)
+    {
+        grantFilter = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await LoadDocuments();
+    }
+
+    private async Task OnDonorFilterChanged(ChangeEventArgs e)
+    {
+        donorFilter = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await LoadDocuments();
+    }
+
+    private async Task OnArchivedChanged(ChangeEventArgs e)
+    {
+        includeArchived = (bool)(e.Value ?? false);
         await LoadDocuments();
     }
 

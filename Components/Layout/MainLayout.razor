@@ -23,6 +23,9 @@
                 <i class="fas fa-fire-extinguisher" aria-hidden="true"></i>
             </div>
             <span class="sidebar-title">NonProfit Finance</span>
+            <button class="btn-collapse-sidebar d-desktop-only" @onclick="ToggleSidebar" aria-label="@(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")" title="@(sidebarCollapsed ? "Expand" : "Collapse")">
+                <i class="fas @(sidebarCollapsed ? "fa-chevron-right" : "fa-chevron-left")" aria-hidden="true"></i>
+            </button>
             <button class="btn-close-mobile d-mobile-only" @onclick="CloseMobileMenu" aria-label="Close menu">
                 <i class="fas fa-times"></i>
             </button>
@@ -76,6 +79,21 @@
         padding: 0.5rem;
         cursor: pointer;
         margin-left: auto;
+    }
+    
+    .btn-collapse-sidebar {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        margin-left: auto;
+        border-radius: 4px;
+        transition: background 0.2s;
+    }
+    
+    .btn-collapse-sidebar:hover {
+        background: rgba(255, 255, 255, 0.1);
     }
     
     .btn-hamburger {
@@ -161,6 +179,16 @@ private void ToggleMobileMenu()
     mobileMenuOpen = !mobileMenuOpen;
 }
 
+private async Task ToggleSidebar()
+{
+    sidebarCollapsed = !sidebarCollapsed;
+    try
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", "sidebarCollapsed", sidebarCollapsed.ToString().ToLower());
+    }
+    catch { }
+}
+
 private void CloseMobileMenu()
 {
     mobileMenuOpen = false;
@@ -189,6 +217,13 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
                 // Initialize theme manager and get current theme
                 await JS.InvokeVoidAsync("themeManager.init");
                 currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+                
+                // Restore sidebar collapsed state from localStorage
+                var savedCollapsed = await JS.InvokeAsync<string?>("localStorage.getItem", "sidebarCollapsed");
+                if (savedCollapsed == "true")
+                {
+                    sidebarCollapsed = true;
+                }
                 StateHasChanged();
                 
                 // Initialize keyboard shortcuts
@@ -263,12 +298,6 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
             Console.WriteLine($"Theme toggle error: {ex.Message}");
             // Already toggled optimistically, so leave as is
         }
-    }
-
-    public void SetPageTitle(string title)
-    {
-        // No longer used, but kept for compatibility
-        StateHasChanged();
     }
 
     public void Dispose()

@@ -4,6 +4,8 @@
 @inject ITransactionService TransactionService
 @inject ICategoryService CategoryService
 @inject IFundService FundService
+@inject IDonorService DonorService
+@inject IGrantService GrantService
 @inject ITextToSpeechService TtsService
 @inject IToastService Toast
 @inject NavigationManager Navigation
@@ -11,22 +13,22 @@
 
 <PageTitle>Transactions - NonProfit Finance</PageTitle>
 
-<div class="d-flex justify-between align-center mb-3">
+<div class="d-flex justify-between align-center mb-3 flex-wrap gap-2">
     <div>
         <h2 style="margin: 0;">Transactions</h2>
     </div>
-    <div class="d-flex gap-2">
-        <a href="/transactions/duplicates" class="btn btn-outline" title="Find duplicate transactions">
-            <i class="fas fa-clone"></i> Duplicates
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/transactions/duplicates" class="btn btn-outline btn-sm" title="Find duplicate transactions">
+            <i class="fas fa-clone"></i> <span class="hide-mobile">Duplicates</span>
         </a>
-        <a href="/transactions/recycle-bin" class="btn btn-outline" title="View deleted transactions">
-            <i class="fas fa-trash-restore"></i> Recycle Bin
+        <a href="/transactions/recycle-bin" class="btn btn-outline btn-sm" title="View deleted transactions">
+            <i class="fas fa-trash-restore"></i> <span class="hide-mobile">Recycle Bin</span>
         </a>
-        <a href="/transactions/recurring" class="btn btn-outline">
-            <i class="fas fa-sync-alt"></i> Recurring
+        <a href="/transactions/recurring" class="btn btn-outline btn-sm">
+            <i class="fas fa-sync-alt"></i> <span class="hide-mobile">Recurring</span>
         </a>
         <button class="btn btn-primary" @onclick="ShowAddForm">
-            <i class="fas fa-plus"></i> Add Transaction
+            <i class="fas fa-plus"></i> Add
         </button>
     </div>
 </div>
@@ -70,9 +72,31 @@
             <option value="">All Types</option>
             <option value="@TransactionType.Income">Income</option>
             <option value="@TransactionType.Expense">Expense</option>
+            <option value="@TransactionType.Transfer">Transfer</option>
         </select>
     </div>
     
+    <div class="filter-group">
+        <span class="filter-label">Donor</span>
+        <select class="form-control" value="@filter.DonorId" @onchange="OnDonorChanged" style="width: 160px;">
+            <option value="">All Donors</option>
+            @foreach (var donor in donors)
+            {
+                <option value="@donor.Id">@donor.Name</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <span class="filter-label">Grant</span>
+        <select class="form-control" value="@filter.GrantId" @onchange="OnGrantChanged" style="width: 160px;">
+            <option value="">All Grants</option>
+            @foreach (var grant in grants)
+            {
+                <option value="@grant.Id">@grant.Name</option>
+            }
+        </select>
+    </div>
     
     <div class="filter-group">
         <span class="filter-label">Tags</span>
@@ -87,6 +111,13 @@
                style="width: 180px;" aria-label="Search transactions" />
     </div>
     
+    <div class="filter-group">
+        <label class="d-flex align-center gap-2" style="margin-bottom: 0; white-space: nowrap;">
+            <input type="checkbox" checked="@filter.UnreconciledOnly" @onchange="OnReconciledFilterChanged" />
+            Unreconciled Only
+        </label>
+    </div>
+    
     <div class="filter-group" style="align-self: flex-end;">
         <button class="btn btn-secondary" @onclick="ClearFilters" disabled="@(!HasActiveFilters)">
             <i class="fas fa-times"></i> Clear
@@ -97,6 +128,22 @@
         }
     </div>
 </div>
+
+<!-- Batch Action Bar -->
+@if (selectedTransactionIds.Count > 0)
+{
+    <div class="alert alert-info d-flex justify-between align-center mb-3 batch-action-bar">
+        <span><strong>@selectedTransactionIds.Count</strong> transaction(s) selected</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline btn-sm" @onclick="DeselectAll">
+                <i class="fas fa-times"></i> Deselect All
+            </button>
+            <button class="btn btn-outline btn-sm text-danger" @onclick="ShowBatchDeleteConfirm">
+                <i class="fas fa-trash"></i> Delete Selected
+            </button>
+        </div>
+    </div>
+}
 
 <!-- Actions Bar - count shown in pagination below -->
 
@@ -114,23 +161,42 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th style="width: 30px;">
+                            <input type="checkbox" checked="@isAllSelected" @onchange="ToggleSelectAll" 
+                                   title="Select all" aria-label="Select all transactions" />
+                        </th>
                         <th style="width: 30px;"></th>
-                        <th style="width: 100px;">Date</th>
-                        <th>Account</th>
-                        <th>Payee/Donor</th>
-                        <th>Category</th>
+                        <SortableHeader Column="Date" CurrentSort="@sortColumn" CurrentDirection="@sortDirection" OnSort="HandleSort">
+                            Date
+                        </SortableHeader>
+                        <SortableHeader Column="Account" CurrentSort="@sortColumn" CurrentDirection="@sortDirection" OnSort="HandleSort">
+                            Account
+                        </SortableHeader>
+                        <SortableHeader Column="Payee" CurrentSort="@sortColumn" CurrentDirection="@sortDirection" OnSort="HandleSort">
+                            Payee/Donor
+                        </SortableHeader>
+                        <SortableHeader Column="Category" CurrentSort="@sortColumn" CurrentDirection="@sortDirection" OnSort="HandleSort">
+                            Category
+                        </SortableHeader>
                         <th>Description</th>
-                        <th class="text-right" style="width: 120px;">Amount</th>
+                        <SortableHeader Column="Amount" CurrentSort="@sortColumn" CurrentDirection="@sortDirection" OnSort="HandleSort">
+                            <span class="text-right">Amount</span>
+                        </SortableHeader>
                         <th style="width: 80px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var tx in transactions)
+                    @foreach (var tx in SortedTransactions)
                     {
                         var hasSplits = tx.Splits?.Any() == true;
                         var isExpanded = expandedTransactions.Contains(tx.Id);
                         
                         <tr>
+                            <td>
+                                <input type="checkbox" checked="@selectedTransactionIds.Contains(tx.Id)" 
+                                       @onchange="() => ToggleSelectTransaction(tx.Id)" 
+                                       aria-label="Select transaction" />
+                            </td>
                             <td>
                                 @if (hasSplits)
                                 {
@@ -169,6 +235,12 @@
                                         <i class="fas fa-code-branch"></i> @tx.Splits!.Count splits
                                     </span>
                                 }
+                                @if (tx.IsReconciled)
+                                {
+                                    <span class="badge badge-success ml-1" title="Reconciled">
+                                        <i class="fas fa-check-double"></i>
+                                    </span>
+                                }
                             </td>
                             <td class="text-right amount @(tx.Type == TransactionType.Income ? "income" : "expense")">
                                 @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C")
@@ -189,7 +261,7 @@
                         @if (hasSplits && isExpanded)
                         {
                             <tr class="split-details-row" style="background: var(--bg-secondary);">
-                                <td colspan="8" style="padding: 0.5rem 1rem;">
+                                <td colspan="9" style="padding: 0.5rem 1rem;">
                                     <div style="margin-left: 30px;">
                                         <strong class="text-muted">Split Details:</strong>
                                         <table style="width: 100%; margin-top: 0.5rem;">
@@ -219,7 +291,7 @@
                     @if (!transactions.Any())
                     {
                         <tr>
-                            <td colspan="8" class="text-center text-muted" style="padding: 2rem;">
+                            <td colspan="9" class="text-center text-muted" style="padding: 2rem;">
                                 No transactions found
                             </td>
                         </tr>
@@ -242,6 +314,31 @@
         ShowItemCount="false"
         OnPageChange="OnPageChange"
         OnPageSizeChange="OnPageSizeChange" />
+}
+
+<!-- Transaction Summary Footer -->
+@if (transactions.Any())
+{
+    <div class="card mt-2">
+        <div class="card-body d-flex justify-between align-center flex-wrap gap-2" style="padding: 0.75rem 1rem;">
+            <span class="text-muted">Page total: <strong>@transactions.Count</strong> transactions</span>
+            <div class="d-flex gap-3">
+                <span class="amount income">
+                    <i class="fas fa-arrow-down"></i> Income: <strong>@transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount).ToString("C2")</strong>
+                </span>
+                <span class="amount expense">
+                    <i class="fas fa-arrow-up"></i> Expenses: <strong>@transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount).ToString("C2")</strong>
+                </span>
+                @{
+                    var pageNet = transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount) 
+                                - transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+                }
+                <span class="@(pageNet >= 0 ? "text-success" : "text-danger")">
+                    Net: <strong>@pageNet.ToString("C2")</strong>
+                </span>
+            </div>
+        </div>
+    </div>
 }
 
 <!-- Edit/Add Modal -->
@@ -273,10 +370,25 @@
     OnConfirmClicked="ConfirmDelete"
     OnCancelClicked="CancelDelete" />
 
+<!-- Batch Delete Confirmation -->
+<ConfirmDialog 
+    IsVisible="showBatchDeleteConfirm"
+    Title="Delete Selected Transactions"
+    Message="@($"Are you sure you want to delete {selectedTransactionIds.Count} selected transaction(s)?")"
+    Type="ConfirmDialog.ConfirmationType.Delete"
+    ConfirmText="Delete All Selected"
+    ShowWarning="true"
+    WarningMessage="This will move all selected transactions to the recycle bin. Fund balances will be recalculated."
+    IsProcessing="isBatchDeleting"
+    OnConfirmClicked="ConfirmBatchDelete"
+    OnCancelClicked="CancelBatchDelete" />
+
 @code {
 private List<TransactionDto> transactions = new();
 private List<CategoryDto> categories = new();
 private List<FundDto> funds = new();
+private List<DonorDto> donors = new();
+private List<GrantDto> grants = new();
 private TransactionFilterModel filter = new();
 private TransactionDto? selectedTransaction;
 private TransactionDto? transactionToDelete;
@@ -292,16 +404,121 @@ private int totalPages = 1;
 // Receipt pre-fill data
 private ReceiptPreFillData? receiptData;
 
+// Batch selection
+private HashSet<int> selectedTransactionIds = new();
+private bool showBatchDeleteConfirm = false;
+private bool isBatchDeleting = false;
+
+private bool isAllSelected => transactions.Any() && transactions.All(t => selectedTransactionIds.Contains(t.Id));
+
+private void ToggleSelectTransaction(int id)
+{
+    if (!selectedTransactionIds.Remove(id))
+        selectedTransactionIds.Add(id);
+}
+
+private void ToggleSelectAll()
+{
+    if (isAllSelected)
+        selectedTransactionIds.Clear();
+    else
+        selectedTransactionIds = transactions.Select(t => t.Id).ToHashSet();
+}
+
+private void DeselectAll()
+{
+    selectedTransactionIds.Clear();
+}
+
+private void ShowBatchDeleteConfirm()
+{
+    showBatchDeleteConfirm = true;
+}
+
+private async Task ConfirmBatchDelete()
+{
+    isBatchDeleting = true;
+    var count = selectedTransactionIds.Count;
+    try
+    {
+        foreach (var id in selectedTransactionIds.ToList())
+        {
+            await TransactionService.DeleteAsync(id);
+        }
+        selectedTransactionIds.Clear();
+        showBatchDeleteConfirm = false;
+        await LoadTransactions();
+        Toast.ShowSuccess($"{count} transaction(s) moved to recycle bin", "Batch Delete");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to delete some transactions: {ex.Message}");
+    }
+    finally
+    {
+        isBatchDeleting = false;
+    }
+}
+
+private void CancelBatchDelete()
+{
+    showBatchDeleteConfirm = false;
+}
+
+// Sort state
+private string sortColumn = "Date";
+private SortableHeader.SortDirection sortDirection = SortableHeader.SortDirection.Descending;
+
+private IEnumerable<TransactionDto> SortedTransactions
+{
+    get
+    {
+        var filtered = filter.UnreconciledOnly 
+            ? transactions.Where(t => !t.IsReconciled)
+            : transactions.AsEnumerable();
+        
+        var sorted = sortColumn switch
+        {
+            "Date" => sortDirection == SortableHeader.SortDirection.Ascending
+                ? filtered.OrderBy(t => t.Date)
+                : filtered.OrderByDescending(t => t.Date),
+            "Account" => sortDirection == SortableHeader.SortDirection.Ascending
+                ? filtered.OrderBy(t => t.FundName ?? "")
+                : filtered.OrderByDescending(t => t.FundName ?? ""),
+            "Payee" => sortDirection == SortableHeader.SortDirection.Ascending
+                ? filtered.OrderBy(t => t.DonorName ?? t.Payee ?? "")
+                : filtered.OrderByDescending(t => t.DonorName ?? t.Payee ?? ""),
+            "Category" => sortDirection == SortableHeader.SortDirection.Ascending
+                ? filtered.OrderBy(t => t.CategoryName)
+                : filtered.OrderByDescending(t => t.CategoryName),
+            "Amount" => sortDirection == SortableHeader.SortDirection.Ascending
+                ? filtered.OrderBy(t => t.Amount)
+                : filtered.OrderByDescending(t => t.Amount),
+            _ => filtered.OrderByDescending(t => t.Date)
+        };
+        return sorted;
+    }
+}
+
+private void HandleSort((string Column, SortableHeader.SortDirection Direction) sort)
+{
+    sortColumn = sort.Column;
+    sortDirection = sort.Direction;
+}
+
 // MED-09 fix: Debounce timer for search
 private System.Timers.Timer? _debounceTimer;
 private const int DebounceDelayMs = 300;
 
 private bool HasActiveFilters =>
-    filter.CategoryId.HasValue ||
-    filter.FundId.HasValue ||
-    filter.Type.HasValue ||
-    !string.IsNullOrWhiteSpace(filter.SearchTerm) ||
-    !string.IsNullOrWhiteSpace(filter.Tags);
+filter.CategoryId.HasValue ||
+filter.FundId.HasValue ||
+filter.DonorId.HasValue ||
+filter.GrantId.HasValue ||
+filter.Type.HasValue ||
+filter.UnreconciledOnly ||
+!string.IsNullOrWhiteSpace(filter.SearchTerm) ||
+!string.IsNullOrWhiteSpace(filter.Tags);
 
 protected override async Task OnInitializedAsync()
 {
@@ -310,6 +527,8 @@ protected override async Task OnInitializedAsync()
         
     categories = await CategoryService.GetAllAsync();
     funds = await FundService.GetAllAsync();
+    donors = await DonorService.GetAllAsync();
+    grants = await GrantService.GetAllAsync(null);
     
     // Check for search parameter from global search
     var uri = new Uri(Navigation.Uri);
@@ -347,8 +566,8 @@ private async Task LoadTransactions()
                 filter.EndDate,
                 filter.CategoryId,
                 filter.FundId,
-                null,
-                null,
+                filter.DonorId,
+                filter.GrantId,
                 filter.Type,
                 filter.SearchTerm,
                 filter.Tags,
@@ -394,6 +613,24 @@ private async Task LoadTransactions()
     {
         filter.FundId = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
         await ApplyFilters();
+    }
+
+    private async Task OnDonorChanged(ChangeEventArgs e)
+    {
+        filter.DonorId = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await ApplyFilters();
+    }
+
+    private async Task OnGrantChanged(ChangeEventArgs e)
+    {
+        filter.GrantId = string.IsNullOrEmpty(e.Value?.ToString()) ? null : int.Parse(e.Value.ToString()!);
+        await ApplyFilters();
+    }
+
+    private void OnReconciledFilterChanged(ChangeEventArgs e)
+    {
+        filter.UnreconciledOnly = (bool)(e.Value ?? false);
+        StateHasChanged();
     }
 
     private async Task OnTypeChanged(ChangeEventArgs e)
@@ -609,9 +846,12 @@ private async Task LoadTransactions()
         public DateTime? EndDate { get; set; }
         public int? CategoryId { get; set; }
         public int? FundId { get; set; }
+        public int? DonorId { get; set; }
+        public int? GrantId { get; set; }
         public TransactionType? Type { get; set; }
         public string? SearchTerm { get; set; }
         public string? Tags { get; set; }
+        public bool UnreconciledOnly { get; set; }
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 25;
     }

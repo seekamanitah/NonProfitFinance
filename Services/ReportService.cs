@@ -304,6 +304,51 @@ public class ReportService : IReportService
         return descendants;
     }
 
+    public async Task<List<TrendDataDto>> GetTrendDataAsync(ReportFilterRequest filter, string interval = "monthly")
+    {
+        // Exclude transfer transactions to prevent inflation of income/expense totals
+        var query = _context.Transactions
+            .Where(t => t.Date >= filter.StartDate && t.Date <= filter.EndDate && t.TransferPairId == null);
+
+        if (filter.CategoryId.HasValue)
+            query = query.Where(t => t.CategoryId == filter.CategoryId.Value);
+        if (filter.FundId.HasValue)
+            query = query.Where(t => t.FundId == filter.FundId.Value);
+        if (filter.DonorId.HasValue)
+            query = query.Where(t => t.DonorId == filter.DonorId.Value);
+        if (filter.GrantId.HasValue)
+            query = query.Where(t => t.GrantId == filter.GrantId.Value);
+
+        var transactions = await query.ToListAsync();
+
+        var periods = GeneratePeriods(filter.StartDate, filter.EndDate, interval);
+        var trends = new List<TrendDataDto>();
+
+        foreach (var period in periods)
+        {
+            var periodTransactions = transactions
+                .Where(t => t.Date >= period.Start && t.Date < period.End)
+                .ToList();
+
+            var income = periodTransactions
+                .Where(t => t.Type == TransactionType.Income)
+                .Sum(t => t.Amount);
+
+            var expenses = periodTransactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .Sum(t => t.Amount);
+
+            trends.Add(new TrendDataDto(
+                period.Start,
+                income,
+                expenses,
+                income - expenses
+            ));
+        }
+
+        return trends;
+    }
+
     public async Task<List<TrendDataDto>> GetTrendDataAsync(DateTime startDate, DateTime endDate, string interval = "monthly")
     {
         // Exclude transfer transactions to prevent inflation of income/expense totals

@@ -12,13 +12,14 @@
 <!-- Filter Bar -->
 <div class="d-flex justify-between align-center mb-3">
     <div class="d-flex gap-3 align-center">
-        <div class="form-group" style="margin-bottom: 0;">
-            <input type="text" class="form-control" placeholder="Search grants..." 
-                   @bind="searchTerm" @bind:event="oninput" style="width: 250px;" />
-        </div>
+        <SearchInput @bind-Value="searchTerm" 
+                     Placeholder="Search grants..." 
+                     OnSearch="OnSearchChanged"
+                     DebounceMs="300"
+                     Style="width: 250px;" />
         
         <div class="form-group" style="margin-bottom: 0;">
-            <select class="form-control" @bind="statusFilter">
+            <select class="form-control" value="@statusFilter" @onchange="OnStatusChanged">
                 <option value="">All Statuses</option>
                 @foreach (var status in Enum.GetValues<GrantStatus>())
                 {
@@ -239,7 +240,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var tx in grantTransactions.Take(10))
+                            @foreach (var tx in grantTransactions)
                             {
                                 <tr>
                                     <td>@tx.Date.ToString("MMM dd, yyyy")</td>
@@ -250,6 +251,10 @@ else
                             }
                         </tbody>
                     </table>
+                    @if (grantTransactions.Count > 20)
+                    {
+                        <p class="text-muted mt-1">Showing all @grantTransactions.Count transactions</p>
+                    }
                 }
                 else
                 {
@@ -433,6 +438,25 @@ else
         await LoadGrants();
         expiringGrants = await GrantService.GetExpiringGrantsAsync(30);
         upcomingReports = await GrantService.GetGrantsWithUpcomingReportsAsync(14);
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        searchTerm = value;
+        StateHasChanged();
+    }
+
+    private void OnStatusChanged(ChangeEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Value?.ToString()))
+        {
+            statusFilter = null;
+        }
+        else if (Enum.TryParse<GrantStatus>(e.Value.ToString(), out var status))
+        {
+            statusFilter = status;
+        }
+        StateHasChanged();
     }
 
     private void CloseForm()

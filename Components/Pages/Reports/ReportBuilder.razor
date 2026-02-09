@@ -40,77 +40,66 @@
                 StartDate="@startDate"
                 EndDate="@endDate"
                 ShowComparison="true"
+                ShowFiscalYear="true"
                 OnRangeChanged="OnDateRangeChanged"
                 OnComparisonChanged="OnComparisonChanged" />
         </div>
 
         <div class="form-row">
             <div class="form-group">
-                <label class="form-label">Filter By</label>
-                <select class="form-control" @bind="filterType">
-                    <option value="all">All Data</option>
-                    <option value="fund">By Account</option>
-                    <option value="category">By Category</option>
-                    <option value="donor">By Donor</option>
-                    <option value="grant">By Grant</option>
+                <label class="form-label">Account</label>
+                <select class="form-control" @bind="selectedFundId">
+                    <option value="">All Accounts</option>
+                    @foreach (var fund in funds)
+                    {
+                        <option value="@fund.Id">@fund.Name</option>
+                    }
                 </select>
             </div>
             
-            @if (filterType == "fund")
-            {
-                <div class="form-group">
-                    <label class="form-label">Account</label>
-                    <select class="form-control" @bind="selectedFundId">
-                        <option value="">All Accounts</option>
-                        @foreach (var fund in funds)
-                        {
-                            <option value="@fund.Id">@fund.Name</option>
-                        }
-                    </select>
-                </div>
-            }
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select class="form-control" @bind="selectedCategoryId">
+                    <option value="">All Categories</option>
+                    @foreach (var category in categories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </div>
             
-            @if (filterType == "category")
-            {
-                <div class="form-group">
-                    <label class="form-label">Category</label>
-                    <select class="form-control" @bind="selectedCategoryId">
-                        <option value="">All Categories</option>
-                        @foreach (var category in categories)
-                        {
-                            <option value="@category.Id">@category.Name</option>
-                        }
-                    </select>
-                </div>
-            }
+            <div class="form-group">
+                <label class="form-label">Donor</label>
+                <select class="form-control" @bind="selectedDonorId">
+                    <option value="">All Donors</option>
+                    @foreach (var donor in donors)
+                    {
+                        <option value="@donor.Id">@donor.Name</option>
+                    }
+                </select>
+            </div>
             
-            @if (filterType == "donor")
-            {
-                <div class="form-group">
-                    <label class="form-label">Donor</label>
-                    <select class="form-control" @bind="selectedDonorId">
-                        <option value="">All Donors</option>
-                        @foreach (var donor in donors)
-                        {
-                            <option value="@donor.Id">@donor.Name</option>
-                        }
-                    </select>
-                </div>
-            }
+            <div class="form-group">
+                <label class="form-label">Grant</label>
+                <select class="form-control" @bind="selectedGrantId">
+                    <option value="">All Grants</option>
+                    @foreach (var grant in grants)
+                    {
+                        <option value="@grant.Id">@grant.Name</option>
+                    }
+                </select>
+            </div>
             
-            @if (filterType == "grant")
-            {
-                <div class="form-group">
-                    <label class="form-label">Grant</label>
-                    <select class="form-control" @bind="selectedGrantId">
-                        <option value="">All Grants</option>
-                        @foreach (var grant in grants)
-                        {
-                            <option value="@grant.Id">@grant.Name</option>
-                        }
-                    </select>
-                </div>
-            }
+            <div class="form-group">
+                <label class="form-label">Interval</label>
+                <select class="form-control" @bind="trendInterval">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                </select>
+            </div>
             
             <div class="form-group" style="align-self: flex-end;">
                 <button class="btn btn-primary" @onclick="GenerateReport">
@@ -278,31 +267,34 @@ else if (summary != null)
             <div class="card-header">
                 <h3 class="card-title">Income Breakdown</h3>
             </div>
-            <div class="card-body" style="padding: 0;">
+            <div class="card-body" style="padding: 0; overflow-x: auto;">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th class="text-right">Amount</th>
-                            <th class="text-right">%</th>
+                            @if (IsColumnVisible("Category")) { <th>Category</th> }
+                            @if (IsColumnVisible("Amount")) { <th class="text-right">Amount</th> }
+                            @if (IsColumnVisible("Percentage")) { <th class="text-right">%</th> }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var cat in summary.IncomeByCategory)
                         {
                             <tr>
-                                <td>
-                                    <span class="tree-color" style="background: @(cat.Color ?? "#28a745");"></span>
-                                    @cat.CategoryName
-                                </td>
-                                <td class="text-right amount income">@cat.Amount.ToString("C2")</td>
-                                <td class="text-right">@cat.Percentage.ToString("N1")%</td>
+                                @if (IsColumnVisible("Category"))
+                                {
+                                    <td>
+                                        <span class="tree-color" style="background: @(cat.Color ?? "#28a745");"></span>
+                                        @cat.CategoryName
+                                    </td>
+                                }
+                                @if (IsColumnVisible("Amount")) { <td class="text-right amount income">@cat.Amount.ToString(columnSettings?.CurrencyFormat ?? "C2")</td> }
+                                @if (IsColumnVisible("Percentage")) { <td class="text-right">@cat.Percentage.ToString("N1")%</td> }
                             </tr>
                         }
                         <tr style="font-weight: 600; background: var(--bg-primary);">
-                            <td>Total</td>
-                            <td class="text-right amount income">@summary.TotalIncome.ToString("C2")</td>
-                            <td class="text-right">100%</td>
+                            @if (IsColumnVisible("Category")) { <td>Total</td> }
+                            @if (IsColumnVisible("Amount")) { <td class="text-right amount income">@summary.TotalIncome.ToString(columnSettings?.CurrencyFormat ?? "C2")</td> }
+                            @if (IsColumnVisible("Percentage")) { <td class="text-right">100%</td> }
                         </tr>
                     </tbody>
                 </table>
@@ -314,31 +306,34 @@ else if (summary != null)
             <div class="card-header">
                 <h3 class="card-title">Expense Breakdown</h3>
             </div>
-            <div class="card-body" style="padding: 0;">
+            <div class="card-body" style="padding: 0; overflow-x: auto;">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th class="text-right">Amount</th>
-                            <th class="text-right">%</th>
+                            @if (IsColumnVisible("Category")) { <th>Category</th> }
+                            @if (IsColumnVisible("Amount")) { <th class="text-right">Amount</th> }
+                            @if (IsColumnVisible("Percentage")) { <th class="text-right">%</th> }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var cat in summary.ExpensesByCategory)
                         {
                             <tr>
-                                <td>
-                                    <span class="tree-color" style="background: @(cat.Color ?? "#dc3545");"></span>
-                                    @cat.CategoryName
-                                </td>
-                                <td class="text-right amount expense">@cat.Amount.ToString("C2")</td>
-                                <td class="text-right">@cat.Percentage.ToString("N1")%</td>
+                                @if (IsColumnVisible("Category"))
+                                {
+                                    <td>
+                                        <span class="tree-color" style="background: @(cat.Color ?? "#dc3545");"></span>
+                                        @cat.CategoryName
+                                    </td>
+                                }
+                                @if (IsColumnVisible("Amount")) { <td class="text-right amount expense">@cat.Amount.ToString(columnSettings?.CurrencyFormat ?? "C2")</td> }
+                                @if (IsColumnVisible("Percentage")) { <td class="text-right">@cat.Percentage.ToString("N1")%</td> }
                             </tr>
                         }
                         <tr style="font-weight: 600; background: var(--bg-primary);">
-                            <td>Total</td>
-                            <td class="text-right amount expense">@summary.TotalExpenses.ToString("C2")</td>
-                            <td class="text-right">100%</td>
+                            @if (IsColumnVisible("Category")) { <td>Total</td> }
+                            @if (IsColumnVisible("Amount")) { <td class="text-right amount expense">@summary.TotalExpenses.ToString(columnSettings?.CurrencyFormat ?? "C2")</td> }
+                            @if (IsColumnVisible("Percentage")) { <td class="text-right">100%</td> }
                         </tr>
                     </tbody>
                 </table>
@@ -392,6 +387,7 @@ else if (summary != null)
 private DateTime startDate = new DateTime(DateTime.Today.Year, 1, 1);
 private DateTime endDate = DateTime.Today;
 private string filterType = "all";
+private string trendInterval = "monthly";
 private int? selectedFundId;
 private int? selectedCategoryId;
 private int? selectedDonorId;
@@ -422,6 +418,30 @@ private DateTime comparisonEndDate;
 private bool showCustomizationModal = false;
 private CustomizableReportType currentReportType = CustomizableReportType.IncomeExpenseSummary;
 private ReportColumnSettings? columnSettings;
+private List<ReportColumnConfig> visibleColumns = new();
+
+private bool IsColumnVisible(string columnId)
+{
+    if (!visibleColumns.Any()) return true; // show all if no customization
+    var col = visibleColumns.FirstOrDefault(c => c.ColumnId == columnId);
+    return col?.IsVisible ?? true;
+}
+
+private void ParseColumnSettings()
+{
+    if (columnSettings != null && !string.IsNullOrEmpty(columnSettings.ColumnsJson) && columnSettings.ColumnsJson != "[]")
+    {
+        try
+        {
+            visibleColumns = System.Text.Json.JsonSerializer.Deserialize<List<ReportColumnConfig>>(columnSettings.ColumnsJson) ?? new();
+        }
+        catch { visibleColumns = new(); }
+    }
+    else
+    {
+        visibleColumns = new();
+    }
+}
 
 protected override async Task OnInitializedAsync()
 {
@@ -433,6 +453,7 @@ protected override async Task OnInitializedAsync()
         grants = await GrantService.GetAllAsync(null);
         await LoadSavedPresets();
         columnSettings = await ReportCustomizationService.GetSettingsAsync(currentReportType);
+        ParseColumnSettings();
     }
     catch (Exception ex)
     {
@@ -470,10 +491,10 @@ private async Task LoadComparisonData()
     try
     {
         var filter = new ReportFilterRequest(comparisonStartDate, comparisonEndDate, 
-            filterType == "category" ? selectedCategoryId : null,
+            selectedCategoryId,
             selectedFundId,
-            filterType == "donor" ? selectedDonorId : null,
-            filterType == "grant" ? selectedGrantId : null);
+            selectedDonorId,
+            selectedGrantId);
         comparisonSummary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
     }
     catch (Exception ex)
@@ -630,17 +651,9 @@ private async Task GenerateReport()
 
     try
     {
-        // Build filter based on selected filter type
-        // Note: Always pass selectedFundId if set, regardless of filterType
-        // This ensures account filtering works even when filtering by category/donor/grant
-        int? categoryId = filterType == "category" ? selectedCategoryId : null;
-        int? fundId = selectedFundId; // Always include selected fund
-        int? donorId = filterType == "donor" ? selectedDonorId : null;
-        int? grantId = filterType == "grant" ? selectedGrantId : null;
-        
-        var filter = new ReportFilterRequest(startDate, endDate, categoryId, fundId, donorId, grantId);
+        var filter = new ReportFilterRequest(startDate, endDate, selectedCategoryId, selectedFundId, selectedDonorId, selectedGrantId);
         summary = await ReportService.GetIncomeExpenseSummaryAsync(filter);
-        trendData = await ReportService.GetTrendDataAsync(startDate, endDate, "monthly");
+        trendData = await ReportService.GetTrendDataAsync(filter, trendInterval);
         hasGeneratedReport = true;
     }
     catch (Exception ex)
@@ -735,7 +748,7 @@ private async Task RenderCharts()
             ReportType = "Financial",
             StartDate = startDate,
             EndDate = endDate,
-            FilterType = filterType,
+            FilterType = "multi",
             AccountId = selectedFundId,
             CategoryId = selectedCategoryId,
             DonorId = selectedDonorId,
@@ -788,6 +801,7 @@ private async Task RenderCharts()
     private async Task ApplyCustomization(ReportColumnSettings settings)
     {
         columnSettings = settings;
+        ParseColumnSettings();
         showCustomizationModal = false;
         StateHasChanged();
         

@@ -9,6 +9,7 @@ public class RecurringTransactionService : IRecurringTransactionService
 {
     private readonly ApplicationDbContext _context;
     private readonly ITransactionService _transactionService;
+    private const int MaxEndDateYears = 5;
 
     // In-memory store for recurring templates (would be database in full implementation)
     private static readonly List<RecurringTemplate> _templates = new();
@@ -46,6 +47,8 @@ public class RecurringTransactionService : IRecurringTransactionService
 
     public async Task<RecurringTransactionDto> CreateAsync(CreateRecurringTransactionRequest request)
     {
+        ValidateEndDate(request.EndDate);
+
         var template = new RecurringTemplate
         {
             Id = _nextId++,
@@ -93,6 +96,8 @@ public class RecurringTransactionService : IRecurringTransactionService
     {
         var template = _templates.FirstOrDefault(t => t.Id == id);
         if (template == null) return null;
+
+        ValidateEndDate(request.EndDate);
 
         template.Name = request.Name;
         template.Amount = request.Amount;
@@ -233,6 +238,15 @@ public class RecurringTransactionService : IRecurringTransactionService
             RecurrencePattern.Yearly => current.AddYears(interval),
             _ => current.AddMonths(interval)
         };
+    }
+
+    private static void ValidateEndDate(DateTime? endDate)
+    {
+        if (endDate.HasValue && endDate.Value > DateTime.Today.AddYears(MaxEndDateYears))
+        {
+            throw new InvalidOperationException(
+                $"End date cannot be more than {MaxEndDateYears} years in the future.");
+        }
     }
 
     // Internal template class
