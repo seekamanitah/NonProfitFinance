@@ -129,9 +129,26 @@
             transform: none;
         }
         
+        /* Override collapsed width on mobile — always show full sidebar */
+        .sidebar.collapsed {
+            width: 280px;
+        }
+        
         .sidebar.mobile-open {
             left: 0;
             box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Show nav labels even when collapsed on mobile */
+        .sidebar.collapsed.mobile-open .nav-item span,
+        .sidebar.collapsed.mobile-open .sidebar-title,
+        .sidebar.collapsed.mobile-open .nav-section,
+        .sidebar.collapsed.mobile-open .btn-sidebar-action span {
+            display: inline;
+        }
+        
+        .sidebar.collapsed.mobile-open .btn-sidebar-action {
+            justify-content: flex-start;
         }
         
         .sidebar-overlay {
@@ -204,76 +221,99 @@ private void CloseMobileMenu()
     mobileMenuOpen = false;
 }
 
-private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
-{
-    // Re-apply theme on navigation - use reapply to ensure it always applies
-    try
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        currentTheme = await JS.InvokeAsync<string>("themeManager.reapply");
-        await InvokeAsync(StateHasChanged);
-    }
-    catch
-    {
-        // Theme manager not available
-    }
-}
-
-protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
+        // Re-apply theme on navigation to ensure it persists
+        try
         {
-            try
+            var savedTheme = await JS.InvokeAsync<string?>("localStorage.getItem", "theme");
+            if (!string.IsNullOrEmpty(savedTheme) && savedTheme != currentTheme)
             {
-                // Initialize theme manager and get current theme
-                await JS.InvokeVoidAsync("themeManager.init");
-                currentTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
-                
-                // Restore sidebar collapsed state from localStorage
-                var savedCollapsed = await JS.InvokeAsync<string?>("localStorage.getItem", "sidebarCollapsed");
-                if (savedCollapsed == "true")
+                currentTheme = savedTheme;
+                if (currentTheme == "dark")
                 {
-                    sidebarCollapsed = true;
+                    await JS.InvokeVoidAsync("document.documentElement.setAttribute", "data-theme", "dark");
                 }
-                StateHasChanged();
-                
-                // Initialize keyboard shortcuts
-                await KeyboardShortcuts.InitializeAsync();
-                
-                // Initialize spell check
-                await SpellCheck.InitializeAsync();
-                
-                // Register global shortcuts
-                KeyboardShortcuts.RegisterShortcut("ctrl+n", async () =>
+                else
                 {
-                    await JS.InvokeVoidAsync("eval", "document.querySelector('.btn-quick-add')?.click()");
-                });
-                
-                KeyboardShortcuts.RegisterShortcut("ctrl+f", async () =>
-                {
-                    await JS.InvokeVoidAsync("eval", "document.querySelector('.search-input')?.focus()");
-                });
-                
-                KeyboardShortcuts.RegisterShortcut("shift+?", async () =>
-                {
-                    showKeyboardHelp = true;
-                    await InvokeAsync(StateHasChanged);
-                });
-                
-                KeyboardShortcuts.RegisterShortcut("escape", async () =>
-                {
-                    if (showKeyboardHelp)
-                    {
-                        showKeyboardHelp = false;
-                        await InvokeAsync(StateHasChanged);
-                    }
-                });
-            }
-            catch
-            {
-                // Initialization failed - not critical
+                    await JS.InvokeVoidAsync("document.documentElement.removeAttribute", "data-theme");
+                }
+                await InvokeAsync(StateHasChanged);
             }
         }
+        catch
+        {
+            // Theme manager not available
+        }
     }
+
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
+    {
+        try
+        {
+            // Read saved theme directly from localStorage (no custom JS dependency)
+            var savedTheme = await JS.InvokeAsync<string?>("localStorage.getItem", "theme");
+            if (!string.IsNullOrEmpty(savedTheme))
+            {
+                currentTheme = savedTheme;
+                if (currentTheme == "dark")
+                {
+                    await JS.InvokeVoidAsync("document.documentElement.setAttribute", "data-theme", "dark");
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("document.documentElement.removeAttribute", "data-theme");
+                }
+            }
+                
+            // Restore sidebar collapsed state from localStorage
+            var savedCollapsed = await JS.InvokeAsync<string?>("localStorage.getItem", "sidebarCollapsed");
+            if (savedCollapsed == "true")
+            {
+                sidebarCollapsed = true;
+            }
+            StateHasChanged();
+                
+            // Initialize keyboard shortcuts
+            await KeyboardShortcuts.InitializeAsync();
+                
+            // Initialize spell check
+            await SpellCheck.InitializeAsync();
+                
+            // Register global shortcuts
+            KeyboardShortcuts.RegisterShortcut("ctrl+n", async () =>
+            {
+                await JS.InvokeVoidAsync("eval", "document.querySelector('.btn-quick-add')?.click()");
+            });
+                
+            KeyboardShortcuts.RegisterShortcut("ctrl+f", async () =>
+            {
+                await JS.InvokeVoidAsync("eval", "document.querySelector('.search-input')?.focus()");
+            });
+                
+            KeyboardShortcuts.RegisterShortcut("shift+?", async () =>
+            {
+                showKeyboardHelp = true;
+                await InvokeAsync(StateHasChanged);
+            });
+                
+            KeyboardShortcuts.RegisterShortcut("escape", async () =>
+            {
+                if (showKeyboardHelp)
+                {
+                    showKeyboardHelp = false;
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+        }
+        catch
+        {
+            // Initialization failed - not critical
+        }
+    }
+}
 
     private void ShowKeyboardHelp()
     {
@@ -289,24 +329,23 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         try
         {
-            // Optimistically update UI first for immediate feedback
             currentTheme = currentTheme == "dark" ? "light" : "dark";
-            StateHasChanged();
-            
-            // Then sync with JS
-            var actualTheme = await JS.InvokeAsync<string>("themeManager.toggle");
-            
-            // Ensure we're in sync with actual theme
-            if (actualTheme != currentTheme)
+
+            // Apply directly via DOM — does not depend on any custom JS object
+            if (currentTheme == "dark")
             {
-                currentTheme = actualTheme;
-                StateHasChanged();
+                await JS.InvokeVoidAsync("document.documentElement.setAttribute", "data-theme", "dark");
             }
+            else
+            {
+                await JS.InvokeVoidAsync("document.documentElement.removeAttribute", "data-theme");
+            }
+
+            await JS.InvokeVoidAsync("localStorage.setItem", "theme", currentTheme);
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Theme toggle error: {ex.Message}");
-            // Already toggled optimistically, so leave as is
+            // JS interop unavailable — icon still updates via Blazor render
         }
     }
 
