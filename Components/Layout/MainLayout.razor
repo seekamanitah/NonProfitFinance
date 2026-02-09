@@ -79,6 +79,11 @@
         padding: 0.5rem;
         cursor: pointer;
         margin-left: auto;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .btn-collapse-sidebar {
@@ -98,12 +103,14 @@
     
     .btn-hamburger {
         margin-right: 0.5rem;
+        flex-shrink: 0;
     }
     
     .header-actions {
         display: flex;
         gap: 0.25rem;
         align-items: center;
+        flex-shrink: 0;
     }
     
     @@media (max-width: 768px) {
@@ -115,9 +122,11 @@
             left: -280px;
             top: 0;
             bottom: 0;
+            width: 280px;
             z-index: 1001;
             transition: left 0.3s ease;
             box-shadow: none;
+            transform: none;
         }
         
         .sidebar.mobile-open {
@@ -144,6 +153,7 @@
         
         .main-header {
             padding: 0.75rem 1rem;
+            justify-content: space-between;
         }
         
         .page-content {

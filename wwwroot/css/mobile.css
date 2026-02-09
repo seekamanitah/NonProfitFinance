@@ -2,25 +2,6 @@
    Mobile Responsiveness Fixes - MED-06
    ============================================ */
 
-/* Mobile hamburger menu toggle button */
-.mobile-menu-toggle {
-    display: none;
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 1100;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    width: 44px;
-    height: 44px;
-    cursor: pointer;
-    font-size: 1.25rem;
-    align-items: center;
-    justify-content: center;
-}
-
 /* Tablet and smaller screens */
 @media (max-width: 1024px) {
     :root {
@@ -43,39 +24,6 @@
 
 /* Mobile screens */
 @media (max-width: 768px) {
-    /* Show hamburger menu button */
-    .mobile-menu-toggle {
-        display: flex;
-    }
-    
-    /* Hide sidebar by default on mobile */
-    .sidebar {
-        transform: translateX(-100%);
-        width: 280px;
-        transition: transform 0.3s ease;
-    }
-    
-    /* Show sidebar when open */
-    .sidebar.mobile-open {
-        transform: translateX(0);
-    }
-    
-    /* Overlay when sidebar is open */
-    .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-    }
-    
-    .sidebar-overlay.visible {
-        display: block;
-    }
-    
     /* Main content takes full width */
     .main-content {
         margin-left: 0 !important;
@@ -84,7 +32,6 @@
     /* Adjust page content padding */
     .page-content {
         padding: 1rem;
-        padding-top: 4rem; /* Room for hamburger button */
     }
     
     /* Stack filter bar vertically */
@@ -183,7 +130,6 @@
     
     .page-content {
         padding: 0.75rem;
-        padding-top: 4rem;
     }
     
     .card-body {
@@ -199,12 +145,6 @@
         font-size: 1.25rem;
     }
     
-    /* Full width buttons on small screens */
-    .btn-primary,
-    .btn-secondary {
-        width: 100%;
-        justify-content: center;
-    }
 }
 
 /* ============================================
@@ -554,7 +494,6 @@
     /* Hide non-printable elements */
     .sidebar,
     .main-header,
-    .mobile-menu-toggle,
     .filter-bar,
     .page-header-right,
     .nav-menu,

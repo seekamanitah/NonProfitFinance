@@ -32,12 +32,12 @@
     <link rel="stylesheet" href="css/accessibility.css" />
     <link rel="stylesheet" href="css/mobile.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
     <a href="#main-content" class="skip-to-content">Skip to main content</a>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="_framework/blazor.web.js"></script>
     <script src="js/theme.js"></script>
