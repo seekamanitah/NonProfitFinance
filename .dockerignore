@@ -23,9 +23,11 @@ npm-debug.log
 *.md
 LICENSE
 
-# Build outputs (will be created fresh)
+# Build outputs (will be created fresh in the container)
 # NOTE: Do NOT exclude Components, Models, Services, or DTOs
 # NOTE: Do NOT exclude .razor files or .cs files
+bin/
+obj/
 
 # Docker files (don't copy into image)
 Dockerfile*

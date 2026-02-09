@@ -128,8 +128,8 @@
                 @if (showExportMenu)
                 {
                     <div class="dropdown-menu show" style="position: absolute; z-index: 1000;" role="menu">
-                        <button class="dropdown-item" @onclick="ExportToPdf" role="menuitem">
-                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Export to PDF
+                        <button class="dropdown-item" @onclick="ShowPdfExportModal" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Comprehensive PDF (Configurable)
                         </button>
                         <button class="dropdown-item" @onclick="ExportToExcel" role="menuitem">
                             <i class="fas fa-file-excel text-success" aria-hidden="true"></i> Export to Excel
@@ -143,6 +143,12 @@
                         </button>
                         <button class="dropdown-item" @onclick="ExportGrantsPdf" role="menuitem">
                             <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Grant Report (PDF)
+                        </button>
+                        <button class="dropdown-item" @onclick="ExportFundsPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Fund Summary (PDF)
+                        </button>
+                        <button class="dropdown-item" @onclick="ExportBudgetPdf" role="menuitem">
+                            <i class="fas fa-file-pdf text-danger" aria-hidden="true"></i> Budget vs Actual (PDF)
                         </button>
                     </div>
                 }
@@ -343,6 +349,76 @@ else if (summary != null)
     
 }
 
+@if (showPdfExportModal)
+{
+    <div class="modal-backdrop" @onclick="ClosePdfExportModal">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-file-pdf"></i> PDF Export Options</h3>
+                <button class="modal-close" @onclick="ClosePdfExportModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Report Title</label>
+                    <input type="text" class="form-control" @bind="pdfCustomTitle" placeholder="Financial Report" />
+                </div>
+
+                <h4 style="margin-top: 1rem;">Sections to Include</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeSummary" /> Financial Summary
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeIncome" /> Income Breakdown
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeExpenses" /> Expense Breakdown
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeTrend" /> Monthly Trend
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeTransactions" /> Transaction Detail
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeDonors" /> Donor Summary
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeGrants" /> Grant Status
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeFunds" /> Fund / Accounts
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfIncludeBudget" /> Budget vs Actual
+                    </label>
+                    <label class="d-flex align-center gap-2">
+                        <input type="checkbox" @bind="pdfLandscape" /> Landscape Orientation
+                    </label>
+                </div>
+
+                <div class="alert alert-info mt-3" style="font-size: 0.85rem;">
+                    <i class="fas fa-filter"></i>
+                    <strong>Active Filters:</strong>
+                    @(selectedFundId.HasValue ? $"Account: {funds.FirstOrDefault(f => f.Id == selectedFundId)?.Name}" : "All Accounts")
+                    @(selectedCategoryId.HasValue ? $" | Category: {categories.FirstOrDefault(c => c.Id == selectedCategoryId)?.Name}" : "")
+                    @(selectedDonorId.HasValue ? $" | Donor: {donors.FirstOrDefault(d => d.Id == selectedDonorId)?.Name}" : "")
+                    @(selectedGrantId.HasValue ? $" | Grant: {grants.FirstOrDefault(g => g.Id == selectedGrantId)?.Name}" : "")
+                    <br /><small>Period: @startDate.ToString("MMM d, yyyy") – @endDate.ToString("MMM d, yyyy")</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="ClosePdfExportModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="ExportConfiguredPdf" disabled="@(!HasAnyPdfSection)">
+                    <i class="fas fa-download"></i> Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @if (showSavePresetDialog)
 {
     <div class="modal-backdrop" @onclick="CloseSavePresetDialog">
@@ -419,6 +495,24 @@ private bool showCustomizationModal = false;
 private CustomizableReportType currentReportType = CustomizableReportType.IncomeExpenseSummary;
 private ReportColumnSettings? columnSettings;
 private List<ReportColumnConfig> visibleColumns = new();
+
+// PDF export modal state
+private bool showPdfExportModal = false;
+private string pdfCustomTitle = "";
+private bool pdfIncludeSummary = true;
+private bool pdfIncludeIncome = true;
+private bool pdfIncludeExpenses = true;
+private bool pdfIncludeTrend = true;
+private bool pdfIncludeTransactions = false;
+private bool pdfIncludeDonors = false;
+private bool pdfIncludeGrants = false;
+private bool pdfIncludeFunds = false;
+private bool pdfIncludeBudget = false;
+private bool pdfLandscape = false;
+
+private bool HasAnyPdfSection => pdfIncludeSummary || pdfIncludeIncome || pdfIncludeExpenses
+    || pdfIncludeTrend || pdfIncludeTransactions || pdfIncludeDonors || pdfIncludeGrants
+    || pdfIncludeFunds || pdfIncludeBudget;
 
 private bool IsColumnVisible(string columnId)
 {
@@ -528,17 +622,53 @@ private void ToggleExportMenu()
     showExportMenu = !showExportMenu;
 }
 
-private async Task ExportToPdf()
+private void ShowPdfExportModal()
 {
     showExportMenu = false;
+    pdfCustomTitle = "";
+    pdfIncludeSummary = true;
+    pdfIncludeIncome = true;
+    pdfIncludeExpenses = true;
+    pdfIncludeTrend = true;
+    pdfIncludeTransactions = false;
+    pdfIncludeDonors = false;
+    pdfIncludeGrants = false;
+    pdfIncludeFunds = false;
+    pdfIncludeBudget = false;
+    pdfLandscape = false;
+    showPdfExportModal = true;
+}
+
+private void ClosePdfExportModal()
+{
+    showPdfExportModal = false;
+}
+
+private async Task ExportConfiguredPdf()
+{
+    showPdfExportModal = false;
     isExporting = true;
     StateHasChanged();
 
     try
     {
         var theme = Enum.Parse<ReportTheme>(selectedTheme);
-        var request = new ReportRequest(startDate, endDate, ReportType.IncomeStatement, theme, true, true, null, selectedFundId);
-        var pdfBytes = await PdfExportService.GenerateFinancialReportAsync(request);
+        var request = new ReportRequest(startDate, endDate, ReportType.IncomeStatement, theme, true, true,
+            selectedCategoryId, selectedFundId, selectedDonorId, selectedGrantId);
+        var options = new PdfReportOptions(
+            IncludeSummary: pdfIncludeSummary,
+            IncludeIncomeBreakdown: pdfIncludeIncome,
+            IncludeExpenseBreakdown: pdfIncludeExpenses,
+            IncludeTrend: pdfIncludeTrend,
+            IncludeTransactions: pdfIncludeTransactions,
+            IncludeDonors: pdfIncludeDonors,
+            IncludeGrants: pdfIncludeGrants,
+            IncludeBudget: pdfIncludeBudget,
+            IncludeFunds: pdfIncludeFunds,
+            LandscapeOrientation: pdfLandscape,
+            CustomTitle: string.IsNullOrWhiteSpace(pdfCustomTitle) ? null : pdfCustomTitle.Trim()
+        );
+        var pdfBytes = await PdfExportService.GenerateFinancialReportAsync(request, options);
         await DownloadFile(pdfBytes, $"financial_report_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
     catch (Exception ex)
@@ -581,8 +711,10 @@ private async Task ExportTransactionsPdf()
 
     try
     {
-        var filter = new TransactionFilterRequest(startDate, endDate);
-        var pdfBytes = await PdfExportService.GenerateTransactionReportAsync(filter);
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var filter = new TransactionFilterRequest(startDate, endDate, selectedCategoryId, selectedFundId,
+            selectedDonorId, selectedGrantId);
+        var pdfBytes = await PdfExportService.GenerateTransactionReportAsync(filter, theme);
         await DownloadFile(pdfBytes, $"transactions_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
     catch (Exception ex)
@@ -603,7 +735,8 @@ private async Task ExportDonorsPdf()
 
     try
     {
-        var pdfBytes = await PdfExportService.GenerateDonorReportAsync();
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var pdfBytes = await PdfExportService.GenerateDonorReportAsync(theme);
         await DownloadFile(pdfBytes, $"donors_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
     catch (Exception ex)
@@ -624,12 +757,57 @@ private async Task ExportGrantsPdf()
 
     try
     {
-        var pdfBytes = await PdfExportService.GenerateGrantReportAsync();
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var pdfBytes = await PdfExportService.GenerateGrantReportAsync(theme);
         await DownloadFile(pdfBytes, $"grants_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
     }
     catch (Exception ex)
     {
         Toast.ShowError($"Failed to export grant report: {ex.Message}");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportFundsPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var pdfBytes = await PdfExportService.GenerateFundSummaryReportAsync(theme);
+        await DownloadFile(pdfBytes, $"funds_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export fund report: {ex.Message}");
+    }
+    finally
+    {
+        isExporting = false;
+    }
+}
+
+private async Task ExportBudgetPdf()
+{
+    showExportMenu = false;
+    isExporting = true;
+    StateHasChanged();
+
+    try
+    {
+        var theme = Enum.Parse<ReportTheme>(selectedTheme);
+        var pdfBytes = await PdfExportService.GenerateBudgetReportAsync(startDate, endDate, theme);
+        await DownloadFile(pdfBytes, $"budget_{DateTime.Now:yyyyMMdd}.pdf", "application/pdf");
+    }
+    catch (Exception ex)
+    {
+        Toast.ShowError($"Failed to export budget report: {ex.Message}");
     }
     finally
     {

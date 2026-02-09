@@ -28,14 +28,14 @@ RUN dotnet publish "NonProfitFinance.csproj" \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Install dependencies for OCR and health checks
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies for OCR and health checks
+# Note: only runtime packages needed — do NOT install -dev packages (headers/static libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    libtesseract-dev \
-    libleptonica-dev \
     curl \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Copy published application
 COPY --from=publish /app/publish .
