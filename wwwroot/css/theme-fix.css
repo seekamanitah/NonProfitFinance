@@ -182,23 +182,32 @@ label {
     border-color: var(--border-color) !important;
 }
 
-/* SIDEBAR - Ensure it stays dark in both modes */
+/* SIDEBAR - Theme-aware using sidebar CSS variables */
 .sidebar {
-    background: linear-gradient(180deg, #212529 0%, #1a1a1a 100%) !important;
-    color: #ffffff !important;
+    background: linear-gradient(180deg, var(--sidebar-bg-start) 0%, var(--sidebar-bg-end) 100%) !important;
+    color: var(--sidebar-text) !important;
+    border-right-color: var(--sidebar-border) !important;
 }
 
 .sidebar-header {
-    border-bottom-color: #495057 !important;
+    border-bottom-color: var(--sidebar-border) !important;
+}
+
+.sidebar-title {
+    color: var(--sidebar-text-hover) !important;
+}
+
+.nav-section {
+    color: var(--sidebar-text-muted) !important;
 }
 
 .nav-item {
-    color: #adb5bd !important;
+    color: var(--sidebar-text) !important;
 }
 
 .nav-item:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #ffffff !important;
+    background-color: var(--sidebar-hover-bg) !important;
+    color: var(--sidebar-text-hover) !important;
 }
 
 .nav-item.active {
