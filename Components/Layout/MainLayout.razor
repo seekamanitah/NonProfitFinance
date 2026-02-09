@@ -75,7 +75,7 @@
     .btn-close-mobile {
         background: none;
         border: none;
-        color: var(--text-secondary);
+        color: var(--sidebar-text-muted);
         padding: 0.5rem;
         cursor: pointer;
         margin-left: auto;
@@ -86,19 +86,24 @@
         justify-content: center;
     }
     
+    .btn-close-mobile:hover {
+        color: var(--sidebar-text-hover);
+    }
+    
     .btn-collapse-sidebar {
         background: none;
         border: none;
-        color: var(--text-secondary);
+        color: var(--sidebar-text-muted);
         padding: 0.25rem 0.5rem;
         cursor: pointer;
         margin-left: auto;
         border-radius: 4px;
-        transition: background 0.2s;
+        transition: background 0.2s, color 0.2s;
     }
     
     .btn-collapse-sidebar:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--sidebar-hover-bg);
+        color: var(--sidebar-text-hover);
     }
     
     .btn-hamburger {

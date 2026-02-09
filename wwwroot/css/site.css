@@ -78,6 +78,16 @@
     --border-color: #dee2e6;
     --border-light: #e9ecef;
     --bg-tooltip: #333333;
+    
+    /* Sidebar (Light Mode) */
+    --sidebar-bg-start: #f1f5f9;
+    --sidebar-bg-end: #ffffff;
+    --sidebar-text: #475569;
+    --sidebar-text-hover: #0f172a;
+    --sidebar-text-muted: #94a3b8;
+    --sidebar-border: #e2e8f0;
+    --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
+    --sidebar-logo-text: #ffffff;
 }
 
 /* ============================================
@@ -122,6 +132,16 @@
     
     /* Tooltips */
     --bg-tooltip: #2a2a2a;
+    
+    /* Sidebar (Dark Mode) */
+    --sidebar-bg-start: #1e293b;
+    --sidebar-bg-end: #0f172a;
+    --sidebar-text: #cbd5e1;
+    --sidebar-text-hover: #f1f5f9;
+    --sidebar-text-muted: #94a3b8;
+    --sidebar-border: #334155;
+    --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+    --sidebar-logo-text: #ffffff;
 }
 
 /* Light Mode (explicit override when data-theme="light" is set) */
@@ -191,15 +211,16 @@ a:hover {
 /* Sidebar */
 .sidebar {
     width: var(--sidebar-width);
-    background: linear-gradient(180deg, var(--color-gray-900) 0%, var(--color-black) 100%);
-    color: var(--color-white);
+    background: linear-gradient(180deg, var(--sidebar-bg-start) 0%, var(--sidebar-bg-end) 100%);
+    color: var(--sidebar-text);
     position: fixed;
     height: 100vh;
     overflow-y: auto;
-    transition: width var(--transition-normal);
+    transition: width var(--transition-normal), background 0.3s ease;
     z-index: 1000;
     display: flex;
     flex-direction: column;
+    border-right: 1px solid var(--sidebar-border);
 }
 
 .sidebar.collapsed {
@@ -208,7 +229,7 @@ a:hover {
 
 .sidebar-header {
     padding: 1.25rem;
-    border-bottom: 1px solid var(--color-gray-700);
+    border-bottom: 1px solid var(--sidebar-border);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -229,6 +250,7 @@ a:hover {
     font-size: 1.1rem;
     font-weight: 600;
     white-space: nowrap;
+    color: var(--sidebar-text-hover);
 }
 
 .sidebar.collapsed .sidebar-title {
@@ -246,7 +268,7 @@ a:hover {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--color-gray-500);
+    color: var(--sidebar-text-muted);
 }
 
 .sidebar.collapsed .nav-section {
@@ -257,21 +279,22 @@ a:hover {
     display: flex;
     align-items: center;
     padding: 0.75rem 1.25rem;
-    color: var(--color-gray-400);
+    color: var(--sidebar-text);
     transition: all var(--transition-fast);
     cursor: pointer;
     gap: 0.75rem;
+    text-decoration: none;
 }
 
 .nav-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-white);
+    background: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-hover);
 }
 
 .nav-item.active {
     background: var(--color-primary);
-    color: var(--color-white);
-    border-left: 3px solid var(--color-white);
+    color: #ffffff;
+    border-left: 3px solid #ffffff;
 }
 
 .nav-item i {
